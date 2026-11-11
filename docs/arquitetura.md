@@ -32,7 +32,7 @@ desktop/main.js (Electron)  ── sobe como processo filho ──►  server.js
 | `editor-arquivos.js`, `editor.js`, `editor-md.js`, `formatador.js` | Editor (Monaco), preservando a codificação dos arquivos |
 | `terminal.js` | Terminal por WebSocket (node-pty) |
 | `midia.js` + `midia.ps1` | Player do rodapé (mídia do Windows) — [player-de-midia.md](player-de-midia.md) |
-| `video-navegador.js`, `ytm-desktop.js`, `clipe.js`, `extensao/` | Vídeo no canto — [video-no-canto.md](video-no-canto.md) |
+| `video-navegador.js`, `video-nativo.js` + `video-navegador.ps1`, `players-externos.js`, `ytm-desktop.js`, `extensao/` + `instala-extensao.ps1`, `clipe.js` | Vídeo no canto (extensão opcional, leitura nativa e Integrações) — [video-no-canto.md](video-no-canto.md) |
 | `novidades.js` | O que entrou em cada versão — [versoes-e-publicacao.md](versoes-e-publicacao.md) |
 | `automacao.js`, `alem.js`, `integracoes.js`, `plugins.js`, `vscode-ponte.js` | Agendadas e fila, busca e resumo, GitHub/Trello/hooks, plugins, ponte com o VS Code |
 | `segredos.js` | Lê os segredos que o app passa por variável de ambiente e os apaga do `process.env` |
@@ -43,7 +43,7 @@ desktop/main.js (Electron)  ── sobe como processo filho ──►  server.js
 
 | Onde | O quê |
 |---|---|
-| `%APPDATA%\Red Code` | Exe: dados do app, `servidor.log`, `app.log`, `atalhos.json`, `ytm-desktop.json`, `bin\yt-dlp.exe`, `extensao-navegador\` |
+| `%APPDATA%\Red Code` | Exe: dados do app, `servidor.log`, `app.log`, `atalhos.json`, `ytm-desktop.json`, `players-externos.json`, `bin\yt-dlp.exe` |
 | Pasta do clone | Rodando pelo código: `dados.json`, `servidor.log` e afins ficam na própria pasta (ignorados no git) |
 | `localStorage` da página | Preferências da tela (`painelPref_*`: tema, vídeo, atalhos, novidades vistas...) |
 | `~/.claude` (ou `CLAUDE_CONFIG_DIR` do perfil) | Transcripts, `settings.json` (ex.: `autoCompactWindow`) — do Claude Code, não do app |
@@ -59,4 +59,5 @@ para ter o mesmo tema e as mesmas preferências. Com isso, os dois dividem tamb�
   A `/api/versao` diz a versão (`versaoApp`); servidor mais velho que o app (ou sem número) recebe o
   pedido de sair quando estiver livre (`assumeServidor`), e o app assume em seguida
   (`confereVersaoAnexado` em `desktop/main.js`).
-- Extensão do navegador e YouTube Music Desktop falam com 4317 e 4319 (a 4319 é a do app de teste).
+- O vídeo no canto não depende de porta: cada servidor (4317, ou 4319 do app de teste) lê o navegador e
+  o YouTube Music Desktop por conta própria.

@@ -17,10 +17,12 @@ function mudou(novo) {
 
 function liga() {
     if (proc || process.platform !== 'win32' || Date.now() < esperaReligar) return;
-    proc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'midia.ps1')], { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] });
+    const meu = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'midia.ps1')], { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] });
+    proc = meu;
     let resto = '';
-    proc.stdout.setEncoding('utf8');
-    proc.stdout.on('data', (pedaco) => {
+    meu.stdout.setEncoding('utf8');
+    meu.stdout.on('data', (pedaco) => {
+        if (proc !== meu) return;
         const linhas = (resto + pedaco).split(/\r?\n/);
         resto = linhas.pop();
         for (const linha of linhas) {
@@ -38,14 +40,14 @@ function liga() {
         }
     });
     const morreu = () => {
-        if (!proc) return;
+        if (proc !== meu) return;
         proc = null;
         // Caiu sozinho: tenta de novo mais tarde (cada falha seguida espera mais, até 5 min)
         if (Date.now() - ultimoUso < 60000) { falhas++; esperaReligar = Date.now() + Math.min(300000, 5000 * 2 ** (falhas - 1)); }
     };
-    proc.on('exit', morreu);
-    proc.on('error', morreu);
-    proc.stdin.on('error', () => { /* processo já fechou */ });
+    meu.on('exit', morreu);
+    meu.on('error', morreu);
+    meu.stdin.on('error', () => { /* processo já fechou */ });
 }
 function desliga() {
     if (!proc) return;

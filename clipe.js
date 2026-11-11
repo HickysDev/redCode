@@ -1,6 +1,5 @@
-// Vídeo da mídia que está tocando: a extensão do navegador (pasta extensao/) diz qual vídeo do YouTube toca e em
-// que segundo; aqui toca uma cópia muda dele, sincronizada. Não lê a tela: funciona com a aba de trás, o navegador
-// coberto ou minimizado. A = player do YouTube (incorporado); B = endereço direto só do vídeo, pelo yt-dlp, para o
+// Vídeo da mídia que está tocando: o servidor diz qual vídeo do YouTube toca e em que segundo (aba selecionada do
+// navegador ou player externo ligado em Integrações); aqui toca uma cópia muda dele, sincronizada. A = player do YouTube (incorporado); B = endereço direto só do vídeo, pelo yt-dlp, para o
 // vídeo que não deixa incorporar. Usado no quadrinho do canto (index.html) e na janela desanexada (clipe.html).
 (function () {
     const ORIGEM_YT = 'https://www.youtube.com';
@@ -10,7 +9,6 @@
         opcoes = opcoes || {};
         const tela = caixa.querySelector('.clipe-tela');
         const aviso = caixa.querySelector('.clipe-aviso');
-        let navegadores = [];
         let tempoYtEm = 0, taxaYt = 1, saltoEm = 0, latencia = { A: 0, B: 0 }, medeSalto = null, inicioB = 0, segurando = false;
         // No app: acesso ao <video> de dentro do player do YouTube (tempo exato, velocidade fina); fora dele, a API
         const ytDireto = window.painelDesktop && window.painelDesktop.clipe && window.painelDesktop.clipe.yt;
@@ -19,12 +17,9 @@
         let preparando = null, semDireto = '';
         // O que falta no YouTube Music Desktop para o vídeo chegar (ligar a autorização, aprovar no app)
         let avisoYtm = '', avisoYtmMostrado = '';
-        let fonte = null, atualId = '', modo = '', iframe = null, video = null, pronto = false, tempoYt = 0, estadoYt = -1, ultimoAjuste = 0, chamaPlayer = null, pedido = 0, ultimo = null, estado = '', pastaExtensao = '';
+        let fonte = null, atualId = '', modo = '', iframe = null, video = null, pronto = false, tempoYt = 0, estadoYt = -1, ultimoAjuste = 0, chamaPlayer = null, pedido = 0, ultimo = null, estado = '';
         const AVISOS = {
-            'sem-extensao': () => 'Para ver o vídeo aqui, o navegador precisa da extensão do Red Code.',
-            instalando: () => 'Instalando a extensão e reabrindo o navegador…',
-            instalada: () => 'Extensão instalada. Abra (ou recarregue) o vídeo no YouTube.',
-            'sem-video': () => 'Nenhum vídeo do YouTube tocando no navegador agora.',
+            'sem-video': () => 'Nenhum vídeo do YouTube tocando agora. No navegador, deixe a aba do YouTube selecionada (pode minimizar ou cobrir a janela).',
             'so-musica': () => 'Só música: no YouTube Music está no modo "Áudio" (troque para "Vídeo" para ver o clipe).',
             anuncio: () => 'Anúncio no YouTube: o vídeo volta quando ele acabar.',
             carregando: () => 'Carregando o vídeo…',
@@ -40,30 +35,13 @@
             // Carregando: um pet como o dos agentes, pulando com um play na mão
             if (novo === 'carregando') aviso.innerHTML = PET_CARREGANDO;
             aviso.hidden = !texto;
-            if (avisoYtm && (novo === 'sem-extensao' || novo === 'sem-video')) { const linha = document.createElement('small'); linha.style.display = 'block'; linha.style.marginTop = '6px'; linha.textContent = 'YouTube Music Desktop: ' + avisoYtm; aviso.appendChild(linha); }
+            if (avisoYtm && novo === 'sem-video') { const linha = document.createElement('small'); linha.style.display = 'block'; linha.style.marginTop = '6px'; linha.textContent = avisoYtm; aviso.appendChild(linha); }
             if (novo === 'sem-ytdlp') aviso.insertAdjacentHTML('beforeend', ' <button type="button" class="mini" data-instalar-ytdlp>Instalar o yt-dlp</button>');
-            // Extensão faltando: um botão por navegador que aceita instalar pelo Red Code; o resto, passo a passo
-            if (novo === 'sem-extensao') {
-                const botoes = navegadores.filter(n => n.suporta).map(n => `<button type="button" class="mini" data-instalar-extensao="${n.id}" data-nome="${n.nome}">Instalar no ${n.nome}</button>`).join(' ');
-                aviso.insertAdjacentHTML('beforeend', `<span class="instalar-extensao">${botoes} <button type="button" class="mini" data-extensao-manual>Instalar à mão</button></span>`);
-            }
             caixa.classList.toggle('clipe-com-aviso', !!texto && novo !== 'carregando');
             caixa.classList.toggle('clipe-carregando', novo === 'carregando');
             if (opcoes.aoEstado) opcoes.aoEstado(novo);
         }
         aviso.addEventListener('click', async (ev) => {
-            const manual = ev.target.closest('[data-extensao-manual]');
-            if (manual) { aviso.textContent = `No navegador, abra a página de extensões (brave://extensions, chrome://extensions ou edge://extensions), ligue o "Modo do desenvolvedor", clique em "Carregar sem compactação" e escolha a pasta: ${pastaExtensao}`; return; }
-            const inst = ev.target.closest('[data-instalar-extensao]');
-            if (inst) {
-                const nome = inst.dataset.nome;
-                const ok = opcoes.confirma ? await opcoes.confirma(`Instalar a extensão no ${nome}?`, `O Red Code coloca a extensão nos atalhos do ${nome} (guarda uma cópia dos atalhos antes) e reabre o ${nome}: as abas e janelas voltam como estavam. O que estiver digitado e não enviado em alguma página se perde.`) : confirm(`Instalar a extensão no ${nome}? O ${nome} vai fechar e abrir de novo, com as abas de volta.`);
-                if (!ok) return;
-                mudaEstado('instalando');
-                try { const r = await fetch('/api/midia/extensao', { method: 'POST', headers: { 'X-Painel': '1', 'Content-Type': 'application/json' }, body: JSON.stringify({ navegador: inst.dataset.instalarExtensao, reiniciar: true }) }); const d = await r.json(); if (!r.ok) throw new Error(d.erro); mudaEstado('instalada'); }
-                catch (e) { estado = ''; mudaEstado('sem-extensao'); aviso.insertAdjacentHTML('afterbegin', `<b>${e.message}</b> `); }
-                return;
-            }
             const b = ev.target.closest('[data-instalar-ytdlp]');
             if (!b) return;
             b.disabled = true; b.textContent = 'Baixando o yt-dlp…';
@@ -259,14 +237,12 @@
             const limite = modo === 'A' ? aj.limiteA : aj.limiteB, espera = modo === 'A' ? aj.esperaA : aj.esperaB;
             if (forca || (Math.abs(dif) > limite && Date.now() - saltoEm > espera)) pula(alvo, aj);
         }
-        // O que a extensão mandou por último
+        // O que o servidor sabe agora (navegador ou player externo)
         async function le() {
             let r;
             try { r = await pega('/api/midia/video'); } catch (e) { return; }
-            pastaExtensao = r.pastaExtensao || pastaExtensao;
-            navegadores = r.navegadores || navegadores;
             temYtdlp = !!r.ytdlp;
-            avisoYtm = r.ytmDesktop && r.ytmDesktop.aviso || '';
+            avisoYtm = (r.avisosPlayers || []).join(' · ');
             if (temYtdlp && modo === 'A' && atualId && !preparando && semDireto !== atualId && (window.__clipeAjustes || {}).trocaB !== false) preparaDireto(atualId);
             if (modo === 'A' && anuncioCopia && temYtdlp && atualId) {
                 if (!anuncioDesde) anuncioDesde = Date.now();
@@ -275,7 +251,6 @@
             const v = r.video;
             // Relógio do servidor x daqui: o "lidoEm" vira hora local
             fonte = v ? { ...v, lidoEm: Date.now() - Math.max(0, (r.agora || 0) - v.recebidoEm) } : null;
-            if (!r.extensao) { limpa(); atualId = ''; return (estado === 'instalando' || estado === 'instalada') ? undefined : mudaEstado('sem-extensao'); }
             if (!v) { limpa(); atualId = ''; return mudaEstado('sem-video'); }
             if (v.modo && /ATV/.test(v.modo)) { limpa(); atualId = ''; return mudaEstado('so-musica'); }
             if (v.id !== atualId) {
@@ -298,7 +273,7 @@
         ligaSinc();
         le();
         return {
-            // Compatível com a chamada do player do Windows (não precisa mais: quem manda é a extensão)
+            // Compatível com a chamada do player do Windows (não precisa mais: quem manda é o servidor)
             atualiza() { },
             atual: () => fonte,
             // Onde a cópia está (para conferir a sincronia)
