@@ -3,6 +3,13 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.13', data: '2026-11-11', itens: [
+            'Tamanho do vídeo no canto: alça nova na borda direita estica só para o lado, o canto de cima também redimensiona com o vídeo encaixado e o duplo clique numa alça volta ao formato do vídeo',
+            'Janela solta do vídeo: a barra com os botões aparece ao passar o mouse',
+            'Um vídeo só: abrir o vídeo no canto fecha a janela solta',
+        ],
+    },
+    {
         versao: '1.0.12', data: '2026-11-11', itens: [
             'Vídeo no canto sem extensão: o vídeo vem da aba do YouTube que estiver selecionada no navegador (pode minimizar ou cobrir a janela), em qualquer navegador',
             'Extensão do navegador opcional: continua funcionando e, quando instalada, deixa o vídeo mais preciso (sincronia fina, próxima música já pronta). Instale ou veja o status em Configurações › Integrações',
