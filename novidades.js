@@ -3,6 +3,14 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.16', data: '2026-11-11', itens: [
+            'Explorar: botão no topo da lista mostra a árvore da pasta da conversa no lugar da lista; clicar num arquivo abre como aba no ao vivo',
+            'Editor no ao vivo: o ao vivo vira o editor de código, com as cores e o tema dele; a edição do Claude anima dentro do editor (vermelho sai, verde entra)',
+            'Trava durante a edição do Claude: o arquivo fica só leitura até ele terminar; abas mostram não salvo e cadeado, e fechar com alteração pergunta antes',
+            'Versão: em Configurações › Sistema aparece a versão instalada e a que está no GitHub',
+        ],
+    },
+    {
         versao: '1.0.15', data: '2026-11-11', itens: [
             'Credenciais das conversas: quando uma extensão pede a chave ou o token do Trello, a caixa lista (mascarados) os que já apareceram nas suas conversas; um clique preenche',
             'Vídeo no canto sem a tela do YouTube: o vídeo vem sempre direto (yt-dlp), sem título, logo nem botão de play por cima. Sem o yt-dlp, o canto oferece instalar',
