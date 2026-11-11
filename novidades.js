@@ -3,6 +3,15 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.12', data: '2026-11-11', itens: [
+            'Vídeo no canto sem extensão: o vídeo vem da aba do YouTube que estiver selecionada no navegador (pode minimizar ou cobrir a janela), em qualquer navegador',
+            'Extensão do navegador opcional: continua funcionando e, quando instalada, deixa o vídeo mais preciso (sincronia fina, próxima música já pronta). Instale ou veja o status em Configurações › Integrações',
+            'Integrações: nova aba em Configurações. O YouTube Music Desktop se conecta por lá, com Integrar e Desativar',
+            'Editor ao vivo: feche abas pelo × ou pelo botão do meio do mouse, como no VS Code',
+            'Painel Git: não fecha mais ao arrastar a largura dele com o editor ao vivo aberto',
+        ],
+    },
+    {
         versao: '1.0.11', data: '2026-11-11', itens: [
             'Extensões do VS Code: instale um .vsix em Configurações › Extensões e use os painéis dela no botão de peça no topo da lista (extensões de painel, comandos e configurações, como o Royal Trello Diário)',
             'Arquivos citados como link: quando o Claude cita um arquivo como link do Markdown, dá para clicar e abrir, como os outros caminhos',

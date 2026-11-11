@@ -1,47 +1,67 @@
-// Vídeo no canto: a extensão do navegador (pasta extensao/) avisa qual vídeo do YouTube toca em cada aba e em que
-// segundo; o Red Code toca uma cópia muda dele (player do YouTube ou, se o vídeo não deixa incorporar, o endereço
-// direto só do vídeo, tirado pelo yt-dlp). Nada de ler a tela.
+// Vídeo no canto: três fontes avisam qual vídeo do YouTube toca e em que segundo, e o Red Code toca uma cópia muda dele
+// (player do YouTube ou, se o vídeo não deixa incorporar, o endereço direto só do vídeo, tirado pelo yt-dlp):
+// - extensão do navegador (opcional, pasta extensao/): tempo exato do player, fila, anúncio e modo Áudio;
+// - leitura nativa (video-nativo.js): aba selecionada de cada navegador pela mídia do Windows, sem instalar nada;
+// - players externos ligados em Integrações (ytm-desktop.js).
+// Com a extensão falando, ela manda: a leitura nativa do mesmo navegador veria o mesmo vídeo com menos precisão.
 const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
 
-const abas = new Map();   // aba do navegador -> último estado recebido
-let ultimoAviso = 0;      // quando a extensão falou pela última vez (saber se ela está instalada)
+const abas = new Map();   // fonte:aba -> último estado recebido (id de aba da extensão e janela da leitura nativa não se misturam)
+// Sumir por um ciclo (falha de leitura) e voltar igual não conta como mudança, senão rouba o canto
+const sumidas = new Map();
+const FONTES = ['extensao', 'nativo', 'ytm'];
+let ultimoAvisoExtensao = 0;   // a extensão falou por último quando (Integrações mostra se ela está instalada)
+const EXTENSAO_MANDA_MS = 15000;
 
 function recebe(c) {
-    ultimoAviso = Date.now();
-    const aba = Number(c.aba);
-    if (!Number.isFinite(aba)) throw new Error('Aba inválida.');
-    if (c.fim) { abas.delete(aba); return; }
+    const numAba = Number(c.aba);
+    if (!Number.isFinite(numAba)) throw new Error('Aba inválida.');
+    const fonte = FONTES.includes(c.fonte) ? c.fonte : numAba === -9863 ? 'ytm' : 'nativo';
+    if (fonte === 'extensao') ultimoAvisoExtensao = Date.now();
+    const aba = fonte + ':' + numAba;
+    if (c.fim) { if (abas.has(aba)) sumidas.set(aba, { ...abas.get(aba), sumiuEm: Date.now() }); abas.delete(aba); return; }
     const id = String(c.id || '');
     if (id && !/^[\w-]{11}$/.test(id)) throw new Error('Vídeo inválido.');
     // Vídeo novo numa aba: já pede o endereço direto (fica em cache) para a opção B entrar sem esperar o yt-dlp
-    const antes = abas.get(aba);
+    const sumida = sumidas.get(aba);
+    sumidas.delete(aba);
+    const antes = abas.get(aba) || (sumida && Date.now() - sumida.sumiuEm < 30000 ? sumida : undefined);
     if (id && (!antes || antes.id !== id) && caminhoYtdlp()) urlDoVideo(id).catch(() => { });
     // Próximas da fila: já busca o endereço, para a troca de música no B ser na hora
     if (Array.isArray(c.proximos) && caminhoYtdlp()) for (const p of c.proximos.slice(0, 4)) if (/^[\w-]{11}$/.test(String(p))) buscaAntes(String(p));
     const num = (v, max) => { const n = Number(v); return Number.isFinite(n) && n >= 0 && n <= max ? n : 0; };
+    const recebidoEm = Number(c.quando) > 0 && Math.abs(Date.now() - Number(c.quando)) < 5000 ? Math.min(Date.now(), Number(c.quando)) : Date.now();
+    const tempo = num(c.tempo, 1e7), pausado = !!c.pausado;
+    const esperado = antes ? antes.tempo + (antes.pausado ? 0 : (recebidoEm - antes.recebidoEm) / 1000 * antes.taxa) : 0;
+    // Sinal repetido não conta como mudança: senão duas fontes pausadas se revezam no canto
+    const mudou = !antes || antes.id !== id || antes.pausado !== pausado || Math.abs(tempo - esperado) > 3;
     abas.set(aba, {
-        aba, id, tempo: num(c.tempo, 1e7), duracao: num(c.duracao, 1e7), pausado: !!c.pausado, taxa: num(c.taxa, 16) || 1,
+        aba: numAba, fonte, id, tempo, duracao: num(c.duracao, 1e7), pausado, taxa: num(c.taxa, 16) || 1,
         titulo: String(c.titulo || '').slice(0, 300), site: String(c.site || '').slice(0, 60), modo: String(c.modo || '').slice(0, 40),
         anuncio: !!c.anuncio, esperando: !!c.esperando, folga: num(c.folga, 2),
         proximos: Array.isArray(c.proximos) ? c.proximos.slice(0, 4).map(String) : [],
         // Momento da leitura na página (se o relógio bate): a conta do tempo parte dele, sem o atraso do envio
-        recebidoEm: Number(c.quando) > 0 && Math.abs(Date.now() - Number(c.quando)) < 5000 ? Math.min(Date.now(), Number(c.quando)) : Date.now(),
+        recebidoEm, mudouEm: mudou ? recebidoEm : antes.mudouEm,
     });
 }
-// O vídeo a mostrar: o que está tocando e falou por último; sem nenhum tocando, o pausado mais recente
+// O vídeo a mostrar: o que começou a tocar por último; sem nenhum tocando, o que mudou de estado por último
 function atual() {
     const agora = Date.now();
     for (const [aba, e] of abas) if (agora - e.recebidoEm > 6 * 3600e3) abas.delete(aba);
-    const lista = [...abas.values()].filter(e => e.id);
+    for (const [aba, e] of sumidas) if (agora - e.sumiuEm > 30000) sumidas.delete(aba);
+    // Extensão falando há pouco: ela manda e a leitura nativa sai da conta (veria o mesmo vídeo, às vezes com outro id:
+    // no YouTube Music em modo Vídeo a aba mostra o id da música e a extensão o do clipe)
+    const extensaoManda = agora - ultimoAvisoExtensao < EXTENSAO_MANDA_MS;
+    const lista = [...abas.values()].filter(e => e.id && !(extensaoManda && e.fonte === 'nativo'));
     // Tocando sem avisar há 15 s: a aba travou ou foi descarregada; não conta como tocando
-    const tocando = lista.filter(e => !e.pausado && agora - e.recebidoEm < 15000).sort((a, b) => b.recebidoEm - a.recebidoEm);
-    const escolhido = tocando[0] || lista.sort((a, b) => b.recebidoEm - a.recebidoEm)[0] || null;
+    const tocando = lista.filter(e => !e.pausado && agora - e.recebidoEm < 15000).sort((a, b) => b.mudouEm - a.mudouEm);
+    const escolhido = tocando[0] || lista.sort((a, b) => b.mudouEm - a.mudouEm)[0] || null;
     // urlPronta: o endereço direto já está no cache (a cópia pode ir direto para o B, sem passar pelo A)
     const c = escolhido && cacheUrls.get(escolhido.id);
     const video = escolhido ? { ...escolhido, urlPronta: !!(c && agora - c.em < 3 * 3600e3) } : null;
-    return { extensao: ultimoAviso > 0 && agora - ultimoAviso < 24 * 3600e3, agora, video };
+    return { agora, video, extensao: ultimoAvisoExtensao > 0 && agora - ultimoAvisoExtensao < 24 * 3600e3 };
 }
 
 // ---------- yt-dlp (opção B): endereço direto só do vídeo, para os vídeos que não deixam incorporar ----------
@@ -150,4 +170,8 @@ function instalaExtensao(id, pastaExtensao, pastaDados, reiniciar) {
     });
 }
 
-module.exports = { recebe, atual, configura, caminhoYtdlp, urlDoVideo, instalaYtdlp, copiaExtensao, navegadores, instalaExtensao };
+
+// A extensão falou há pouco: o servidor nem liga a leitura nativa (ela gasta ~12% de um núcleo e a extensão já manda)
+const extensaoAtiva = (ms = 30000) => Date.now() - ultimoAvisoExtensao < ms;
+
+module.exports = { recebe, atual, configura, caminhoYtdlp, urlDoVideo, instalaYtdlp, copiaExtensao, navegadores, instalaExtensao, extensaoAtiva };
