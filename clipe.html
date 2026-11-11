@@ -11,7 +11,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color:
 .clipe-tela iframe, .clipe-tela video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; object-fit: contain; background: #000; pointer-events: none; }
 .clipe-aviso { position: absolute; inset: 0; display: grid; place-items: center; padding: 34px 18px 14px; text-align: center; color: #c9beb5; background: #000c; overflow-wrap: anywhere; }
 .clipe-aviso .mini { margin-left: 6px; padding: 2px 8px; border: 1px solid #fff6; border-radius: 6px; background: transparent; color: #fff; cursor: pointer; -webkit-app-region: no-drag; }
-.clipe-aviso .instalar-extensao { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 8px; }
 /* Pet de carregando (igual ao dos agentes do Red Code) */
 /* Pet de carregando comendo pipoca: mastiga, balde listrado do lado e graos voando do balde ate a boca */
 .pet-video .pet-corpo { animation: petMastiga .6s ease-in-out infinite; }
@@ -40,7 +39,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color:
 @keyframes petPontos { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
 .clipe-procurando .clipe-aviso { top: auto; padding: 16px 10px 7px; font-size: 11px; background: linear-gradient(#0000, #000b); }
 .barra { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 2px; padding: 6px 6px 18px 10px; background: linear-gradient(#000d, #0000); opacity: 0; transition: opacity .2s; -webkit-app-region: drag; }
-body:hover .barra, body.clipe-com-aviso .barra { opacity: 1; }
+body:hover .barra, body.pairando .barra, body.clipe-com-aviso .barra { opacity: 1; }
 .barra .nome { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
 .barra button { -webkit-app-region: no-drag; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: #fff; cursor: pointer; }
 .barra button:hover { background: #ffffff2b; }
@@ -70,6 +69,7 @@ const clipe = ClipeMusica(document.body, {
 document.getElementById('anexar').addEventListener('click', () => { canal.postMessage({ tipo: 'anexar' }); window.close(); });
 document.getElementById('fechar').addEventListener('click', () => { canal.postMessage({ tipo: 'fechar' }); window.close(); });
 canal.addEventListener('message', (ev) => { if (ev.data && ev.data.tipo === 'fecha-janela') window.close(); });
+if (window.painelDesktop && window.painelDesktop.clipe && window.painelDesktop.clipe.aoPairar) window.painelDesktop.clipe.aoPairar((dentro) => document.body.classList.toggle('pairando', dentro));
 canal.postMessage({ tipo: 'desanexou' });
 </script>
 </body>

@@ -21,6 +21,8 @@ const midia = require('./midia');
 const login = require('./login');
 const plugins = require('./plugins');
 const videoNavegador = require('./video-navegador');
+const videoNativo = require('./video-nativo');
+const playersExternos = require('./players-externos');
 // Nome da pasta de transcripts das conversas Chat (o SDK grava pelo cwd sanitizado)
 const PASTA_CHAT = chat.pastaDoProjeto(chat.CHAT_DIR).toLowerCase();
 // Primeiro nome do usuário do Windows (henrique.freitas -> Henrique), para a saudação do Chat
@@ -1294,13 +1296,79 @@ function requisicaoConfiavel(req) {
 // Favoritas e vínculos entre conversas ("continuação de"), guardados num arquivo ao lado do servidor
 // PAINEL_DADOS: no Red Code.exe, %APPDATA%\Red Code (a pasta do programa é trocada a cada versão)
 const PASTA_DADOS = process.env.PAINEL_DADOS || __dirname;
-// Extensão do navegador (vídeo no canto): copiada para uma pasta fixa, que é a que se carrega no navegador
 videoNavegador.configura(PASTA_DADOS);
-// YouTube Music Desktop (app à parte, sem extensão): o vídeo vem do Companion Server dele, como mais uma aba
-let ytmDesktop = null;
-try { ytmDesktop = require('./ytm-desktop'); ytmDesktop.configura(PASTA_DADOS, videoNavegador.recebe); } catch (e) { ytmDesktop = null; console.log('ytm desktop: ' + e.message); }
+// Extensões do VS Code (.vsix) instaladas no Red Code: cada uma num processo próprio, encerrado junto com o servidor
+const extensoes = require('./extensoes');
+extensoes.configura({ pasta: __dirname, pastaDados: PASTA_DADOS, porta: PORTA });
+process.on('exit', () => extensoes.encerraTodas());
+// Corpo binário (o .vsix), com limite
+function leBinario(req, limite) {
+    return new Promise((ok, falha) => {
+        const partes = []; let total = 0;
+        req.on('data', (d) => { total += d.length; if (total > limite) { falha(new Error('Arquivo grande demais (máximo 50 MB).')); req.destroy(); } else partes.push(d); });
+        req.on('end', () => ok(Buffer.concat(partes)));
+        req.on('error', falha);
+    });
+}
+// Webview e arquivos das extensões: sem o cabeçalho do painel (quem pede é o iframe em sandbox), mas só pelo
+// endereço local certo (contra DNS rebinding) e sempre em sandbox, mesmo se abertos direto numa aba
+const CABECALHOS_SANDBOX = { 'Content-Security-Policy': 'sandbox allow-scripts allow-forms', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store' };
+const hostLocal = (req) => [`127.0.0.1:${PORTA}`, `localhost:${PORTA}`].includes(String(req.headers.host || ''));
+async function rotaExtensoes(req, res, url) {
+    const p = url.pathname;
+    const webview = p.match(/^\/api\/extensoes\/webview\/([^/]+)\/([^/]+)$/);
+    const arquivoExt = p.match(/^\/api\/extensoes\/arquivo\/([^/]+)\/(.+)$/);
+    if (webview || arquivoExt) {
+        if (req.method !== 'GET' || !hostLocal(req)) return responde(res, 403, { erro: 'pedido recusado' });
+        if (webview) {
+            res.writeHead(200, { ...CABECALHOS_SANDBOX, 'Content-Type': 'text/html; charset=utf-8' });
+            return res.end(extensoes.htmlWebview(decodeURIComponent(webview[1]), decodeURIComponent(webview[2])));
+        }
+        const a = extensoes.arquivo(decodeURIComponent(arquivoExt[1]), arquivoExt[2]);
+        if (!a) return responde(res, 404, { erro: 'não encontrado' });
+        res.writeHead(200, { ...CABECALHOS_SANDBOX, 'Content-Type': a.tipo });
+        return fs.createReadStream(a.caminho).pipe(res);
+    }
+    if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+    try {
+        if (req.method === 'GET') {
+            if (url.searchParams.has('id') && !/^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/.test(url.searchParams.get('id'))) throw new Error('Extensão inválida.');
+            if (p === '/api/extensoes/estado') return responde(res, 200, extensoes.estado());
+            if (p === '/api/extensoes/eventos') return responde(res, 200, await extensoes.espera(url.searchParams.get('desde'), 20000));
+            if (p === '/api/extensoes/arvore') return responde(res, 200, await extensoes.arvore(url.searchParams.get('id'), url.searchParams.get('viewId'), url.searchParams.get('handle')));
+            if (p === '/api/extensoes/config') return responde(res, 200, extensoes.configDe(url.searchParams.get('id')));
+            if (p === '/api/extensoes/log') return responde(res, 200, extensoes.logsDe(url.searchParams.get('id')));
+            return responde(res, 404, { erro: 'não encontrado' });
+        }
+        if (req.method !== 'POST') return responde(res, 405, { erro: 'método não permitido' });
+        if (p === '/api/extensoes/instalar') return responde(res, 200, extensoes.preparaInstalacao(await leBinario(req, 50 * 1024 * 1024)));
+        const corpo = await leCorpo(req, 2e6);
+        const id = String(corpo.id || '');
+        if (corpo.id !== undefined && !/^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/.test(id)) throw new Error('Extensão inválida.');
+        switch (p) {
+            case '/api/extensoes/confirmar': return responde(res, 200, await extensoes.confirmaInstalacao(corpo.token));
+            case '/api/extensoes/acao': {
+                if (corpo.acao === 'ligar' || corpo.acao === 'desligar') await extensoes.liga(id, corpo.acao === 'ligar');
+                else if (corpo.acao === 'reiniciar') await extensoes.reinicia(id);
+                else if (corpo.acao === 'remover') await extensoes.remove(id);
+                else if (corpo.acao === 'apagar-dados') extensoes.apagaDados(id);
+                else throw new Error('Ação desconhecida.');
+                return responde(res, 200, extensoes.estado());
+            }
+            case '/api/extensoes/visibilidade': await extensoes.visibilidade(id, corpo.viewId, corpo.visivel); return responde(res, 200, { ok: true });
+            case '/api/extensoes/mensagem': await extensoes.mensagem(id, corpo.viewId, corpo.msg); return responde(res, 200, { ok: true });
+            case '/api/extensoes/clique': extensoes.clique(id, corpo.viewId, corpo.handle); return responde(res, 200, { ok: true });
+            case '/api/extensoes/comando': extensoes.comando(id, String(corpo.comando || '')); return responde(res, 200, { ok: true });
+            case '/api/extensoes/config': await extensoes.mudaConfig(id, String(corpo.chave || ''), corpo.valor === undefined ? null : corpo.valor, false); return responde(res, 200, extensoes.configDe(id));
+            case '/api/extensoes/resposta': return responde(res, 200, { ok: extensoes.responde(corpo.pendente, corpo.valor) });
+        }
+        return responde(res, 404, { erro: 'não encontrado' });
+    } catch (e) { return responde(res, 400, { erro: e.message }); }
+}
 let PASTA_EXTENSAO = null;
 try { PASTA_EXTENSAO = videoNavegador.copiaExtensao(__dirname, PASTA_DADOS); } catch (e) { console.log('extensão do navegador: ' + e.message); }
+videoNativo.configura(videoNavegador.recebe);
+try { playersExternos.configura(PASTA_DADOS, videoNavegador.recebe); } catch (e) { console.log('players externos: ' + e.message); }
 const ARQUIVO_DADOS = path.join(PASTA_DADOS, 'dados.json');
 function leDados() {
     const vazio = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], pastasExtras: [], navegador: 'padrao' };
@@ -2551,20 +2619,28 @@ const servidor = http.createServer(async (req, res) => {
         if (url.pathname === '/api/midia/video' && req.method === 'POST') {
             const origem = String(req.headers.origin || '');
             if (req.headers['x-redcode-extensao'] !== '1' || (origem && !/^chrome-extension:\/\/[a-p]{32}$/.test(origem))) return responde(res, 403, { erro: 'só a extensão do Red Code' });
-            try { videoNavegador.recebe(await leCorpo(req, 1e4)); return responde(res, 200, { ok: true }); }
+            try { videoNavegador.recebe({ ...(await leCorpo(req, 1e4)), fonte: 'extensao' }); return responde(res, 200, { ok: true }); }
             catch (e) { return responde(res, 400, { erro: e.message }); }
         }
-        if (url.pathname === '/api/midia/video' && req.method === 'GET') {
-            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
-            return responde(res, 200, { ...videoNavegador.atual(), ytdlp: !!videoNavegador.caminhoYtdlp(), pastaExtensao: PASTA_EXTENSAO, navegadores: videoNavegador.navegadores(), ytmDesktop: ytmDesktop ? ytmDesktop.estado() : null });
-        }
-        // Instalar a extensão (a pessoa aceitou na tela): atalhos do navegador com --load-extension e, se pedido, reinicia ele
+        // Instalar a extensão (a pessoa aceitou em Integrações): atalhos do navegador com --load-extension e reinicia ele
         if (url.pathname === '/api/midia/extensao' && req.method === 'POST') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
             try {
                 const corpo = await leCorpo(req, 1e4);
                 return responde(res, 200, await videoNavegador.instalaExtensao(String(corpo.navegador || ''), PASTA_EXTENSAO, PASTA_DADOS, !!corpo.reiniciar));
             } catch (e) { return responde(res, 400, { erro: e.message }); }
+        }
+        // Vídeo no canto: a extensão (se houver), a aba do YouTube selecionada em algum navegador (video-nativo) ou um player externo ligado
+        if (url.pathname === '/api/midia/video' && req.method === 'GET') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            if (!videoNavegador.extensaoAtiva()) videoNativo.usado();
+            return responde(res, 200, { ...videoNavegador.atual(), ytdlp: !!videoNavegador.caminhoYtdlp(), avisosPlayers: playersExternos.avisos(), pastaExtensao: PASTA_EXTENSAO, navegadores: videoNavegador.navegadores() });
+        }
+        if (url.pathname === '/api/players-externos') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            if (req.method === 'GET') return responde(res, 200, playersExternos.lista());
+            try { const corpo = await leCorpo(req, 1e4); return responde(res, 200, playersExternos.executa(String(corpo.id || ''), String(corpo.acao || ''))); }
+            catch (e) { return responde(res, 400, { erro: e.message }); }
         }
         // Opção B: endereço direto só do vídeo (yt-dlp), para vídeo que não deixa incorporar
         if (url.pathname === '/api/midia/video-url' && req.method === 'GET') {
@@ -2609,6 +2685,7 @@ const servidor = http.createServer(async (req, res) => {
                 return responde(res, 200, dados.visualPets);
             } catch (e) { return responde(res, 400, { erro: e.message }); }
         }
+        if (url.pathname.startsWith('/api/extensoes/')) return await rotaExtensoes(req, res, url);
         if (url.pathname === '/api/novidades' && req.method === 'GET') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
             let versoes = [], versaoApp = '';
@@ -2619,8 +2696,12 @@ const servidor = http.createServer(async (req, res) => {
         if (url.pathname === '/api/midia') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
             // Com ?versao=: segura a resposta até o estado mudar (play/pausa de fora aparece na hora, sem esperar a próxima pergunta)
-            if (req.method === 'GET' && url.searchParams.has('versao')) return responde(res, 200, await midia.espera(url.searchParams.get('versao'), 20000));
-            if (req.method === 'GET') return responde(res, 200, midia.le());
+            if (req.method === 'GET') {
+                const estado = url.searchParams.has('versao') ? await midia.espera(url.searchParams.get('versao'), 20000) : midia.le();
+                // Navegador tocando: liga o leitor antes de abrir o vídeo, para o vídeo e o yt-dlp já estarem prontos
+                if (videoNativo.ehNavegador(estado.app) && !videoNavegador.extensaoAtiva()) videoNativo.usado();
+                return responde(res, 200, estado);
+            }
             try { const corpo = await leCorpo(req, 1e4); midia.comando(String(corpo.acao || '')); return responde(res, 200, { ok: true }); }
             catch (e) { return responde(res, 400, { erro: e.message }); }
         }

@@ -13,6 +13,8 @@ controles de mídia do sistema, com tocar/pausar, próxima e anterior.
   em ~100-170 ms.
 - Sumiu a mídia por um instante (troca de música): a tela segura a última por 5 s.
 - Comandos (`alternar`, `proxima`, `anterior`): `POST /api/midia`.
+- Com um navegador tocando, o `GET /api/midia` também liga o leitor do vídeo no canto
+  (`videoNativo.usado()`), para o vídeo já estar pronto quando a pessoa abrir.
 
 ## Aberto (disco)
 

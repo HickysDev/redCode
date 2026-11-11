@@ -45,7 +45,9 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html, body { height: 100%; }
+/* A janela nunca rola: o app é uma tela só (cada parte rola por dentro). Algo passando da borda, mesmo por um
+   instante (animação, aviso entrando), não cria barra de rolagem na janela */
+html, body { height: 100%; overflow: hidden; }
 body { margin: 0; font: 14px/1.5 var(--sans); background: var(--papel); color: var(--tinta); }
 :focus-visible { outline: 2px solid var(--modelo); outline-offset: 2px; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
@@ -1311,6 +1313,9 @@ button.partes:hover, button.partes[aria-expanded="true"] { color: var(--voce); b
 @keyframes faixa-viva { 50% { border-left-color: color-mix(in srgb, var(--ok) 35%, transparent); } }
 .linha-selo { display: flex; align-items: center; gap: 6px; margin: 4px 0 1px 21px; min-width: 0; }
 .linha-selo .fazendo { flex: 1; min-width: 0; }
+/* Selo maior que a lista (ex.: "Agente rodando, continua sozinha quando terminar"): cabe na largura e corta com reticências */
+.linha-selo .selo-status:not(.trabalhando) { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; }
+.linha-selo .selo-status .selo-texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* margin: 0 porque .trabalhando (indicador do chat) também casa com este selo */
 .linha-selo .selo-status.trabalhando { margin: 0; padding: 0; background: none; border: 0; font-size: 13px; line-height: 1; width: 13px; justify-content: center; }
 .selo-texto { font-weight: 400; opacity: .85; }
@@ -1468,6 +1473,90 @@ details[open]::details-content { block-size: auto; }
 .codigo pre { transition: max-height .3s var(--entrada); }
 /* Janelas, menu e imagem ampliada entram com fade e um leve zoom */
 .ajuda:not([hidden]) { animation: fundo-entra .18s ease-out; }
+/* Extensões do VS Code: botão com selo, gaveta à direita com os painéis, avisos no canto e caixa de perguntas */
+.marca #btnExtensoes { position: relative; opacity: .75; }
+.marca #btnExtensoes:hover { opacity: 1; }
+.marca #btnExtensoes svg { width: 16px; height: 16px; }
+#btnExtensoes .selo-ext { position: absolute; top: -5px; right: -7px; min-width: 15px; height: 15px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: var(--voce); color: #fff; font: 700 9.5px/15px var(--sans); text-align: center; }
+.gaveta-ext { position: fixed; top: 0; right: 0; bottom: 0; z-index: 28; width: min(420px, 92vw); display: flex; flex-direction: column; background: var(--folha); border-left: 1px solid var(--linha); box-shadow: -14px 0 36px rgba(0, 0, 0, .28); animation: gavetaEntra .22s cubic-bezier(.2, .8, .2, 1); }
+@keyframes gavetaEntra { from { transform: translateX(24px); opacity: 0; } }
+.gaveta-ext .ge-topo { display: flex; align-items: center; gap: 6px; padding: 12px 12px 10px 16px; border-bottom: 1px solid var(--linha); }
+.gaveta-ext .ge-topo b { font: 600 14px var(--sans); }
+.gaveta-ext .ge-vao { flex: 1; }
+.gaveta-ext .ge-topo button { padding: 3px 8px; border-radius: 6px; color: var(--grafite); font-size: 12px; }
+.gaveta-ext .ge-topo button:hover { background: var(--realce); color: var(--tinta); }
+.gaveta-ext .ge-topo [data-ge-fechar] { font-size: 17px; line-height: 1; }
+.gaveta-ext .ge-corpo { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+.ext-container { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.ext-container + .ext-container { border-top: 1px solid var(--linha); }
+.ext-cab { position: relative; display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px 16px; }
+.ext-cab .ext-ic { width: 16px; height: 16px; flex: none; background: var(--voce); -webkit-mask: var(--ic) center / contain no-repeat; mask: var(--ic) center / contain no-repeat; }
+.ext-cab b { flex: 1; min-width: 0; font: 600 12.5px var(--sans); text-transform: uppercase; letter-spacing: .03em; color: var(--grafite); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ext-cab .ext-status { font-size: 11px; color: var(--grafite); }
+.ext-cab .ext-status.falhou { color: var(--erro); }
+.ext-cab button { padding: 2px 7px; border-radius: 6px; color: var(--grafite); }
+.ext-cab button:hover { background: var(--realce); color: var(--tinta); }
+.ext-menu { position: absolute; right: 10px; top: 34px; z-index: 2; min-width: 240px; max-width: 340px; padding: 4px; border: 1px solid var(--linha); border-radius: 9px; background: var(--folha); box-shadow: 0 12px 30px rgba(0, 0, 0, .3); }
+.ext-menu button { display: block; width: 100%; padding: 6px 9px; border-radius: 6px; text-align: left; font-size: 12.5px; color: var(--tinta); }
+.ext-menu button:hover { background: var(--realce); }
+.ext-menu hr { border: 0; border-top: 1px solid var(--linha); margin: 4px 2px; }
+.ext-view { display: flex; flex-direction: column; min-height: 0; border-top: 1px solid var(--linha); }
+.ext-view.webview { flex: 1; min-height: 260px; }
+.ext-view > .ext-view-cab { display: flex; align-items: center; gap: 6px; padding: 6px 12px 6px 14px; font: 600 11.5px var(--sans); color: var(--tinta); text-align: left; }
+.ext-view > .ext-view-cab .seta { font-size: 9px; color: var(--grafite); transition: transform .15s; }
+.ext-view.recolhida > .ext-view-cab .seta { transform: rotate(-90deg); }
+.ext-view.recolhida > :not(.ext-view-cab) { display: none; }
+.ext-view.recolhida.webview { flex: 0 0 auto; min-height: 0; }
+.ext-view .ext-view-cab .selo-ext-view { margin-left: auto; min-width: 16px; padding: 0 5px; border-radius: 8px; background: var(--voce); color: #fff; font: 700 10px/16px var(--sans); text-align: center; }
+.ext-view iframe { flex: 1; width: 100%; min-height: 240px; border: 0; background: transparent; }
+.ext-arvore { list-style: none; margin: 0; padding: 0 6px 8px; max-height: 40vh; overflow: auto; }
+.ext-arvore li { display: flex; align-items: baseline; gap: 7px; padding: 4px 8px; border-radius: 6px; font-size: 12.5px; cursor: default; }
+.ext-arvore li.clicavel { cursor: pointer; }
+.ext-arvore li.clicavel:hover { background: var(--realce); }
+.ext-arvore li .ic { width: 12px; flex: none; text-align: center; color: var(--grafite); }
+.ext-arvore li .ic.novo { color: var(--voce); }
+.ext-arvore li span.rotulo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ext-arvore li small { color: var(--grafite); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ext-arvore .vazio { padding: 6px 10px; color: var(--grafite); font-size: 12px; }
+.ext-log { flex: 1; min-height: 200px; display: flex; flex-direction: column; border-top: 1px solid var(--linha); }
+.ext-log .ext-log-cab { display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 12px; color: var(--grafite); }
+.ext-log .ext-log-cab button { margin-left: auto; padding: 2px 8px; border-radius: 6px; }
+.ext-log .ext-log-cab button:hover { background: var(--realce); }
+.ext-log pre { flex: 1; margin: 0; padding: 8px 12px; overflow: auto; font: 11px/1.45 var(--mono); white-space: pre-wrap; word-break: break-word; color: var(--tinta); background: var(--papel); }
+.ext-log pre .error { color: var(--erro); } .ext-log pre .warn { color: var(--atencao); }
+.ext-vazio { padding: 18px 16px; color: var(--grafite); font-size: 12.5px; }
+.toasts-ext { position: fixed; right: 16px; bottom: 16px; z-index: 31; display: flex; flex-direction: column; gap: 8px; width: min(380px, 92vw); pointer-events: none; }
+.toast-ext { pointer-events: auto; position: relative; padding: 11px 32px 10px 13px; border: 1px solid var(--linha); border-left: 3px solid var(--voce); border-radius: 10px; background: var(--folha); box-shadow: 0 12px 30px rgba(0, 0, 0, .3); font-size: 12.5px; animation: playerEntra .25s cubic-bezier(.2, .8, .2, 1); }
+.toast-ext.aviso { border-left-color: var(--atencao); } .toast-ext.erro { border-left-color: var(--erro); }
+.toast-ext .te-de { display: block; color: var(--grafite); font-size: 11px; margin-bottom: 3px; }
+.toast-ext p { margin: 0; white-space: pre-wrap; }
+.toast-ext .te-bts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.toast-ext .te-bts button { padding: 4px 10px; border-radius: 7px; background: var(--realce); color: var(--tinta); font: 600 12px var(--sans); }
+.toast-ext .te-bts button:first-child { background: var(--voce); color: #fff; }
+.toast-ext [data-te-fechar] { position: absolute; top: 6px; right: 7px; width: 20px; height: 20px; border-radius: 5px; color: var(--grafite); font-size: 15px; line-height: 1; }
+.toast-ext [data-te-fechar]:hover { background: var(--realce); color: var(--tinta); }
+.ajuda .caixa.pergunta-ext { width: min(480px, 92vw); }
+.pergunta-ext .pe-de { display: block; color: var(--grafite); font-size: 11.5px; margin-bottom: 4px; }
+.pergunta-ext p { margin: 6px 0 10px; color: var(--grafite); font-size: 13px; white-space: pre-wrap; }
+.pergunta-ext input { width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--linha); border-radius: 7px; background: var(--folha); color: var(--tinta); font: 13px var(--sans); }
+.pergunta-ext .pe-bts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.pergunta-ext .pe-bts button { padding: 6px 14px; border-radius: 8px; background: var(--realce); color: var(--tinta); font: 600 12.5px var(--sans); }
+.pergunta-ext .pe-bts button.principal { background: var(--voce); color: #fff; }
+.config-ext { padding: 12px 0; border-bottom: 1px solid var(--linha); }
+.config-ext .ce-topo { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.config-ext .ce-topo b { font-size: 13.5px; }
+.config-ext .ce-topo small { color: var(--grafite); }
+.config-ext .ce-status { padding: 1px 8px; border-radius: 10px; font: 600 11px var(--sans); background: var(--realce); color: var(--grafite); }
+.config-ext .ce-status.ativa { background: var(--ok-fundo); color: var(--ok); }
+.config-ext .ce-status.falhou { background: var(--erro-fundo); color: var(--erro); }
+.config-ext p { margin: 4px 0 8px; color: var(--grafite); font-size: 12.5px; }
+.config-ext .ce-acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.config-ext .ce-form { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--linha); border-radius: 9px; display: grid; gap: 10px; }
+.config-ext .ce-campo { display: grid; gap: 3px; font-size: 12.5px; }
+.config-ext .ce-campo code { font-size: 11px; color: var(--grafite); }
+.config-ext .ce-campo small { color: var(--grafite); }
+.config-ext .ce-campo input[type="text"], .config-ext .ce-campo input[type="number"], .config-ext .ce-campo select, .config-ext .ce-campo textarea { max-width: 360px; padding: 5px 8px; border: 1px solid var(--linha); border-radius: 6px; background: var(--folha); color: var(--tinta); font: 12.5px var(--sans); }
+.botao-arquivo { cursor: pointer; }
 /* Carregando ao abrir: estrela girando devagar e barrinha indo e voltando, até a lista de conversas chegar */
 .carregando-inicio { position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; justify-items: center; gap: 16px; background: var(--papel); transition: opacity .3s ease; }
 .carregando-inicio.saindo { opacity: 0; pointer-events: none; }
@@ -1701,7 +1790,6 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .pip-clipe { position: fixed; left: 10px; bottom: 150px; z-index: 44; width: 300px; aspect-ratio: var(--pip-prop, 1.7778); overflow: hidden; border-radius: 12px; background: #000; border: 1px solid var(--linha); box-shadow: 0 14px 36px rgba(0, 0, 0, .5); animation: playerEntra .3s cubic-bezier(.2, .8, .2, 1); }
 .pip-clipe .clipe-tela { position: absolute; inset: 0; overflow: hidden; }
 .pip-clipe .clipe-tela iframe, .pip-clipe .clipe-tela video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; object-fit: contain; background: #000; pointer-events: none; }
-.pip-clipe .clipe-aviso .instalar-extensao { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 8px; }
 .pip-clipe .clipe-aviso .mini { margin-left: 6px; padding: 2px 8px; border: 1px solid #fff6; border-radius: 6px; color: #fff; }
 .pip-clipe .clipe-aviso { position: absolute; inset: 0; display: grid; place-items: center; padding: 32px 14px 10px; text-align: center; font-size: 12px; line-height: 1.35; color: #d8cfc7; background: #000c; overflow-wrap: anywhere; }
 /* Carregando: o pet no meio, sobre o preto */
@@ -1721,18 +1809,13 @@ body.lista-escondida .rodape-sessoes { display: none; }
 /* Encaixado na lateral, logo acima do player: entra crescendo e empurra a lista de conversas para cima */
 .pip-clipe.no-canto { position: relative; left: auto; bottom: auto; z-index: auto; width: 100%; box-sizing: border-box; max-height: 0; margin: 0 0 0; box-shadow: none; animation: none; opacity: 0; transform: translateY(10px); transition: max-height .45s cubic-bezier(.2, .8, .2, 1), margin .45s cubic-bezier(.2, .8, .2, 1), opacity .3s ease, transform .45s cubic-bezier(.2, .8, .2, 1); }
 .pip-clipe.no-canto.aberto { margin-bottom: 8px; opacity: 1; transform: none; }
-.pip-clipe.no-canto [data-pip-tamanho], .pip-clipe.no-canto .pip-alca, .pip-clipe.no-canto [data-pip="encaixar"] { display: none; }
-/* Encaixado: alça no canto de baixo à direita para diminuir/aumentar ali mesmo (o canto de cima à esquerda fica parado) */
-.pip-clipe .pip-alca-canto { display: none; position: absolute; right: 0; bottom: 0; z-index: 1; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none; }
-.pip-clipe.no-canto .pip-alca-canto { display: block; }
-.pip-clipe .pip-alca-canto::after { content: ""; position: absolute; right: 4px; bottom: 4px; width: 7px; height: 7px; border-bottom: 2px solid #fff9; border-right: 2px solid #fff9; border-radius: 0 0 3px 0; opacity: 0; transition: opacity .18s; }
-.pip-clipe:hover .pip-alca-canto::after { opacity: 1; }
+.pip-clipe.no-canto [data-pip-tamanho], .pip-clipe.no-canto [data-pip="encaixar"] { display: none; }
 .pip-clipe.no-canto.redimensionando { transition: none; }
 /* Arrastado para fora do canto: flutua onde a pessoa soltar, com tamanho P/M/G ou pela alça */
 .pip-clipe { cursor: grab; touch-action: none; }
 .pip-clipe.arrastando { cursor: grabbing; user-select: none; transition: none !important; box-shadow: 0 18px 44px rgba(0, 0, 0, .6); }
 .pip-clipe.pequeno [data-pip-tamanho], .pip-clipe.pequeno .pip-vao { display: none; }
-.pip-clipe.pequeno .pip-barra { justify-content: flex-end; padding: 3px 14px 10px 3px; }
+.pip-clipe.pequeno .pip-barra { justify-content: flex-end; padding: 3px 22px 10px 3px; }
 .pip-clipe.pequeno .pip-barra button { min-width: 20px; height: 20px; padding: 0 3px; }
 .pip-clipe.pequeno .clipe-aviso { padding: 4px; font-size: 10px; line-height: 1.25; }
 .pip-clipe.pequeno .pet-video { transform: scale(.7); }
@@ -1743,15 +1826,27 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .pip-clipe.vai-soltar::after { content: "Solte para tirar do Red Code"; position: absolute; inset: auto 0 0 0; padding: 6px; background: #000c; color: #fff; font: 600 11px/1.2 var(--sans); text-align: center; pointer-events: none; }
 /* Soltando em cima do player: o canto acende para mostrar que volta a encaixar */
 .rodape-sessoes.vai-encaixar .player-midia { outline: 2px dashed var(--voce); outline-offset: 3px; }
-.pip-clipe .pip-barra { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 2px; padding: 5px 18px 16px 5px; background: linear-gradient(#000d, #0000); opacity: 0; transition: opacity .18s; }
+.pip-clipe .pip-barra { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 2px; padding: 5px 22px 16px 5px; background: linear-gradient(#000d, #0000); opacity: 0; transition: opacity .18s; }
 .pip-clipe:hover .pip-barra, .pip-clipe.clipe-com-aviso .pip-barra { opacity: 1; }
 .pip-clipe .pip-barra button { display: grid; place-items: center; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 7px; color: #fff; font: 600 11px/1 var(--sans); }
 .pip-clipe .pip-barra button:hover { background: #ffffff2b; }
 .pip-clipe .pip-barra button.ligado { background: #ffffff38; }
+/* Esticar a imagem: o <video> preenche; o player do YouTube ganha a altura do formato do vídeo e é achatado até caber */
+.pip-clipe [data-pip="esticar"] { display: none !important; }
+.pip-clipe.formato-livre [data-pip="esticar"] { display: grid !important; }
+.pip-clipe.esticado .clipe-tela video { object-fit: fill; }
+.pip-clipe.esticado .clipe-tela iframe { bottom: auto; height: calc(100% * var(--pip-estica, 1)); transform: scaleY(calc(1 / var(--pip-estica, 1))); transform-origin: top; }
 .pip-clipe .pip-vao { flex: 1; }
-.pip-clipe .pip-alca { position: absolute; right: 0; top: 0; z-index: 1; width: 16px; height: 16px; cursor: nesw-resize; touch-action: none; }
-.pip-clipe .pip-alca::after { content: ""; position: absolute; right: 4px; top: 4px; width: 7px; height: 7px; border-top: 2px solid #fff9; border-right: 2px solid #fff9; border-radius: 0 3px 0 0; opacity: 0; transition: opacity .18s; }
+/* Alças coladas na borda: o canto é um arco que segue o arredondado da janelinha e o lado um tracinho em cima da borda */
+.pip-clipe { --alca-grossura: 3px; }
+.pip-clipe .pip-alca { position: absolute; right: 0; top: 0; z-index: 1; width: 20px; height: 20px; cursor: nesw-resize; touch-action: none; }
+.pip-clipe .pip-alca::after { content: ""; position: absolute; right: 0; top: 0; width: 15px; height: 15px; box-sizing: border-box; border-top: var(--alca-grossura) solid #ffffff80; border-right: var(--alca-grossura) solid #ffffff80; border-top-right-radius: 11px; -webkit-mask: linear-gradient(to left, #000 55%, #0000), linear-gradient(to bottom, #000 55%, #0000); -webkit-mask-composite: source-in; mask-composite: intersect; filter: drop-shadow(0 0 1px #0009); opacity: 0; transition: opacity .18s, border-color .18s; }
 .pip-clipe:hover .pip-alca::after { opacity: 1; }
+.pip-clipe .pip-alca:hover::after, .pip-clipe.redimensionando .pip-alca::after { border-color: #ffffffb3; }
+.pip-clipe .pip-alca-lado { position: absolute; right: 0; top: 22px; bottom: 10px; z-index: 1; width: 10px; cursor: ew-resize; touch-action: none; }
+.pip-clipe .pip-alca-lado::after { content: ""; position: absolute; right: 0; top: 50%; width: var(--alca-grossura); height: min(24px, 40%); transform: translateY(-50%); border-radius: 3px 0 0 3px; background: #ffffff80; filter: drop-shadow(0 0 1px #0009); opacity: 0; transition: opacity .18s, height .18s, background .18s; }
+.pip-clipe:hover .pip-alca-lado::after { opacity: 1; }
+.pip-clipe .pip-alca-lado:hover::after, .pip-clipe.redimensionando .pip-alca-lado::after { height: min(32px, 55%); background: #ffffffb3; }
 .pip-clipe.redimensionando { user-select: none; }
 /* Limites de uso abertos: sobem para acima do player (senão cobrem os botões) */
 /* Com o vídeo encaixado acima do player, o cartão de uso sobe junto */
@@ -2061,6 +2156,10 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
 .config-linha { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 0; border-top: 1px solid var(--linha); }
 .config-linha[hidden] { display: none; }
 .config-rotulo { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.icone-integracao { flex: none; display: flex; margin-right: -6px; }
+.botao-icone { display: inline-flex; align-items: center; gap: 6px; }
+.icone-integracao + .config-rotulo { flex: 1; }
+.passos-integracao { margin: 0 0 10px; padding-left: 20px; display: grid; gap: 6px; }
 .config-rotulo b { font-weight: 500; font-size: 13.5px; }
 .config-rotulo small { color: var(--grafite); font-size: 12px; line-height: 1.45; }
 .config-controle { flex: none; display: flex; align-items: center; gap: 8px; }
@@ -2410,6 +2509,8 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
                 <button role="tab" data-aba-config="worktrees" aria-selected="false" data-busca="worktrees copias isoladas branches"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4.5" cy="3.5" r="1.8"/><circle cx="4.5" cy="12.5" r="1.8"/><circle cx="11.5" cy="5.5" r="1.8"/><path d="M4.5 5.3v5.4M11.5 7.3c0 3-4 2.2-6.4 4"/></svg>Worktrees</button>
                 <button role="tab" data-aba-config="github" aria-selected="false" data-busca="github prs ci gh"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 13.5c-3 1-3-1.5-4.2-1.8M10 15v-2.4c0-.7.1-1.1-.4-1.6 2-.2 4.1-1 4.1-4.4 0-.9-.3-1.7-.9-2.4.1-.4.3-1.3-.1-2.4 0 0-.7-.2-2.4.9a8 8 0 0 0-4.4 0C4.2 1.6 3.5 1.8 3.5 1.8c-.4 1.1-.2 2-.1 2.4-.6.7-.9 1.5-.9 2.4 0 3.4 2.1 4.2 4.1 4.4-.4.4-.5.9-.4 1.6V15"/></svg>GitHub</button>
                 <div class="config-grupo">Este computador</div>
+                <button role="tab" data-aba-config="extensoes" aria-selected="false" data-busca="extensoes extensao vscode vsix plugin instalar"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h2.2a1.3 1.3 0 1 1 2.6 0H13v3.2a1.3 1.3 0 1 1 0 2.6v3.7H9.6a1.3 1.3 0 1 0-2.6 0H3V8.3a1.3 1.3 0 1 0 0-2.6V2.5h3z"/></svg>Extensões</button>
+                <button role="tab" data-aba-config="integracoes" aria-selected="false" data-busca="integracoes players musica youtube music desktop ytmdesktop spotify video canto"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 9.5l3-3M7 4.5l1.3-1.3a2.6 2.6 0 0 1 3.7 3.7L10.7 8.2M9 11.5l-1.3 1.3a2.6 2.6 0 0 1-3.7-3.7l1.3-1.3"/></svg>Integrações</button>
                 <button role="tab" data-aba-config="atalhos" aria-selected="false" data-busca="atalhos teclas teclado comandos combinacao video terminal"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="4" width="13" height="8.5" rx="1.5"/><path d="M4 6.8h.01M6.5 6.8h.01M9 6.8h.01M11.5 6.8h.01M5 9.8h6"/></svg>Atalhos</button>
                 <button role="tab" data-aba-config="sistema" aria-selected="false" data-busca="sistema avisos notificacoes windows iniciar com o windows"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="8.5" rx="1.2"/><path d="M5.5 14h5M8 11v3"/></svg>Sistema</button>
                 <button role="tab" data-aba-config="dev" aria-selected="false" data-busca="desenvolvedor versao porta logs reiniciar servidor"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 2a3.5 3.5 0 0 0-3.2 4.9L2.5 11.7v1.8h1.8l4.8-4.8A3.5 3.5 0 1 0 10.5 2z"/></svg>Desenvolvedor</button>
@@ -2503,6 +2604,14 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
             <button type="submit" class="botao principal">Começar conversa</button>
         </div>
     </form>
+</div>
+<aside class="gaveta-ext" id="gavetaExtensoes" hidden aria-label="Extensões">
+    <div class="ge-topo"><b>Extensões</b><span class="ge-vao"></span><button type="button" data-ge-config title="Gerenciar extensões">Gerenciar</button><button type="button" data-ge-fechar title="Fechar (Esc)" aria-label="Fechar">×</button></div>
+    <div class="ge-corpo" id="gavetaExtCorpo"></div>
+</aside>
+<div class="toasts-ext" id="toastsExt" aria-live="polite"></div>
+<div class="ajuda" id="janelaExtPergunta" hidden>
+    <div class="caixa pergunta-ext" role="dialog" aria-modal="true"></div>
 </div>
 <div class="ajuda" id="janelaNovidades" hidden>
     <div class="caixa novidades" role="dialog" aria-modal="true" aria-labelledby="tituloNovidades"></div>
@@ -2976,7 +3085,7 @@ async function vigiaMidia() {
 }
 playerMidia.addEventListener('click', async (ev) => {
     if (ev.target.closest('[data-midia-dispensar]')) { avisoMidiaDispensado = true; return desenhaMidia(); }
-    if (ev.target.closest('[data-midia-clipe]')) { if (clipePip) fechaPip(true); else abrePip(); return desenhaMidia(); }
+    if (ev.target.closest('[data-midia-clipe]')) return alternaVideoCanto();
     const b = ev.target.closest('[data-midia]');
     if (!b) return;
     // Resposta imediata no botão; a leitura seguinte confirma o estado real
@@ -2990,12 +3099,14 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) atua
 setTimeout(atualizaMidia, 0);
 
 /* ---------- Vídeo da mídia no canto (como o picture-in-picture do navegador) ---------- */
-// A extensão do navegador diz qual vídeo do YouTube toca e em que segundo; o clipe.js toca uma cópia muda dele
+// O servidor diz qual vídeo do YouTube toca e em que segundo (aba selecionada do navegador ou player externo); o clipe.js toca uma cópia muda dele
 const SUPORTA_CLIPE = !!window.ClipeMusica && !JANELA_SECUNDARIA;
 const SO_AUDIO = /spotify|deezer|tidal|amazonmusic|applemusic|zunemusic/i;
 let pip = null, clipePip = null;
 function abrePip() {
     if (!SUPORTA_CLIPE) return;
+    // Um vídeo só: abrindo no canto, a janela solta (se houver) fecha
+    if (lePref('clipe', '') === 'solto' && 'BroadcastChannel' in window) new BroadcastChannel('redcode-clipe').postMessage({ tipo: 'fecha-janela' });
     gravaPref('clipe', 'canto');
     if (!pip) {
         pip = document.createElement('div');
@@ -3008,21 +3119,22 @@ function abrePip() {
                 <button type="button" data-pip-tamanho="360" title="Médio">M</button>
                 <button type="button" data-pip-tamanho="520" title="Grande">G</button>
                 <span class="pip-vao"></span>
+                <button type="button" data-pip="esticar" title="Esticar a imagem (sem faixas pretas)" aria-label="Esticar a imagem"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 8h13M4.5 5l-3 3 3 3M11.5 5l3 3-3 3"/></svg></button>
                 <button type="button" data-pip="encaixar" title="Encaixar de volta acima do player" aria-label="Encaixar de volta">${ICONE_MIDIA.encaixar}</button>
                 <button type="button" data-pip="soltar" title="Desanexar: janela própria, sempre por cima das outras" aria-label="Desanexar">${ICONE_MIDIA.soltar}</button>
                 <button type="button" data-pip="fechar" title="Fechar o vídeo" aria-label="Fechar o vídeo">${ICONE_MIDIA.fechar}</button>
             </div>
-            <span class="pip-alca" title="Arraste para mudar o tamanho"></span>
-            <span class="pip-alca-canto" title="Arraste para diminuir ou aumentar"></span>`;
+            <span class="pip-alca" title="Arraste para mudar o tamanho (duplo clique volta ao formato do vídeo)"></span>
+            <span class="pip-alca-lado" title="Arraste para os lados para alargar ou estreitar (duplo clique volta ao formato do vídeo)"></span>`;
         // No rodapé da lateral, logo acima do player (a lista de conversas encolhe para dar lugar)
         pip.classList.add('no-canto');
         document.getElementById('rodapeSessoes').insertBefore(pip, playerMidia);
+        aplicaProporcaoPip();
         ligaPip();
     }
     if (lePref('clipeFlutua', '') === '1') modoPip(true);
     if (!clipePip) clipePip = ClipeMusica(pip, {
-        confirma: (titulo, texto) => confirmaNaPagina(titulo, `<p>${esc(texto)}</p>`, 'Instalar e reabrir'),
-        aoProporcao: (r) => { pip.style.setProperty('--pip-prop', r.toFixed(4)); if (pip.classList.contains('flutuando')) posicionaPip(); else if (pip.classList.contains('aberto')) mostraPip(true); },
+        aoProporcao: (r) => { pip.__propVideo = r; aplicaProporcaoPip(); if (pip.classList.contains('flutuando')) posicionaPip(); else if (pip.classList.contains('aberto')) mostraPip(true); },
     });
     atualizaPip();
 }
@@ -3050,6 +3162,31 @@ function mostraPip(mostrar) {
         pip.__fecha = setTimeout(() => { if (!pip.classList.contains('aberto')) pip.hidden = true; }, 460);
     }
 }
+// Formato do quadrinho: o que a pessoa puxou pelas alças ou, sem isso, o do próprio vídeo (o vídeo fica inteiro com faixa preta)
+function aplicaProporcaoPip() {
+    if (!pip) return;
+    const doVideo = pip.__propVideo || 16 / 9;
+    let formato = Number(lePref('clipeProp', '')) || doVideo;
+    // Encaixado numa lateral estreita: o formato cede para a altura não cair abaixo de 63px (a escolha fica guardada)
+    if (pip.classList.contains('no-canto') && larguraLivreCanto()) formato = Math.min(formato, larguraLivreCanto() / 63);
+    pip.style.setProperty('--pip-prop', formato.toFixed(4));
+    pip.style.setProperty('--pip-estica', (formato / doVideo).toFixed(4));
+    // Formato mudado pela alça: a pessoa escolhe entre faixas pretas (o vídeo inteiro) e a imagem esticada
+    const livre = Math.abs(formato / doVideo - 1) > 0.02;
+    pip.classList.toggle('formato-livre', livre);
+    pip.classList.toggle('esticado', livre && !!lePref('clipeEsticar', ''));
+    const botao = pip.querySelector('[data-pip="esticar"]');
+    if (botao) { botao.classList.toggle('ligado', pip.classList.contains('esticado')); botao.title = pip.classList.contains('esticado') ? 'Voltar às faixas pretas (o vídeo inteiro)' : 'Esticar a imagem (sem faixas pretas)'; }
+}
+const limitaProporcao = (largura, altura) => Math.max(0.5, Math.min(4, largura / Math.max(63, altura)));
+// Esticado para o lado, a largura mínima sobe junto para a altura nunca ficar abaixo de 63px
+const larguraMinimaPip = (proporcao) => Math.max(112, Math.ceil(63 * proporcao));
+const proporcaoAtualPip = () => parseFloat(pip.style.getPropertyValue('--pip-prop')) || 16 / 9;
+function voltaFormatoDoVideo() {
+    gravaPref('clipeProp', '');
+    aplicaProporcaoPip();
+    if (pip.classList.contains('flutuando')) posicionaPip(); else mostraPip(true);
+}
 // Largura de dentro da lateral (sem o espaçamento dela): o máximo do vídeo encaixado
 function larguraLivreCanto() {
     const pai = pip && pip.parentElement;
@@ -3060,9 +3197,10 @@ function larguraLivreCanto() {
 // Encaixado: a largura escolhida pela alça (vazio = a lateral toda); bem pequeno usa a barra enxuta
 function aplicaLarguraCanto() {
     if (!pip || !pip.classList.contains('no-canto')) return;
+    aplicaProporcaoPip();
     const escolhida = Number(lePref('clipeLarguraCanto', '')) || 0;
     const cabe = larguraLivreCanto();
-    const largura = escolhida && cabe ? Math.max(112, Math.min(escolhida, cabe)) : 0;
+    const largura = escolhida && cabe ? Math.min(cabe, Math.max(larguraMinimaPip(proporcaoAtualPip()), escolhida)) : 0;
     pip.style.width = largura && largura < cabe ? largura + 'px' : '';
     pip.classList.toggle('pequeno', !!largura && largura < 220);
 }
@@ -3070,8 +3208,9 @@ function aplicaLarguraCanto() {
 function posicionaPip() {
     if (!pip || pip.hidden || !pip.classList.contains('flutuando')) return;
     // Flutuando: largura escolhida (P/M/G ou alça) e posição dentro da janela
+    aplicaProporcaoPip();
     const proporcao = parseFloat(pip.style.getPropertyValue('--pip-prop')) || 16 / 9;
-    const largura = Math.round(Math.max(112, Math.min(Number(lePref('clipeLargura', '360')) || 360, innerWidth - 24, (innerHeight - 24) * proporcao)));
+    const largura = Math.round(Math.max(larguraMinimaPip(proporcao), Math.min(Number(lePref('clipeLargura', '360')) || 360, innerWidth - 24, (innerHeight - 24) * proporcao)));
     pip.style.width = largura + 'px';
     // Bem pequeno: a barra fica só com encaixar, desanexar e fechar; pet e avisos menores
     pip.classList.toggle('pequeno', largura < 220);
@@ -3118,9 +3257,10 @@ function ligaPip() {
         if (b.dataset.pip === 'fechar') { fechaPip(true); return desenhaMidia(); }
         if (b.dataset.pip === 'encaixar') return modoPip(false);
         if (b.dataset.pip === 'soltar') desanexaPip();
+        if (b.dataset.pip === 'esticar') { gravaPref('clipeEsticar', lePref('clipeEsticar', '') ? '' : '1'); aplicaProporcaoPip(); }
     });
     pip.addEventListener('pointerdown', (ev) => {
-        if (ev.button !== 0 || ev.target.closest('button, .pip-alca, .pip-alca-canto, .clipe-aviso button')) return;
+        if (ev.button !== 0 || ev.target.closest('button, .pip-alca, .pip-alca-lado, .clipe-aviso button')) return;
         const r0 = pip.getBoundingClientRect();
         const dx = ev.clientX - r0.left, dy = ev.clientY - r0.top, x0 = ev.clientX, y0 = ev.clientY;
         let movendo = false;
@@ -3128,7 +3268,7 @@ function ligaPip() {
         const emCimaDoPlayer = (e) => { const r = playerMidia.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top - 20 && e.clientY <= r.bottom + 10; };
         // Ponteiro fora da janela do Red Code: soltar ali vira janela solta (como o picture-in-picture do navegador)
         const foraDaJanela = (e) => podeSoltarFora() && (e.clientX < 0 || e.clientY < 0 || e.clientX >= innerWidth || e.clientY >= innerHeight);
-        const mexe = (e) => {
+        acompanhaArraste(pip, (e) => {
             if (!movendo) {
                 if (Math.hypot(e.clientX - x0, e.clientY - y0) < 6) return;
                 movendo = true;
@@ -3142,13 +3282,12 @@ function ligaPip() {
             posicionaPip();
             rodape.classList.toggle('vai-encaixar', emCimaDoPlayer(e));
             pip.classList.toggle('vai-soltar', foraDaJanela(e));
-        };
-        const solta = (e) => {
-            pip.removeEventListener('pointermove', mexe);
+        }, (e, soltou) => {
             pip.classList.remove('arrastando', 'vai-soltar');
             rodape.classList.remove('vai-encaixar');
             if (!movendo) return;
-            pip.__arrastou = true;
+            seguraClique();
+            if (!soltou) return;
             if (foraDaJanela(e)) {
                 // Nasce com o mesmo tamanho, com o ponto que a pessoa segurava embaixo do ponteiro
                 const largura = pip.offsetWidth, altura = pip.offsetHeight;
@@ -3156,51 +3295,77 @@ function ligaPip() {
                 return desanexaPip({ x: e.screenX - px, y: e.screenY - py, width: largura, height: altura });
             }
             if (emCimaDoPlayer(e)) modoPip(false);
-        };
-        pip.addEventListener('pointermove', mexe);
-        pip.addEventListener('pointerup', solta, { once: true });
-        pip.addEventListener('pointercancel', solta, { once: true });
-    });
-    // Encaixado: alça no canto de baixo à direita; para a esquerda ou para cima diminui, o vídeo continua acima do player
-    const alcaCanto = pip.querySelector('.pip-alca-canto');
-    alcaCanto.addEventListener('pointerdown', (ev) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        alcaCanto.setPointerCapture(ev.pointerId);
-        const x0 = ev.clientX, y0 = ev.clientY, largura0 = pip.offsetWidth, proporcao = pip.offsetWidth / pip.offsetHeight;
-        const cabe = larguraLivreCanto();
-        pip.classList.add('redimensionando');
-        const mexe = (e) => {
-            // Vale o movimento maior: o de lado ou o de cima/baixo (convertido em largura pela proporção do vídeo)
-            const dx = e.clientX - x0, dy = (e.clientY - y0) * proporcao;
-            const largura = Math.round(Math.max(112, Math.min(cabe, largura0 + (Math.abs(dx) > Math.abs(dy) ? dx : dy))));
-            gravaPref('clipeLarguraCanto', largura >= cabe ? '' : String(largura));
-            mostraPip(true);
-        };
-        const solta = () => { alcaCanto.removeEventListener('pointermove', mexe); pip.classList.remove('redimensionando'); pip.__arrastou = true; setTimeout(() => { pip.__arrastou = false; }, 0); };
-        alcaCanto.addEventListener('pointermove', mexe);
-        alcaCanto.addEventListener('pointerup', solta, { once: true });
-        alcaCanto.addEventListener('pointercancel', solta, { once: true });
+        });
     });
     // Alça no canto de cima à direita: arrastar para fora aumenta (o quadrinho cresce para cima e para a direita)
     const alca = pip.querySelector('.pip-alca');
     alca.addEventListener('pointerdown', (ev) => {
+        if (ev.button !== 0) return;
         ev.preventDefault();
+        ev.stopPropagation();
         alca.setPointerCapture(ev.pointerId);
         const x0 = ev.clientX, y0 = ev.clientY, largura0 = pip.offsetWidth, proporcao = pip.offsetWidth / pip.offsetHeight;
+        const encaixado = pip.classList.contains('no-canto'), cabe = encaixado ? larguraLivreCanto() : Infinity;
         pip.classList.add('redimensionando');
         const baixo0 = pip.getBoundingClientRect().bottom;
-        const mexe = (e) => {
-            const largura = Math.round(Math.max(112, largura0 + Math.max(e.clientX - x0, (y0 - e.clientY) * proporcao)));
+        acompanhaArraste(alca, (e) => {
+            const dx = e.clientX - x0, dy = (y0 - e.clientY) * proporcao;
+            if (encaixado) {
+                const largura = Math.round(Math.min(cabe, Math.max(larguraMinimaPip(proporcao), largura0 + (Math.abs(dx) > Math.abs(dy) ? dx : dy))));
+                gravaPref('clipeLarguraCanto', largura >= cabe ? '' : String(largura));
+                return mostraPip(true);
+            }
+            const largura = Math.round(Math.max(larguraMinimaPip(proporcao), largura0 + Math.max(dx, dy)));
             gravaPref('clipeLargura', String(largura));
             gravaPref('clipeY', String(Math.round(baixo0 - largura / proporcao)));
             posicionaPip();
-        };
-        const solta = () => { alca.removeEventListener('pointermove', mexe); pip.classList.remove('redimensionando'); };
-        alca.addEventListener('pointermove', mexe);
-        alca.addEventListener('pointerup', solta, { once: true });
-        alca.addEventListener('pointercancel', solta, { once: true });
+        }, () => { pip.classList.remove('redimensionando'); seguraClique(); });
     });
+    alca.addEventListener('dblclick', (ev) => { ev.stopPropagation(); voltaFormatoDoVideo(); });
+    // Borda direita: puxar de lado muda só a largura (a altura fica); faixa preta ou imagem esticada conforme a escolha
+    const alcaLado = pip.querySelector('.pip-alca-lado');
+    alcaLado.addEventListener('pointerdown', (ev) => {
+        if (ev.button !== 0) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        alcaLado.setPointerCapture(ev.pointerId);
+        const x0 = ev.clientX, largura0 = pip.offsetWidth, altura0 = pip.offsetHeight;
+        const encaixado = pip.classList.contains('no-canto'), cabe = encaixado ? larguraLivreCanto() : Infinity;
+        pip.classList.add('redimensionando');
+        acompanhaArraste(alcaLado, (e) => {
+            const largura = Math.round(Math.max(112, Math.min(cabe, largura0 + e.clientX - x0)));
+            gravaPref('clipeProp', limitaProporcao(largura, altura0).toFixed(4));
+            aplicaProporcaoPip();
+            if (encaixado) { gravaPref('clipeLarguraCanto', largura >= cabe ? '' : String(largura)); mostraPip(true); }
+            else { gravaPref('clipeLargura', String(largura)); posicionaPip(); }
+        }, () => { pip.classList.remove('redimensionando'); seguraClique(); });
+    });
+    alcaLado.addEventListener('dblclick', (ev) => { ev.stopPropagation(); voltaFormatoDoVideo(); });
+}
+// O clique que vem logo depois de um arraste não vale (não fecha nem encaixa sem querer)
+function seguraClique() {
+    pip.__arrastou = true;
+    setTimeout(() => { pip.__arrastou = false; }, 0);
+}
+// Arraste até soltar o botão; botão já solto, cancelado ou sem captura encerram sem desanexar nem encaixar
+function acompanhaArraste(el, aoMexer, aoSoltar) {
+    let acabou = false;
+    const encerra = (e, soltou) => {
+        if (acabou) return;
+        acabou = true;
+        el.removeEventListener('pointermove', mexe);
+        el.removeEventListener('pointerup', soltouBotao);
+        el.removeEventListener('pointercancel', cancelou);
+        el.removeEventListener('lostpointercapture', cancelou);
+        aoSoltar(e, soltou);
+    };
+    const mexe = (e) => { if (!(e.buttons & 1)) return encerra(e, false); aoMexer(e); };
+    const soltouBotao = (e) => encerra(e, true);
+    const cancelou = (e) => encerra(e, false);
+    el.addEventListener('pointermove', mexe);
+    el.addEventListener('pointerup', soltouBotao);
+    el.addEventListener('pointercancel', cancelou);
+    el.addEventListener('lostpointercapture', cancelou);
 }
 if (SUPORTA_CLIPE && 'BroadcastChannel' in window) {
     // Conversa com a janela desanexada (clipe.html): voltar para o canto, fechar
@@ -4351,9 +4516,17 @@ function markdownLinha(linha) {
             ? `<code class="link-arquivo" role="link" tabindex="0" data-abrir-arquivo="${c}" title="Clique: abre no VS Code · Ctrl + clique: abre no editor do Red Code">${c}</code>`
             : `<code>${c}</code>`)
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        // Link web vira link clicável (abre em outra aba); caminho local fica só o texto (tem o botão "Abrir")
+        // Link web vira link clicável (abre em outra aba)
         .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a class="link-md" href="$2" target="_blank" rel="noopener noreferrer" title="$2">$1 ↗</a>')
-        .replace(/!?\[([^\]]+)\]\([^)\s]+\)/g, '$1')
+        // Link para arquivo do projeto ([database/x.sql](database/x.sql), com #L12 ou :12): abre o arquivo como o `caminho`
+        .replace(/!?\[([^\]]+)\]\(([^)\s]+)\)/g, (todo, texto, alvo) => {
+            const m = alvo.replace(/&amp;/g, '&').match(/^([^#]+?)(?:#L(\d+)(?:-L?\d+)?)?$/);
+            let caminho = '';
+            try { caminho = m ? decodeURIComponent(m[1]).replace(/^file:\/\/\/?/i, '') + (m[2] ? ':' + m[2] : '') : ''; } catch (e) { caminho = ''; }
+            if (!caminho || todo.startsWith('!') || !ehCaminhoCitado(caminho)) return texto;
+            const c = esc(caminho);
+            return `<code class="link-arquivo" role="link" tabindex="0" data-abrir-arquivo="${c}" title="${c} · Clique: abre no VS Code · Ctrl + clique: abre no editor do Red Code">${texto.replace(/<[^>]+>/g, '')}</code>`;
+        })
         .replace(/^#{1,4} (.+)$/, '<strong>$1</strong>');
 }
 // Células de uma linha de tabela "| a | b |" (pipes escapados \| ficam no texto)
@@ -4626,7 +4799,7 @@ function itemSessao(s, { numeroParte = 1, total = 1, filho = false, raiz = '', a
             ? `<span class="linha-selo"><span class="selo-status trabalhando"><i class="giro-mini" aria-hidden="true"></i></span><span class="fazendo" title="${esc(fazendo)}">${esc(fazendo || 'Trabalhando…')}</span></span>`
             : situacao.selo
             // Demais estados: um selo só, com o texto junto ("✓ Respondeu há 5 min")
-            ? `<span class="linha-selo"><span class="selo-status ${situacao.classe}"><b>${situacao.icone}</b>${esc(situacao.selo)}<span class="selo-texto">, ${esc(situacao.texto)}</span></span></span>`
+            ? `<span class="linha-selo"><span class="selo-status ${situacao.classe}" title="${esc(situacao.selo + ', ' + situacao.texto)}"><b>${situacao.icone}</b>${esc(situacao.selo)}<span class="selo-texto">, ${esc(situacao.texto)}</span></span></span>`
             : ''}
         <span class="info-item">${!filho && total > 1 ? `<button class="partes" data-partes="${esc(raiz)}" aria-expanded="${aberta}" title="${aberta ? 'Esconder as partes anteriores' : 'Ver as partes anteriores'}">${total} partes ${aberta ? '▴' : '▾'}</button>` : ''}<span class="etiqueta-projeto" title="${esc(s.nomeProjeto)}">${esc(nomeProjetoBonito(s.nomeProjeto))}</span>${esc(modeloCurto(s.modelo))}${situacao.selo ? '' : ', ' + esc(situacao.texto)}${s.contexto ? `, ${mil(s.contexto)}` : ''}</span>
         ${s.contexto ? `<span class="barra-contexto nivel-${nivel}" title="Contexto: ${mil(s.contexto)} de ${mil(LIMITES.janela)}"><span style="width:${largura}%"></span></span>` : ''}
@@ -6246,6 +6419,31 @@ const ICONES_TEMA = {
     claro: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1"/></svg>',
     escuro: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>',
 };
+const ICONES_INTEGRACAO = {
+    'ytm-desktop': '<svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#ff0033"/><circle cx="12" cy="12" r="6.4" fill="none" stroke="#fff" stroke-width="1.3"/><path d="M10.2 9.3v5.4l4.6-2.7z" fill="#fff"/></svg>',
+};
+const situacaoPlayer = (p) => p.aviso ? ['failed', 'falta um passo'] : !p.aberto ? ['', 'app fechado'] : !p.pareado ? ['', 'pareando'] : ['connected', 'conectado'];
+const linhaPlayerExterno = (p) => {
+    const [classe, texto] = situacaoPlayer(p);
+    const controle = p.ligado
+        ? `<span class="estado-mcp ${classe}">${texto}</span><button class="botao" data-player-desativar="${esc(p.id)}">Desativar</button>`
+        : `<button class="botao principal botao-icone" data-player-integrar="${esc(p.id)}"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 9.5l3-3M7 4.5l1.3-1.3a2.6 2.6 0 0 1 3.7 3.7L10.7 8.2M9 11.5l-1.3 1.3a2.6 2.6 0 0 1-3.7-3.7l1.3-1.3"/></svg>Integrar</button>`;
+    return `<div class="config-linha" data-busca="${esc(semAcento(p.nome + ' ' + p.descricao + ' players musica'))}">
+        <span class="icone-integracao">${ICONES_INTEGRACAO[p.id] || ''}</span>
+        <div class="config-rotulo"><b>${esc(p.nome)}</b><small>${esc(p.ligado && p.aviso ? p.aviso[0].toUpperCase() + p.aviso.slice(1) : p.descricao)}</small></div>
+        <div class="config-controle">${controle}</div>
+    </div>`;
+};
+let timerIntegracoes = null;
+function vigiaIntegracoes() {
+    clearTimeout(timerIntegracoes);
+    timerIntegracoes = setTimeout(async () => {
+        const lista = document.getElementById('listaPlayersExternos');
+        if (!lista || janelaConfig.hidden) return;
+        try { const html = (await getPainel('/api/players-externos')).map(linhaPlayerExterno).join(''); if (lista.innerHTML !== html) { lista.innerHTML = html; filtraConfig(); } } catch (e) { }
+        vigiaIntegracoes();
+    }, 2000);
+}
 const SECOES_CONFIG = {
     async geral() {
         const tema = lePref('tema', 'escuro');
@@ -6297,6 +6495,23 @@ const SECOES_CONFIG = {
         return '<h3 class="config-titulo">Skills</h3>'
             + `<p class="nota">${cwd ? 'As suas, as do projeto desta conversa e as dos plugins.' : 'Sem conversa aberta: só as skills do disco. Abra uma conversa para ver as do projeto e dos plugins.'} Para usar, digite / no campo de mensagem.</p>`
             + (skills.length ? skills.map(c => `<div class="config-skill" data-busca="${esc(semAcento(c.nome + ' ' + (c.descricao || '') + ' ' + c.origem))}"><b>/${esc(c.nome)}</b><span class="etiqueta">${esc(c.origem)}</span><small>${esc(c.descricao || '')}</small></div>`).join('') : '<p class="nota">Nenhuma skill encontrada.</p>');
+    },
+    async extensoes() {
+        const e = await getPainel('/api/extensoes/estado');
+        return '<h3 class="config-titulo">Extensões</h3>'
+            + '<p class="nota">Extensões do VS Code (.vsix) de painel, comandos e configurações rodam aqui, cada uma num processo próprio e com as suas permissões, como no VS Code. Extensões de editor (linguagens, depurador, temas) não funcionam. Os painéis ficam no botão de peça no topo da lista.</p>'
+            + linhaConfig('Instalar uma extensão', 'Escolha o arquivo .vsix. Antes de instalar, o Red Code mostra o nome, a versão e quem publicou.', '<label class="mini botao-arquivo">Escolher .vsix…<input type="file" accept=".vsix" data-ext-instalar hidden></label>', 'instalar vsix')
+            + (e.extensoes.length ? e.extensoes.map(cartaoConfigExt).join('') : '<p class="nota">Nenhuma extensão instalada.</p>');
+    },
+    async integracoes() {
+        const players = await getPainel('/api/players-externos');
+        vigiaIntegracoes();
+        return '<h3 class="config-titulo">Integrações</h3>'
+            + '<p class="nota">Conecte o Red Code a aplicativos externos.</p>'
+            + '<h3 class="sub-config">Music Player</h3>'
+            + `<div id="listaPlayersExternos">${players.map(linhaPlayerExterno).join('')}</div>`
+            + '<h3 class="sub-config">Navegador</h3>'
+            + await linhaExtensaoNavegador();
     },
     async atalhos() {
         // Global (mostrar/esconder o Red Code de qualquer programa): só no app; o resto vale com a janela do Red Code em foco
@@ -6441,6 +6656,8 @@ janelaConfig.addEventListener('click', async (evt) => {
         else { const g = atalhosGravados(); delete g[id]; gravaPref('atalhos', JSON.stringify(g)); }
         return abreConfig('atalhos');
     }
+    if (await cliqueConfigExt(evt)) return;
+    if (await cliqueExtensaoNavegador(evt)) return;
     if (acao && acao.dataset.configAcao === 'novidades') { janelaConfig.hidden = true; return mostraNovidades(true); }
     if (acao && acao.dataset.configAcao === 'atualizacoes') {
         const texto = acao.textContent;
@@ -7005,6 +7222,20 @@ janelaConfig.addEventListener('click', async (ev) => {
     if (ev.target === janelaConfig || ev.target.closest('[data-fechar-config]')) { janelaConfig.hidden = true; return; }
     const aba = ev.target.closest('[data-aba-config]');
     if (aba) return abreConfig(aba.dataset.abaConfig);
+    const integrar = ev.target.closest('[data-player-integrar]');
+    if (integrar) {
+        const p = (await getPainel('/api/players-externos').catch(() => [])).find(x => x.id === integrar.dataset.playerIntegrar);
+        if (!p) return;
+        const site = p.site ? `<p class="nota">Ainda não tem o app? <a href="${esc(p.site)}" target="_blank">Baixe em ${esc(p.site.replace(/^https?:\/\//, ''))} ↗</a></p>` : '';
+        if (!await confirmaNaPagina('Integrar ' + p.nome, `<ol class="passos-integracao">${(p.passos || []).map(t => `<li>${esc(t)}</li>`).join('')}</ol>${site}`, 'Ativar')) return;
+        try { recado((await api('/api/players-externos', { id: p.id, acao: 'ligar' })).nome + ' ativado'); } catch (e) { recado(e.message); }
+        return abreConfig('integracoes');
+    }
+    const desativar = ev.target.closest('[data-player-desativar]');
+    if (desativar) {
+        try { recado((await api('/api/players-externos', { id: desativar.dataset.playerDesativar, acao: 'desligar' })).nome + ' desativado'); } catch (e) { recado(e.message); }
+        return abreConfig('integracoes');
+    }
     const abrirAchado = ev.target.closest('[data-abrir-achado]');
     if (abrirAchado) { janelaConfig.hidden = true; return abreSessao(abrirAchado.dataset.abrirAchado); }
     const salvarAg = ev.target.closest('#agSalvar');
@@ -7650,6 +7881,8 @@ document.addEventListener('keydown', (ev) => {
         if (!janelaNova.hidden) { janelaNova.hidden = true; return; }
         if (!janelaAlteracoes.hidden) { janelaAlteracoes.hidden = true; return; }
         if (!document.getElementById('janelaNovidades').hidden) { document.getElementById('janelaNovidades').hidden = true; return; }
+        if (!document.getElementById('janelaExtPergunta').hidden) { respondePerguntaExt(null); return; }
+        if (!document.getElementById('gavetaExtensoes').hidden) { fechaGavetaExt(); return; }
         if (!document.getElementById('menuSumario').hidden) { document.getElementById('menuSumario').hidden = true; return; }
         if (document.activeElement.id === 'procuraSessao' || procura) {
             procura = '';
@@ -9444,10 +9677,10 @@ function alternaQuebra() {
 elEv('evVscode').addEventListener('click', () => { if (ev.arquivo) { window.open(linkVscode(ev.arquivo, ev.linha)); recado('Abrindo no VS Code'); } });
 elEv('evEditor').addEventListener('click', () => { if (ev.arquivo) abreEditor(ev.arquivo, ev.linha); });
 elEv('evPainel').addEventListener('click', () => document.getElementById('btnLateral').click());
-// Painel lateral por cima do editor: clicar fora fecha
+// Painel lateral por cima do editor: clicar fora fecha (as alças de largura não contam: soltar o arrasto gera um click nelas)
 document.addEventListener('click', (evt) => {
     if (!document.body.classList.contains('layout-editor') || !document.body.classList.contains('lateral-aberta')) return;
-    if (evt.target.closest('.lateral, #btnLateral, #evPainel, .botoes-cantos, .pop-visual')) return;
+    if (evt.target.closest('.lateral, .alca-coluna, #btnLateral, #evPainel, .botoes-cantos, .pop-visual')) return;
     document.getElementById('btnLateral').click();
 });
 // Configuração do visual (⚙ no topo e no editor)
@@ -9524,6 +9757,429 @@ janelaNovidades.addEventListener('click', (ev) => { if (ev.target === janelaNovi
 new MutationObserver(() => { if (janelaNovidades.hidden && janelaNovidades.dataset.versao) { if (lePref('novidadesVistas', '') !== janelaNovidades.dataset.versao) gravaPref('novidadesDesde', janelaNovidades.dataset.desde || ''); gravaPref('novidadesVistas', janelaNovidades.dataset.versao); delete janelaNovidades.dataset.versao; } }).observe(janelaNovidades, { attributes: true, attributeFilter: ['hidden'] });
 // Só na janela principal, um pouco depois de abrir (a tela termina de montar antes)
 if (!JANELA_SECUNDARIA) setTimeout(() => mostraNovidades(false), 1500);
+
+/* ---------- Integrações › Navegador: extensão opcional do vídeo no canto ---------- */
+// Sem ela o vídeo vem da aba selecionada do navegador (leitura nativa). Com ela, do próprio player do YouTube: sincronia
+// de ~10-20 ms, a próxima música já pronta e anúncio/modo Áudio detectados. Instalar = atalhos do Brave/Edge com
+// --load-extension (instala-extensao.ps1); o Chrome não aceita mais: só à mão
+async function linhaExtensaoNavegador() {
+    let r = {};
+    try { r = await getPainel('/api/midia/video'); } catch (e) { /* sem resposta */ }
+    const navegadores = (r.navegadores || []).filter(n => n.suporta);
+    const status = r.extensao ? '<span class="ce-status ativa">Detectada</span>' : '<span class="ce-status">Não detectada</span>';
+    return `<div class="config-ext" data-busca="extensao navegador video canto brave edge chrome youtube">
+        <div class="ce-topo"><b>Extensão do vídeo no canto</b><small>opcional</small>${status}</div>
+        <p>O vídeo no canto já funciona sem ela, pela aba selecionada do navegador. Com a extensão fica mais preciso: sincronia de ~10-20 ms, a próxima música já pronta e anúncio e modo "Áudio" do YouTube Music detectados.</p>
+        <div class="ce-acoes">${navegadores.map(n => `<button class="mini" data-instalar-extensao="${esc(n.id)}" data-nome="${esc(n.nome)}">Instalar no ${esc(n.nome)}</button>`).join('')}<button class="mini" data-extensao-manual="${esc(r.pastaExtensao || '')}">Instalar à mão</button></div>
+        <p class="nota" data-extensao-passos hidden></p>
+    </div>`;
+}
+async function cliqueExtensaoNavegador(evt) {
+    const manual = evt.target.closest('[data-extensao-manual]');
+    if (manual) {
+        const p = manual.closest('.config-ext').querySelector('[data-extensao-passos]');
+        p.textContent = `No navegador, abra a página de extensões (brave://extensions, chrome://extensions ou edge://extensions), ligue o "Modo do desenvolvedor", clique em "Carregar sem compactação" e escolha a pasta: ${manual.dataset.extensaoManual}`;
+        p.hidden = false;
+        return true;
+    }
+    const inst = evt.target.closest('[data-instalar-extensao]');
+    if (!inst) return false;
+    const nome = inst.dataset.nome;
+    if (!(await confirmaNaPagina(`Instalar a extensão no ${nome}?`, `<p>O Red Code coloca a extensão nos atalhos do ${esc(nome)} (guarda uma cópia dos atalhos antes) e reabre o ${esc(nome)}: as abas e janelas voltam como estavam. O que estiver digitado e não enviado em alguma página se perde.</p>`, 'Instalar e reabrir'))) return true;
+    try { await api('/api/midia/extensao', { navegador: inst.dataset.instalarExtensao, reiniciar: true }); recado(`Extensão instalada no ${nome}: abra (ou recarregue) o vídeo no YouTube`); }
+    catch (e) { recado(e.message); }
+    abreConfig('integracoes');
+    return true;
+}
+
+/* ---------- Extensões do VS Code (.vsix): gaveta com os painéis, avisos, caixas de digitar e a aba nas Configurações ---------- */
+// Servidor: extensoes.js (cada extensão num processo, extensoes-host.js). A página só desenha e repassa: o que a extensão
+// pede chega pelo long-poll /api/extensoes/eventos (também com a janela escondida, para o aviso do Windows sair)
+const btnExtensoes = document.getElementById('btnExtensoes');
+const gavetaExt = document.getElementById('gavetaExtensoes');
+const corpoGavetaExt = document.getElementById('gavetaExtCorpo');
+let extEstado = { versao: 0, extensoes: [], pendentes: [] };
+const SEP_EXT = '\n';                // separa id e viewId nas chaves (não aparece em nenhum dos dois)
+const extIframes = new Map();          // id + SEP_EXT + viewId -> iframe (nunca muda de lugar no DOM: mover recarregaria)
+const extVisiveis = new Set();         // 'id|viewId' que a extensão já sabe que estão à vista
+const extPendentesVistos = new Set();  // avisos/perguntas já na tela
+const extFilaPerguntas = [];           // perguntas modais esperando a vez
+let extPerguntaAtual = null;
+const extNome = (id) => (extEstado.extensoes.find(x => x.id === id) || {}).nome || id;
+const extUrlWebview = (id, viewId, v) => `/api/extensoes/webview/${encodeURIComponent(id)}/${encodeURIComponent(viewId)}?v=${v || 0}`;
+// Tema do Red Code nas variáveis que as webviews do VS Code usam
+const MAPA_TEMA_EXT = {
+    '--vscode-foreground': '--tinta', '--vscode-descriptionForeground': '--grafite', '--vscode-font-family': '--sans', '--vscode-editor-font-family': '--mono',
+    '--vscode-textLink-foreground': '--voce', '--vscode-sideBarSectionHeader-foreground': '--tinta', '--vscode-sideBarSectionHeader-border': '--linha', '--vscode-panel-border': '--linha',
+    '--vscode-editor-inactiveSelectionBackground': '--realce', '--vscode-editorWarning-foreground': '--atencao', '--vscode-inputValidation-warningBorder': '--atencao',
+    '--vscode-inputValidation-errorBorder': '--erro', '--vscode-inputValidation-errorBackground': '--erro-fundo', '--vscode-inputValidation-infoBorder': '--linha',
+    '--vscode-inputValidation-infoBackground': '--realce', '--vscode-button-background': '--voce', '--vscode-button-hoverBackground': '--voce',
+    '--vscode-button-secondaryBackground': '--realce', '--vscode-button-secondaryForeground': '--tinta', '--vscode-button-secondaryHoverBackground': '--linha',
+    '--vscode-input-background': '--papel', '--vscode-input-foreground': '--tinta', '--vscode-input-border': '--linha', '--vscode-badge-background': '--voce',
+    '--vscode-textCodeBlock-background': '--realce', '--vscode-statusBarItem-prominentBackground': '--realce', '--vscode-focusBorder': '--voce',
+    '--vscode-errorForeground': '--erro', '--vscode-sideBar-background': '--folha', '--vscode-scrollbarSlider-background': '--linha',
+};
+function temaExt() {
+    const cs = getComputedStyle(document.documentElement), vars = { '--vscode-button-foreground': '#ffffff', '--vscode-badge-foreground': '#ffffff', '--vscode-font-size': getComputedStyle(document.body).fontSize || '13px' };
+    for (const [vs, nosso] of Object.entries(MAPA_TEMA_EXT)) { const v = cs.getPropertyValue(nosso).trim(); if (v) vars[vs] = v; }
+    return { claro: document.documentElement.dataset.temaEfetivo === 'claro', vars };
+}
+// Iframe recarregando (HTML novo da extensão): o que chegar para ele espera o "pronta" do documento novo
+function entregaExt(f, msg) {
+    if (f.__pronta) { try { f.contentWindow.postMessage(msg, '*'); } catch (e) { /* recarregando */ } }
+    else (f.__fila = f.__fila || []).push(msg);
+}
+function mandaTemaExt() { const t = temaExt(); for (const f of extIframes.values()) { try { f.contentWindow.postMessage({ __redcodeTema: t }, '*'); } catch (e) { /* recarregando */ } } }
+new MutationObserver(() => { if (extIframes.size) mandaTemaExt(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema-efetivo', 'style', 'data-cor-principal', 'data-cor-secundaria', 'data-cor-fundo', 'data-fonte-ui'] });
+
+// Botão do topo: só com extensão instalada; o selo soma os contadores (ex.: textos novos do Trello Diário)
+function desenhaBotaoExt() {
+    btnExtensoes.hidden = !extEstado.extensoes.length;
+    const total = extEstado.extensoes.filter(x => x.ligada).reduce((n, x) => n + Object.values(x.badges || {}).reduce((m, b) => m + (Number(b.value) || 0), 0), 0);
+    const selo = btnExtensoes.querySelector('.selo-ext');
+    selo.hidden = !total; selo.textContent = total > 99 ? '99+' : String(total);
+    btnExtensoes.title = total ? `Extensões (${total} ${total === 1 ? 'novidade' : 'novidades'})` : 'Extensões';
+}
+function abreGavetaExt(viewIdFoco) {
+    const estavaFechada = gavetaExt.hidden;
+    gavetaExt.hidden = false;
+    desenhaGavetaExt();
+    if (estavaFechada) corpoGavetaExt.querySelectorAll('.ext-view.arvore').forEach(v => carregaArvoreExt(v.dataset.ext, v.dataset.view));
+    if (viewIdFoco) {
+        const el = corpoGavetaExt.querySelector(`.ext-view[data-view="${CSS.escape(viewIdFoco)}"]`);
+        if (el) { el.classList.remove('recolhida'); el.scrollIntoView({ block: 'nearest' }); avisaVisibilidadeExt(); }
+    }
+}
+function fechaGavetaExt() {
+    gavetaExt.hidden = true;
+    for (const chave of [...extVisiveis]) { const [id, viewId] = chave.split(SEP_EXT); api('/api/extensoes/visibilidade', { id, viewId, visivel: false }).catch(() => { }); }
+    extVisiveis.clear();
+}
+// Avisa a extensão das views abertas (a primeira vez faz ela montar o painel) e das que fecharam
+function avisaVisibilidadeExt() {
+    const abertas = new Set();
+    if (!gavetaExt.hidden) corpoGavetaExt.querySelectorAll('.ext-view:not(.recolhida)').forEach(v => abertas.add(v.dataset.ext + SEP_EXT + v.dataset.view));
+    for (const chave of abertas) if (!extVisiveis.has(chave)) { extVisiveis.add(chave); const [id, viewId] = chave.split(SEP_EXT); api('/api/extensoes/visibilidade', { id, viewId, visivel: true }).catch(e => recado(e.message)); }
+    for (const chave of [...extVisiveis]) if (!abertas.has(chave)) { extVisiveis.delete(chave); const [id, viewId] = chave.split(SEP_EXT); api('/api/extensoes/visibilidade', { id, viewId, visivel: false }).catch(() => { }); }
+}
+// Uma seção por extensão ativa; refeita só quando o estado dela muda (o iframe não pode mudar de lugar)
+function desenhaGavetaExt() {
+    if (gavetaExt.hidden) return;
+    const ativas = extEstado.extensoes.filter(x => x.ligada);
+    if (!ativas.length) { corpoGavetaExt.innerHTML = '<div class="ext-vazio">Nenhuma extensão ligada. Use "Gerenciar" para instalar ou ligar uma.</div>'; extIframes.clear(); extVisiveis.clear(); return; }
+    corpoGavetaExt.querySelector('.ext-vazio')?.remove();
+    for (const sec of [...corpoGavetaExt.querySelectorAll('.ext-container')]) if (!ativas.some(x => x.id === sec.dataset.ext)) { tiraIframesExt(sec.dataset.ext); sec.remove(); }
+    for (const x of ativas) {
+        for (const ct of x.containers.length ? x.containers : [{ id: '_', titulo: x.nome, icone: '', views: [] }]) {
+            const assinatura = x.status;
+            let sec = corpoGavetaExt.querySelector(`.ext-container[data-ext="${CSS.escape(x.id)}"][data-ct="${CSS.escape(ct.id)}"]`);
+            if (sec && sec.dataset.assinatura !== assinatura) { tiraIframesExt(x.id); sec.remove(); sec = null; }
+            if (!sec) {
+                sec = document.createElement('section');
+                sec.className = 'ext-container'; sec.dataset.ext = x.id; sec.dataset.ct = ct.id; sec.dataset.assinatura = assinatura;
+                sec.innerHTML = `<div class="ext-cab">${ct.icone ? `<span class="ext-ic" style="--ic:url('${esc(ct.icone)}')"></span>` : ''}<b title="${esc(x.nome)}">${esc(ct.titulo || x.nome)}</b><span class="ext-status ${esc(x.status)}"></span><button type="button" data-ext-menu title="Comandos e opções" aria-label="Comandos">⋯</button></div>`;
+                if (x.status === 'ativa') {
+                    for (const v of ct.views) {
+                        const div = document.createElement('div');
+                        div.className = 'ext-view ' + v.tipo; div.dataset.ext = x.id; div.dataset.view = v.id;
+                        div.innerHTML = `<button type="button" class="ext-view-cab"><span class="seta">▾</span>${esc(v.nome)}<span class="selo-ext-view" hidden></span></button>`;
+                        if (v.tipo === 'webview') {
+                            const f = document.createElement('iframe');
+                            f.setAttribute('sandbox', 'allow-scripts allow-forms');
+                            f.title = v.nome;
+                            f.__pronta = false;
+                            f.src = extUrlWebview(x.id, v.id, (x.html || {})[v.id]);
+                            div.appendChild(f);
+                            extIframes.set(x.id + SEP_EXT + v.id, f);
+                        } else {
+                            div.insertAdjacentHTML('beforeend', `<ul class="ext-arvore" data-boas-vindas="${esc(v.boasVindas || '')}"><li class="vazio">Carregando…</li></ul>`);
+                            carregaArvoreExt(x.id, v.id);
+                        }
+                        sec.appendChild(div);
+                    }
+                }
+                corpoGavetaExt.appendChild(sec);
+            }
+            const st = sec.querySelector('.ext-status');
+            st.textContent = x.status === 'ativa' ? '' : x.status === 'falhou' ? 'falhou' : x.status === 'iniciando' ? 'iniciando…' : x.status;
+            st.title = x.erro || '';
+            if (x.status === 'falhou' && !sec.querySelector('.ext-vazio')) sec.insertAdjacentHTML('beforeend', `<div class="ext-vazio">A extensão parou: ${esc(x.erro || 'erro desconhecido')}. Veja o log no ⋯ ou reinicie em Gerenciar.</div>`);
+            for (const v of ct.views) {
+                const b = (x.badges || {})[v.id], el = sec.querySelector(`.ext-view[data-view="${CSS.escape(v.id)}"] .selo-ext-view`);
+                if (el) { el.hidden = !(b && b.value); el.textContent = b ? b.value : ''; el.title = b ? b.tooltip : ''; }
+            }
+        }
+    }
+    avisaVisibilidadeExt();
+}
+function tiraIframesExt(id) {
+    for (const chave of [...extIframes.keys()]) if (chave.startsWith(id + SEP_EXT)) extIframes.delete(chave);
+    for (const chave of [...extVisiveis]) if (chave.startsWith(id + SEP_EXT)) extVisiveis.delete(chave);
+}
+const ICONES_ARVORE_EXT = { 'circle-filled': '●', 'circle-outline': '○', note: '✎', check: '✓', warning: '⚠', error: '✕', file: '▤', folder: '▸', info: 'ℹ' };
+async function carregaArvoreExt(id, viewId) {
+    const ul = corpoGavetaExt.querySelector(`.ext-view[data-ext="${CSS.escape(id)}"][data-view="${CSS.escape(viewId)}"] .ext-arvore`);
+    if (!ul) return;
+    let itens;
+    try { itens = await getPainel(`/api/extensoes/arvore?id=${encodeURIComponent(id)}&viewId=${encodeURIComponent(viewId)}`); }
+    catch (e) { ul.innerHTML = `<li class="vazio">${esc(e.message)}</li>`; return; }
+    ul.innerHTML = itens.length ? itens.map(i => `<li class="${i.temComando ? 'clicavel' : ''}" data-handle="${esc(i.handle)}" title="${esc(i.tooltip || i.label)}"><span class="ic ${i.icone === 'circle-filled' ? 'novo' : ''}">${esc(ICONES_ARVORE_EXT[i.icone] || '•')}</span><span class="rotulo">${esc(i.label)}</span>${i.description ? `<small>${esc(i.description)}</small>` : ''}</li>`).join('')
+        : `<li class="vazio">${esc(ul.dataset.boasVindas || 'Nada aqui.')}</li>`;
+}
+gavetaExt.addEventListener('click', (ev) => {
+    if (ev.target.closest('[data-ge-fechar]')) return fechaGavetaExt();
+    if (ev.target.closest('[data-ge-config]')) return abreConfig('extensoes');
+    const cab = ev.target.closest('.ext-view-cab');
+    if (cab) { cab.parentElement.classList.toggle('recolhida'); return avisaVisibilidadeExt(); }
+    const item = ev.target.closest('.ext-arvore li.clicavel');
+    if (item) { const v = item.closest('.ext-view'); return api('/api/extensoes/clique', { id: v.dataset.ext, viewId: v.dataset.view, handle: item.dataset.handle }).catch(e => recado(e.message)); }
+    const menuBt = ev.target.closest('[data-ext-menu]');
+    const aberto = gavetaExt.querySelector('.ext-menu');
+    if (aberto && !ev.target.closest('.ext-menu')) aberto.remove();
+    if (menuBt && !aberto) {
+        const sec = menuBt.closest('.ext-container'), x = extEstado.extensoes.find(e => e.id === sec.dataset.ext);
+        if (!x) return;
+        const menu = document.createElement('div');
+        menu.className = 'ext-menu';
+        menu.innerHTML = x.comandos.map(c => `<button type="button" data-ext-cmd="${esc(c.id)}">${esc(c.titulo)}</button>`).join('') + '<hr><button type="button" data-ext-log>Log da extensão</button><button type="button" data-ge-config>Configurações e gerenciar</button>';
+        menu.dataset.ext = x.id;
+        sec.querySelector('.ext-cab').appendChild(menu);
+        return;
+    }
+    const cmd = ev.target.closest('[data-ext-cmd]');
+    if (cmd) { const id = cmd.closest('.ext-menu').dataset.ext; cmd.closest('.ext-menu').remove(); return api('/api/extensoes/comando', { id, comando: cmd.dataset.extCmd }).catch(e => recado(e.message)); }
+    const log = ev.target.closest('[data-ext-log]');
+    if (log) { const id = log.closest('.ext-menu').dataset.ext; log.closest('.ext-menu').remove(); return mostraLogExt(id); }
+    if (ev.target.closest('[data-ext-log-fechar]')) return ev.target.closest('.ext-log').remove();
+});
+async function mostraLogExt(id) {
+    abreGavetaExt();
+    const sec = corpoGavetaExt.querySelector(`.ext-container[data-ext="${CSS.escape(id)}"]`);
+    if (!sec) return;
+    let caixa = sec.querySelector('.ext-log');
+    if (!caixa) { sec.insertAdjacentHTML('beforeend', '<div class="ext-log"><div class="ext-log-cab">Log da extensão<button type="button" data-ext-log-fechar>Fechar</button></div><pre></pre></div>'); caixa = sec.querySelector('.ext-log'); }
+    try { const linhas = await getPainel('/api/extensoes/log?id=' + encodeURIComponent(id)); caixa.querySelector('pre').innerHTML = linhas.map(linhaLogExt).join(''); }
+    catch (e) { caixa.querySelector('pre').textContent = e.message; }
+    const pre = caixa.querySelector('pre'); pre.scrollTop = pre.scrollHeight;
+    caixa.scrollIntoView({ block: 'nearest' });
+}
+const linhaLogExt = (l) => `<span class="${esc(l.nivel)}">${esc((l.canal ? '[' + l.canal + '] ' : '') + l.texto)}</span>\n`;
+btnExtensoes.addEventListener('click', () => gavetaExt.hidden ? abreGavetaExt() : fechaGavetaExt());
+
+// Mensagens dos iframes (painéis): só do iframe certo, para a extensão dona dele
+window.addEventListener('message', (ev) => {
+    const d = ev.data;
+    if (!d || !d.__redcodeExt) return;
+    for (const [chave, f] of extIframes) {
+        if (f.contentWindow !== ev.source) continue;
+        const [id, viewId] = chave.split(SEP_EXT);
+        if (d.__redcodeExt === 'pronta') {
+            f.__pronta = true;
+            f.contentWindow.postMessage({ __redcodeTema: temaExt() }, '*');
+            const fila = f.__fila || []; f.__fila = [];
+            for (const m of fila) f.contentWindow.postMessage(m, '*');
+        }
+        else if (d.__redcodeExt === 'mensagem') api('/api/extensoes/mensagem', { id, viewId, msg: d.m }).catch(e => recado(e.message));
+        return;
+    }
+});
+
+// ---------- Avisos (toast ou modal) e caixa de digitar ----------
+function mostraPendenteExt(p) {
+    if (extPendentesVistos.has(p.id)) return;
+    extPendentesVistos.add(p.id);
+    if (p.pedido === 'aviso' && !p.dados.modal) {
+        const t = document.createElement('div');
+        t.className = 'toast-ext ' + (p.dados.nivel || 'info'); t.dataset.pendente = p.id;
+        t.innerHTML = `<span class="te-de">${esc(extNome(p.extId))}</span><p>${esc(p.dados.texto)}</p>${p.dados.botoes.length ? `<div class="te-bts">${p.dados.botoes.map(b => `<button type="button" data-te-valor="${esc(b)}">${esc(b)}</button>`).join('')}</div>` : ''}<button type="button" data-te-fechar aria-label="Fechar">×</button>`;
+        document.getElementById('toastsExt').appendChild(t);
+        // Sem botão, some sozinho (como no VS Code); com botão, fica até a pessoa escolher
+        if (!p.dados.botoes.length) setTimeout(() => { if (t.isConnected) respondeExt(p.id, null); }, 9000);
+        if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+            const n = new Notification(extNome(p.extId), { body: p.dados.texto, tag: 'ext-' + p.id });
+            n.onclick = () => { window.painelDesktop?.mostrar?.(); window.focus(); n.close(); };
+        }
+        return;
+    }
+    extFilaPerguntas.push(p);
+    if (!extPerguntaAtual) proximaPerguntaExt();
+}
+function proximaPerguntaExt() {
+    const j = document.getElementById('janelaExtPergunta');
+    extPerguntaAtual = extFilaPerguntas.shift() || null;
+    if (!extPerguntaAtual) { j.hidden = true; return; }
+    const p = extPerguntaAtual, caixa = j.firstElementChild;
+    if (p.pedido === 'entrada') {
+        caixa.innerHTML = `<span class="pe-de">${esc(extNome(p.extId))}</span><h2>${esc(p.dados.titulo || 'Digite')}</h2>${p.dados.prompt ? `<p>${esc(p.dados.prompt)}</p>` : ''}<input type="${p.dados.senha ? 'password' : 'text'}" autocomplete="off" spellcheck="false" placeholder="${esc(p.dados.placeholder)}"><div class="pe-bts"><button type="button" data-pe-cancelar>Cancelar</button><button type="button" class="principal" data-pe-ok>OK</button></div>`;
+        caixa.querySelector('input').value = p.dados.valor || '';
+    } else {
+        caixa.innerHTML = `<span class="pe-de">${esc(extNome(p.extId))}</span><h2>${esc(p.dados.texto)}</h2>${p.dados.detalhe ? `<p>${esc(p.dados.detalhe)}</p>` : ''}<div class="pe-bts"><button type="button" data-pe-cancelar>Cancelar</button>${p.dados.botoes.map((b, i) => `<button type="button" class="${i === 0 ? 'principal' : ''}" data-pe-valor="${esc(b)}">${esc(b)}</button>`).join('')}</div>`;
+    }
+    j.hidden = false;
+    (caixa.querySelector('input') || caixa.querySelector('.principal') || caixa.querySelector('button')).focus();
+    if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+        const n = new Notification(extNome(p.extId), { body: p.dados.titulo || p.dados.texto || 'Esperando você', tag: 'ext-' + p.id });
+        n.onclick = () => { window.painelDesktop?.mostrar?.(); window.focus(); n.close(); };
+    }
+}
+function respondePerguntaExt(valor) { if (extPerguntaAtual) respondeExt(extPerguntaAtual.id, valor); }
+function respondeExt(id, valor) {
+    api('/api/extensoes/resposta', { pendente: id, valor }).catch(() => { });
+    tiraPendenteExt(id);
+}
+function tiraPendenteExt(id) {
+    document.querySelector(`.toast-ext[data-pendente="${CSS.escape(id)}"]`)?.remove();
+    const i = extFilaPerguntas.findIndex(p => p.id === id);
+    if (i >= 0) extFilaPerguntas.splice(i, 1);
+    if (extPerguntaAtual && extPerguntaAtual.id === id) proximaPerguntaExt();
+}
+document.getElementById('toastsExt').addEventListener('click', (ev) => {
+    const t = ev.target.closest('.toast-ext');
+    if (!t) return;
+    const b = ev.target.closest('[data-te-valor]');
+    if (b) return respondeExt(t.dataset.pendente, b.dataset.teValor);
+    if (ev.target.closest('[data-te-fechar]')) respondeExt(t.dataset.pendente, null);
+});
+document.getElementById('janelaExtPergunta').addEventListener('click', (ev) => {
+    if (!extPerguntaAtual) return;
+    if (ev.target.closest('[data-pe-cancelar]') || ev.target.id === 'janelaExtPergunta') return respondePerguntaExt(null);
+    if (ev.target.closest('[data-pe-ok]')) return respondePerguntaExt(document.querySelector('#janelaExtPergunta input').value);
+    const b = ev.target.closest('[data-pe-valor]');
+    if (b) respondePerguntaExt(b.dataset.peValor);
+});
+document.getElementById('janelaExtPergunta').addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && ev.target.matches('input')) { ev.preventDefault(); respondePerguntaExt(ev.target.value); }
+});
+
+// ---------- Eventos do servidor (long-poll) ----------
+async function recarregaEstadoExt() {
+    extEstado = await getPainel('/api/extensoes/estado');
+    desenhaBotaoExt();
+    desenhaGavetaExt();
+    for (const p of extEstado.pendentes) mostraPendenteExt(p);
+    // Pendente que sumiu do servidor (extensão parou): sai da tela
+    const vivos = new Set(extEstado.pendentes.map(p => p.id));
+    for (const id of [...extPendentesVistos]) if (!vivos.has(id)) { extPendentesVistos.delete(id); tiraPendenteExt(id); }
+    if (!janelaConfig.hidden && document.querySelector('[data-aba-config="extensoes"][aria-selected="true"]')) abreConfig('extensoes');
+    return extEstado.versao;
+}
+function trataEventoExt(e) {
+    const x = extEstado.extensoes.find(y => y.id === e.extId);
+    switch (e.tipo) {
+        case 'webview': {
+            if (x) { x.html = x.html || {}; x.html[e.viewId] = e.versao; }
+            const f = extIframes.get(e.extId + SEP_EXT + e.viewId);
+            if (f) { f.__pronta = false; f.src = extUrlWebview(e.extId, e.viewId, e.versao); }
+            break;
+        }
+        case 'mensagem': { const f = extIframes.get(e.extId + SEP_EXT + e.viewId); if (f) entregaExt(f, e.msg); break; }
+        case 'arvore': if (!gavetaExt.hidden) carregaArvoreExt(e.extId, e.viewId); break;
+        case 'badge': if (x) { x.badges = x.badges || {}; if (e.badge) x.badges[e.viewId] = e.badge; else delete x.badges[e.viewId]; } desenhaBotaoExt(); desenhaGavetaExt(); break;
+        case 'pendente': mostraPendenteExt({ id: e.id, extId: e.extId, pedido: e.pedido, dados: e.dados }); break;
+        case 'pendente-fim': extPendentesVistos.delete(e.id); tiraPendenteExt(e.id); break;
+        case 'log': { const pre = corpoGavetaExt.querySelector(`.ext-container[data-ext="${CSS.escape(e.extId)}"] .ext-log pre`); if (pre) { pre.insertAdjacentHTML('beforeend', linhaLogExt(e.linha)); pre.scrollTop = pre.scrollHeight; } break; }
+        case 'log-mostrar': mostraLogExt(e.extId); break;
+        case 'status': recado(e.texto); break;
+        case 'abrir': if (/^https?:\/\//i.test(e.url)) window.open(e.url, '_blank', 'noopener'); break;
+        case 'copiar': navigator.clipboard.writeText(e.texto).catch(() => recado('Não deu para copiar.')); break;
+        case 'focar': abreGavetaExt(e.viewId); break;
+        // Configuração salva não redesenha a aba (fecharia o formulário no meio da edição)
+        case 'lista': return 'recarregar';
+    }
+}
+async function vigiaExtensoes() {
+    let desde = -1;
+    const pausa = (ms) => new Promise(r => setTimeout(r, ms));
+    for (;;) {
+        try {
+            if (desde < 0) { desde = await recarregaEstadoExt(); continue; }
+            const r = await getPainel('/api/extensoes/eventos?desde=' + desde);
+            if (r.recarregar) { desde = -1; continue; }
+            desde = r.versao;
+            let recarregar = false;
+            for (const e of r.eventos) if (trataEventoExt(e) === 'recarregar') recarregar = true;
+            if (recarregar) desde = await recarregaEstadoExt();
+        } catch (e) { desde = -1; await pausa(5000); }
+    }
+}
+if (!JANELA_SECUNDARIA) vigiaExtensoes();
+
+// ---------- Configurações › Extensões ----------
+function cartaoConfigExt(x) {
+    const st = { ativa: 'Rodando', iniciando: 'Iniciando…', falhou: 'Falhou', parada: 'Parada', desligada: 'Desligada' }[x.status] || x.status;
+    return `<div class="config-ext" data-busca="${esc(semAcento(x.nome + ' ' + x.descricao + ' ' + x.publisher))}">
+        <div class="ce-topo"><b>${esc(x.nome)}</b><small>${esc(x.versao)} · ${esc(x.publisher)}</small><span class="ce-status ${esc(x.status)}" title="${esc(x.erro || '')}">${esc(st)}</span></div>
+        <p>${esc(x.descricao)}${x.erro ? `<br><b>Erro:</b> ${esc(x.erro)}` : ''}</p>
+        <div class="ce-acoes">
+            <button class="mini" data-ext-acao="${x.ligada ? 'desligar' : 'ligar'}" data-id="${esc(x.id)}">${x.ligada ? 'Desligar' : 'Ligar'}</button>
+            ${x.ligada ? `<button class="mini" data-ext-acao="reiniciar" data-id="${esc(x.id)}">Reiniciar</button>` : ''}
+            ${x.temConfig ? `<button class="mini" data-ext-form-abrir="${esc(x.id)}">Configurações</button>` : ''}
+            <button class="mini" data-ext-acao="remover" data-id="${esc(x.id)}">Remover</button>
+            ${!x.ligada ? `<button class="mini" data-ext-acao="apagar-dados" data-id="${esc(x.id)}">Apagar dados</button>` : ''}
+        </div>
+        <div class="ce-form" data-ext-form="${esc(x.id)}" hidden></div>
+    </div>`;
+}
+async function abreFormConfigExt(id, caixa) {
+    if (!caixa.hidden) { caixa.hidden = true; return; }
+    let campos;
+    try { campos = await getPainel('/api/extensoes/config?id=' + encodeURIComponent(id)); } catch (e) { return recado(e.message); }
+    caixa.innerHTML = campos.map(c => {
+        const nome = c.chave.split('.').slice(1).join(' › ');
+        const atr = `data-ext-campo="${esc(c.chave)}" data-id="${esc(id)}" data-tipo="${esc(c.tipo)}"`;
+        let controle;
+        if (c.tipo === 'boolean') controle = `<label class="config-chave"><input type="checkbox" ${atr} ${c.valor ? 'checked' : ''}><span></span></label>`;
+        else if (c.enum) controle = `<select ${atr} ${c.enum.every(v => typeof v === 'number') ? 'data-numerico' : ''}>${c.enum.map((v, i) => `<option value="${esc(v)}" ${v === c.valor ? 'selected' : ''}>${esc(v)}${c.enumDescricoes && c.enumDescricoes[i] ? ' · ' + esc(c.enumDescricoes[i]) : ''}</option>`).join('')}</select>`;
+        else if (c.tipo === 'array') controle = `<textarea rows="3" ${atr} ${c.itens === 'number' || c.itens === 'integer' ? 'data-numerico' : ''}>${esc((c.valor || []).join('\n'))}</textarea><small>Um por linha.</small>`;
+        else if (c.tipo === 'number' || c.tipo === 'integer') controle = `<input type="number" ${atr} value="${esc(c.valor ?? '')}" ${c.minimo !== undefined ? `min="${c.minimo}"` : ''} ${c.maximo !== undefined ? `max="${c.maximo}"` : ''}>`;
+        else controle = `<input type="text" ${atr} value="${esc(c.valor ?? '')}" ${c.padraoTexto ? `pattern="${esc(c.padraoTexto)}"` : ''}>`;
+        return `<div class="ce-campo"><b>${esc(nome)}</b>${c.descricao ? `<small>${esc(c.descricao)}</small>` : ''}${controle}<code>${esc(c.chave)}</code></div>`;
+    }).join('') || '<small>Sem configurações.</small>';
+    caixa.hidden = false;
+}
+async function cliqueConfigExt(evt) {
+    const acao = evt.target.closest('[data-ext-acao]');
+    if (acao) {
+        const id = acao.dataset.id, a = acao.dataset.extAcao, nome = extNome(id);
+        if (a === 'remover' && !(await confirmaNaPagina(`Remover ${nome}?`, '<p>A extensão sai do Red Code. As configurações e os dados dela ficam guardados (dá para apagar depois, com ela desligada).</p>', 'Remover'))) return true;
+        if (a === 'apagar-dados' && !(await confirmaNaPagina(`Apagar os dados de ${nome}?`, '<p>Apaga as configurações, as senhas guardadas e o que a extensão salvou. Não dá para desfazer.</p>', 'Apagar'))) return true;
+        try { await api('/api/extensoes/acao', { id, acao: a }); recado({ ligar: 'Extensão ligada', desligar: 'Extensão desligada', reiniciar: 'Extensão reiniciada', remover: 'Extensão removida', 'apagar-dados': 'Dados apagados' }[a]); }
+        catch (e) { recado(e.message); }
+        abreConfig('extensoes');
+        return true;
+    }
+    const form = evt.target.closest('[data-ext-form-abrir]');
+    if (form) { await abreFormConfigExt(form.dataset.extFormAbrir, document.querySelector(`[data-ext-form="${CSS.escape(form.dataset.extFormAbrir)}"]`)); return true; }
+    return false;
+}
+document.getElementById('corpoConfig').addEventListener('change', async (ev) => {
+    const arq = ev.target.closest('[data-ext-instalar]');
+    if (arq && arq.files && arq.files[0]) {
+        const arquivo = arq.files[0];
+        arq.value = '';
+        try {
+            const r = await fetch('/api/extensoes/instalar', { method: 'POST', headers: { 'X-Painel': '1', 'Content-Type': 'application/octet-stream' }, body: arquivo });
+            const previa = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(previa.erro || 'Não deu para ler o .vsix.');
+            const ok = await confirmaNaPagina(`Instalar ${previa.nome} ${previa.versao}?`, `<p><b>${esc(previa.publisher)}</b> · ${esc(previa.id)}${previa.instalada ? ` · substitui a ${esc(previa.instalada)}` : ''}</p><p>${esc(previa.descricao)}</p><p>A extensão roda no seu PC com as suas permissões, como no VS Code. Instale só extensões em que você confia.</p>`, 'Instalar');
+            if (!ok) return;
+            await api('/api/extensoes/confirmar', { token: previa.token });
+            recado(`${previa.nome} instalada: abra pelo botão de peça no topo da lista`);
+            abreConfig('extensoes');
+        } catch (e) { recado(e.message); }
+        return;
+    }
+    const campo = ev.target.closest('[data-ext-campo]');
+    if (!campo) return;
+    let valor;
+    if (campo.dataset.tipo === 'boolean') valor = campo.checked;
+    else if (campo.dataset.tipo === 'array') { valor = campo.value.split(/\r?\n/).map(t => t.trim()).filter(Boolean); if (campo.hasAttribute('data-numerico')) valor = valor.map(Number); }
+    else if (campo.hasAttribute('data-numerico')) valor = Number(campo.value);
+    else if (campo.dataset.tipo === 'number' || campo.dataset.tipo === 'integer') valor = campo.value === '' ? null : Number(campo.value);
+    else valor = campo.value;
+    try { await api('/api/extensoes/config', { id: campo.dataset.id, chave: campo.dataset.extCampo, valor }); recado('Configuração salva'); }
+    catch (e) { recado(e.message); }
+});
 
 /* ---------- Atalhos de teclado: um registro só, trocável em Configurações › Atalhos ---------- */
 // Guardados como "Ctrl+Alt+Shift+Tecla" pela tecla física (evt.code), então valem igual em teclado ABNT e americano

@@ -3,6 +3,36 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.14', data: '2026-11-11', itens: [
+            'Alças do vídeo no canto: coladas na borda (arco no canto de cima e tracinho na borda direita); a alça de baixo saiu e o canto de cima redimensiona também com o vídeo encaixado',
+            'Esticar a imagem: com o formato mudado pela alça, um botão escolhe entre faixas pretas e a imagem esticada',
+            'Arrastar o vídeo ficou à prova de soltar perdido: se o botão do mouse escapar, ele não desanexa nem encaixa sem querer',
+        ],
+    },
+    {
+        versao: '1.0.13', data: '2026-11-11', itens: [
+            'Tamanho do vídeo no canto: alça nova na borda direita estica só para o lado, o canto de cima também redimensiona com o vídeo encaixado e o duplo clique numa alça volta ao formato do vídeo',
+            'Janela solta do vídeo: a barra com os botões aparece ao passar o mouse',
+            'Um vídeo só: abrir o vídeo no canto fecha a janela solta',
+        ],
+    },
+    {
+        versao: '1.0.12', data: '2026-11-11', itens: [
+            'Vídeo no canto sem extensão: o vídeo vem da aba do YouTube que estiver selecionada no navegador (pode minimizar ou cobrir a janela), em qualquer navegador',
+            'Extensão do navegador opcional: continua funcionando e, quando instalada, deixa o vídeo mais preciso (sincronia fina, próxima música já pronta). Instale ou veja o status em Configurações › Integrações',
+            'Integrações: nova aba em Configurações. O YouTube Music Desktop se conecta por lá, com Integrar e Desativar',
+            'Editor ao vivo: feche abas pelo × ou pelo botão do meio do mouse, como no VS Code',
+            'Painel Git: não fecha mais ao arrastar a largura dele com o editor ao vivo aberto',
+        ],
+    },
+    {
+        versao: '1.0.11', data: '2026-11-11', itens: [
+            'Extensões do VS Code: instale um .vsix em Configurações › Extensões e use os painéis dela no botão de peça no topo da lista (extensões de painel, comandos e configurações, como o Royal Trello Diário)',
+            'Arquivos citados como link: quando o Claude cita um arquivo como link do Markdown, dá para clicar e abrir, como os outros caminhos',
+            'Selos da lista: "Agente rodando" e os outros selos longos cabem na lista (o texto inteiro aparece ao parar o mouse em cima)',
+        ],
+    },
+    {
         versao: '1.0.10', data: '2026-11-11', itens: [
             'Tarefas em segundo plano na lista: conversa com um comando ou teste rodando em segundo plano aparece como trabalhando, com o nome da tarefa',
             'Player com disco pela capa: o disco abre só com o mouse parado na capa do álbum; aberto, continua aberto enquanto o mouse estiver no player',

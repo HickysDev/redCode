@@ -404,7 +404,7 @@ ipcMain.handle('painel:abrir-logs', async (ev) => {
     return (await shell.openPath(PASTA_DADOS)) === '';
 });
 
-// ---------- Vídeo da mídia que está tocando: janela desanexada (o vídeo vem da extensão do navegador, clipe.js) ----------
+// ---------- Vídeo da mídia que está tocando: janela desanexada (o vídeo vem do servidor, clipe.js) ----------
 const janelasClipe = new Set();
 // Onde nasce a próxima janela solta (a página manda logo antes de abrir, ao soltar o vídeo fora do Red Code)
 let posicaoClipe = null;
@@ -445,9 +445,26 @@ ipcMain.handle('painel:clipe-proporcao', (ev, r) => {
     w.setBounds({ x: b.x, y: b.y + b.height - altura, width: b.width, height: altura });
     return true;
 });
+// A janela solta é toda área de arrastar e o Windows não manda o mouse para a página ali (o :hover nunca acende):
+// daqui confere se o ponteiro está em cima dela e avisa, para a barra aparecer
+let timerPairarClipe = null;
+function acompanhaPairarClipe() {
+    if (timerPairarClipe || !janelasClipe.size) return;
+    timerPairarClipe = setInterval(() => {
+        if (!janelasClipe.size) { clearInterval(timerPairarClipe); timerPairarClipe = null; return; }
+        const p = screen.getCursorScreenPoint();
+        for (const w of janelasClipe) {
+            if (w.isDestroyed()) continue;
+            const b = w.getBounds();
+            const dentro = w.isVisible() && p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height;
+            if (dentro !== w.__pairando) { w.__pairando = dentro; w.webContents.send('painel:clipe-pairando', dentro); }
+        }
+    }, 120);
+}
 function ajustaJanelaClipe(w) {
     janelasClipe.add(w);
     w.on('closed', () => janelasClipe.delete(w));
+    acompanhaPairarClipe();
     // Acima de tudo, até de janela em tela cheia
     w.setAlwaysOnTop(true, 'floating');
     w.setAspectRatio(16 / 9);

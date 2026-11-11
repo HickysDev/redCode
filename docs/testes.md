@@ -12,8 +12,8 @@ const app = spawn('node_modules/electron/dist/electron.exe',
 ```
 
 - `--user-data-dir` e `PAINEL_DADOS` numa pasta temporária: perfil limpo, sem tocar nos dados do usuário.
-- `PAINEL_PORTA=4319`: a extensão do navegador e o YouTube Music Desktop também falam com a 4319,
-  então o vídeo no canto funciona na cópia.
+- `PAINEL_PORTA=4319`: a cópia lê o navegador sozinha, então o vídeo no canto funciona nela. O YouTube
+  Music Desktop precisa ser ativado na cópia (Configurações › Integrações), com outro pareamento.
 - Mexer no `settings.json` do Claude: subir o servidor com `CLAUDE_CONFIG_DIR` apontando para uma
   pasta temporária com um `settings.json` de mentira.
 - Precisa do yt-dlp: copiar `bin/yt-dlp.exe` para `<pasta>/bin/`.
@@ -44,6 +44,10 @@ node -e "const s=require('fs').readFileSync('index.html','utf8');const re=/<scri
 ```
 
 - PowerShell (`.ps1`): `[System.Management.Automation.Language.Parser]::ParseFile(...)` sem erros.
+- Testes automáticos ficam em `testes/` (ex.: `node testes/extensoes.test.js`). A pasta não vai no exe
+  (o `empacotar.js` só copia arquivos da raiz): teste novo vai para lá, nunca para a raiz.
+- Iframe em sandbox (painel de extensão) roda em outro processo: pelo CDP, conectar no alvo `iframe` de
+  `/json`, não no da página.
 - Mudança visual: print no tema claro e no escuro.
 - Correção de bug: reproduzir o bug antes (ou trocar a função pela versão antiga só na página de
   teste) e mostrar o antes e o depois.
