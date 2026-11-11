@@ -2948,7 +2948,7 @@ async function vigiaMidia() {
 }
 playerMidia.addEventListener('click', async (ev) => {
     if (ev.target.closest('[data-midia-dispensar]')) { avisoMidiaDispensado = true; return desenhaMidia(); }
-    if (ev.target.closest('[data-midia-clipe]')) { if (clipePip) fechaPip(true); else abrePip(); return desenhaMidia(); }
+    if (ev.target.closest('[data-midia-clipe]')) return alternaVideoCanto();
     const b = ev.target.closest('[data-midia]');
     if (!b) return;
     // Resposta imediata no botão; a leitura seguinte confirma o estado real
@@ -2968,6 +2968,8 @@ const SO_AUDIO = /spotify|deezer|tidal|amazonmusic|applemusic|zunemusic/i;
 let pip = null, clipePip = null;
 function abrePip() {
     if (!SUPORTA_CLIPE) return;
+    // Um vídeo só: abrindo no canto, a janela solta (se houver) fecha
+    if (lePref('clipe', '') === 'solto' && 'BroadcastChannel' in window) new BroadcastChannel('redcode-clipe').postMessage({ tipo: 'fecha-janela' });
     gravaPref('clipe', 'canto');
     if (!pip) {
         pip = document.createElement('div');
