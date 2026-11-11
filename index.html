@@ -1989,6 +1989,11 @@ body.layout-editor .filtro { font-size: 12px; }
 .ev-aba:hover { color: var(--tinta); }
 .ev-aba.ativa { color: var(--tinta); background: #120e0f; box-shadow: inset 0 2px 0 var(--voce); }
 .ev-ic { font: 600 10px var(--mono); color: var(--voce); opacity: .85; }
+/* × de fechar: como no VS Code, à vista na aba da tela e ao passar o mouse; nas outras só reserva o lugar */
+.ev-fecha { display: grid; place-items: center; width: 18px; height: 18px; margin: 0 -8px 0 2px; border-radius: 4px; font-size: 15px; line-height: 1; opacity: 0; }
+.ev-aba:hover .ev-fecha, .ev-aba.ativa .ev-fecha { opacity: .75; }
+.ev-fecha:hover { opacity: 1 !important; background: #ffffff1f; }
+html[data-tema-efetivo="claro"] .ev-fecha:hover { background: #0000001a; }
 .ev-sem-abas { align-self: center; padding: 0 14px; color: var(--grafite); font-size: 12.5px; }
 .ev-acoes { display: flex; align-items: center; gap: 4px; padding: 0 8px; flex: none; }
 .ev-acoes button { font-size: 12px; padding: 3px 8px; border: 1px solid transparent; border-radius: 6px; color: var(--grafite); background: none; }
@@ -9020,7 +9025,7 @@ async function localizaSoPosicao(e) { if (e.codigo.tipo === 'diff') await montaC
 // ---------- Desenho e animação ----------
 function desenhaAbasEv() {
     // Todos os arquivos editados na conversa (até 40); a faixa rola para o lado
-    elEv('evAbas').innerHTML = ev.ordem.slice(-40).map(a => `<button type="button" class="ev-aba ${a === ev.arquivo ? 'ativa' : ''}" data-ev-arq="${esc(a)}" title="${esc(a)}">${iconesCatppuccin ? imgIcone(a.split(/[\\/]/).pop()) : `<span class="ev-ic">${esc(ICONE_EV[LING_EV(a)] || '≡')}</span>`}${esc(a.split(/[\\/]/).pop())}</button>`).join('')
+    elEv('evAbas').innerHTML = ev.ordem.slice(-40).map(a => `<button type="button" class="ev-aba ${a === ev.arquivo ? 'ativa' : ''}" data-ev-arq="${esc(a)}" title="${esc(a)}">${iconesCatppuccin ? imgIcone(a.split(/[\\/]/).pop()) : `<span class="ev-ic">${esc(ICONE_EV[LING_EV(a)] || '≡')}</span>`}${esc(a.split(/[\\/]/).pop())}<span class="ev-fecha" data-ev-fechar title="Fechar (ou clique com o botão do meio)">×</span></button>`).join('')
         || '<span class="ev-sem-abas">Nenhum arquivo editado ainda</span>';
     // A aba do arquivo que está na tela fica sempre à vista
     const ativa = elEv('evAbas').querySelector('.ev-aba.ativa');
@@ -9229,8 +9234,29 @@ elEv('evAbas').addEventListener('wheel', (evt) => {
     evt.currentTarget.scrollLeft += evt.deltaY;
     evt.preventDefault();
 }, { passive: false });
+// Fechar aba (× ou botão do meio, como no VS Code): sai da faixa até o Claude editar o arquivo de novo
+function fechaAbaEv(a) {
+    const visiveis = ev.ordem.slice(-40), i = visiveis.indexOf(a);
+    ev.ordem = ev.ordem.filter(x => x !== a); ev.ultimaEdicao.delete(a);
+    ev.fila = ev.fila.filter(e => e.texto !== a);
+    if (a !== ev.arquivo) return desenhaAbasEv();
+    // Era a da tela: mostra a vizinha (a da direita; sem ela, a da esquerda)
+    ev.geracao++; ev.fila = []; ev.rodandoFila = false;
+    const vizinha = visiveis[i + 1] || visiveis[i - 1];
+    if (vizinha) { ev.seguir = false; atualizaBotaoSeguir(); mostraEdicao(ev.ultimaEdicao.get(vizinha), false).catch(() => {}); return; }
+    ev.arquivo = null; ev.edicaoMostrada = null; desenhaAbasEv();
+    elEv('evTrilha').innerHTML = ''; statusEv(null, '', 1);
+    elEv('evCodigo').innerHTML = '<div class="ev-vazio">Quando o Claude editar um arquivo, ele aparece aqui.</div>';
+}
+// Botão do meio: o mousedown liga a rolagem automática do Chromium; o auxclick fecha
+elEv('evAbas').addEventListener('mousedown', (evt) => { if (evt.button === 1 && evt.target.closest('[data-ev-arq]')) evt.preventDefault(); });
+elEv('evAbas').addEventListener('auxclick', (evt) => {
+    const b = evt.target.closest('[data-ev-arq]'); if (!b || evt.button !== 1) return;
+    evt.preventDefault(); fechaAbaEv(b.dataset.evArq);
+});
 elEv('evAbas').addEventListener('click', (evt) => {
     const b = evt.target.closest('[data-ev-arq]'); if (!b) return;
+    if (evt.target.closest('[data-ev-fechar]')) return fechaAbaEv(b.dataset.evArq);
     const e = ev.ultimaEdicao.get(b.dataset.evArq); if (!e) return;
     ev.seguir = false; atualizaBotaoSeguir();
     ev.geracao++; ev.fila = []; ev.rodandoFila = false;
