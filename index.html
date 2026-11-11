@@ -1726,7 +1726,7 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .pip-clipe { cursor: grab; touch-action: none; }
 .pip-clipe.arrastando { cursor: grabbing; user-select: none; transition: none !important; box-shadow: 0 18px 44px rgba(0, 0, 0, .6); }
 .pip-clipe.pequeno [data-pip-tamanho], .pip-clipe.pequeno .pip-vao { display: none; }
-.pip-clipe.pequeno .pip-barra { justify-content: flex-end; padding: 3px 14px 10px 3px; }
+.pip-clipe.pequeno .pip-barra { justify-content: flex-end; padding: 3px 22px 10px 3px; }
 .pip-clipe.pequeno .pip-barra button { min-width: 20px; height: 20px; padding: 0 3px; }
 .pip-clipe.pequeno .clipe-aviso { padding: 4px; font-size: 10px; line-height: 1.25; }
 .pip-clipe.pequeno .pet-video { transform: scale(.7); }
@@ -1737,19 +1737,25 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .pip-clipe.vai-soltar::after { content: "Solte para tirar do Red Code"; position: absolute; inset: auto 0 0 0; padding: 6px; background: #000c; color: #fff; font: 600 11px/1.2 var(--sans); text-align: center; pointer-events: none; }
 /* Soltando em cima do player: o canto acende para mostrar que volta a encaixar */
 .rodape-sessoes.vai-encaixar .player-midia { outline: 2px dashed var(--voce); outline-offset: 3px; }
-.pip-clipe .pip-barra { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 2px; padding: 5px 18px 16px 5px; background: linear-gradient(#000d, #0000); opacity: 0; transition: opacity .18s; }
+.pip-clipe .pip-barra { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 2px; padding: 5px 22px 16px 5px; background: linear-gradient(#000d, #0000); opacity: 0; transition: opacity .18s; }
 .pip-clipe:hover .pip-barra, .pip-clipe.clipe-com-aviso .pip-barra { opacity: 1; }
 .pip-clipe .pip-barra button { display: grid; place-items: center; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 7px; color: #fff; font: 600 11px/1 var(--sans); }
 .pip-clipe .pip-barra button:hover { background: #ffffff2b; }
 .pip-clipe .pip-barra button.ligado { background: #ffffff38; }
+/* Esticar a imagem: o <video> preenche; o player do YouTube ganha a altura do formato do vídeo e é achatado até caber */
+.pip-clipe [data-pip="esticar"] { display: none !important; }
+.pip-clipe.formato-livre [data-pip="esticar"] { display: grid !important; }
+.pip-clipe.esticado .clipe-tela video { object-fit: fill; }
+.pip-clipe.esticado .clipe-tela iframe { bottom: auto; height: calc(100% * var(--pip-estica, 1)); transform: scaleY(calc(1 / var(--pip-estica, 1))); transform-origin: top; }
 .pip-clipe .pip-vao { flex: 1; }
 /* Alças coladas na borda: o canto é um arco que segue o arredondado da janelinha e o lado um tracinho em cima da borda */
+.pip-clipe { --alca-grossura: 3px; }
 .pip-clipe .pip-alca { position: absolute; right: 0; top: 0; z-index: 1; width: 20px; height: 20px; cursor: nesw-resize; touch-action: none; }
-.pip-clipe .pip-alca::after { content: ""; position: absolute; right: 0; top: 0; width: 15px; height: 15px; box-sizing: border-box; border-top: 2.5px solid #ffffff80; border-right: 2.5px solid #ffffff80; border-top-right-radius: 11px; -webkit-mask: linear-gradient(to left, #000 30%, #0000), linear-gradient(to bottom, #000 30%, #0000); -webkit-mask-composite: source-in; mask-composite: intersect; filter: drop-shadow(0 0 1px #0009); opacity: 0; transition: opacity .18s, border-color .18s; }
+.pip-clipe .pip-alca::after { content: ""; position: absolute; right: 0; top: 0; width: 15px; height: 15px; box-sizing: border-box; border-top: var(--alca-grossura) solid #ffffff80; border-right: var(--alca-grossura) solid #ffffff80; border-top-right-radius: 11px; -webkit-mask: linear-gradient(to left, #000 55%, #0000), linear-gradient(to bottom, #000 55%, #0000); -webkit-mask-composite: source-in; mask-composite: intersect; filter: drop-shadow(0 0 1px #0009); opacity: 0; transition: opacity .18s, border-color .18s; }
 .pip-clipe:hover .pip-alca::after { opacity: 1; }
 .pip-clipe .pip-alca:hover::after, .pip-clipe.redimensionando .pip-alca::after { border-color: #ffffffb3; }
 .pip-clipe .pip-alca-lado { position: absolute; right: 0; top: 22px; bottom: 10px; z-index: 1; width: 10px; cursor: ew-resize; touch-action: none; }
-.pip-clipe .pip-alca-lado::after { content: ""; position: absolute; right: 0; top: 50%; width: 2.5px; height: min(24px, 40%); transform: translateY(-50%); border-radius: 3px 0 0 3px; background: #ffffff80; filter: drop-shadow(0 0 1px #0009); opacity: 0; transition: opacity .18s, height .18s, background .18s; }
+.pip-clipe .pip-alca-lado::after { content: ""; position: absolute; right: 0; top: 50%; width: var(--alca-grossura); height: min(24px, 40%); transform: translateY(-50%); border-radius: 3px 0 0 3px; background: #ffffff80; filter: drop-shadow(0 0 1px #0009); opacity: 0; transition: opacity .18s, height .18s, background .18s; }
 .pip-clipe:hover .pip-alca-lado::after { opacity: 1; }
 .pip-clipe .pip-alca-lado:hover::after, .pip-clipe.redimensionando .pip-alca-lado::after { height: min(32px, 55%); background: #ffffffb3; }
 .pip-clipe.redimensionando { user-select: none; }
@@ -2980,6 +2986,7 @@ function abrePip() {
                 <button type="button" data-pip-tamanho="360" title="Médio">M</button>
                 <button type="button" data-pip-tamanho="520" title="Grande">G</button>
                 <span class="pip-vao"></span>
+                <button type="button" data-pip="esticar" title="Esticar a imagem (sem faixas pretas)" aria-label="Esticar a imagem"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 8h13M4.5 5l-3 3 3 3M11.5 5l3 3-3 3"/></svg></button>
                 <button type="button" data-pip="encaixar" title="Encaixar de volta acima do player" aria-label="Encaixar de volta">${ICONE_MIDIA.encaixar}</button>
                 <button type="button" data-pip="soltar" title="Desanexar: janela própria, sempre por cima das outras" aria-label="Desanexar">${ICONE_MIDIA.soltar}</button>
                 <button type="button" data-pip="fechar" title="Fechar o vídeo" aria-label="Fechar o vídeo">${ICONE_MIDIA.fechar}</button>
@@ -3025,8 +3032,18 @@ function mostraPip(mostrar) {
 // Formato do quadrinho: o que a pessoa puxou pelas alças ou, sem isso, o do próprio vídeo (o vídeo fica inteiro com faixa preta)
 function aplicaProporcaoPip() {
     if (!pip) return;
-    const escolhida = Number(lePref('clipeProp', '')) || 0;
-    pip.style.setProperty('--pip-prop', (escolhida || pip.__propVideo || 16 / 9).toFixed(4));
+    const doVideo = pip.__propVideo || 16 / 9;
+    let formato = Number(lePref('clipeProp', '')) || doVideo;
+    // Encaixado numa lateral estreita: o formato cede para a altura não cair abaixo de 63px (a escolha fica guardada)
+    if (pip.classList.contains('no-canto') && larguraLivreCanto()) formato = Math.min(formato, larguraLivreCanto() / 63);
+    pip.style.setProperty('--pip-prop', formato.toFixed(4));
+    pip.style.setProperty('--pip-estica', (formato / doVideo).toFixed(4));
+    // Formato mudado pela alça: a pessoa escolhe entre faixas pretas (o vídeo inteiro) e a imagem esticada
+    const livre = Math.abs(formato / doVideo - 1) > 0.02;
+    pip.classList.toggle('formato-livre', livre);
+    pip.classList.toggle('esticado', livre && !!lePref('clipeEsticar', ''));
+    const botao = pip.querySelector('[data-pip="esticar"]');
+    if (botao) { botao.classList.toggle('ligado', pip.classList.contains('esticado')); botao.title = pip.classList.contains('esticado') ? 'Voltar às faixas pretas (o vídeo inteiro)' : 'Esticar a imagem (sem faixas pretas)'; }
 }
 const limitaProporcao = (largura, altura) => Math.max(0.5, Math.min(4, largura / Math.max(63, altura)));
 // Esticado para o lado, a largura mínima sobe junto para a altura nunca ficar abaixo de 63px
@@ -3047,6 +3064,7 @@ function larguraLivreCanto() {
 // Encaixado: a largura escolhida pela alça (vazio = a lateral toda); bem pequeno usa a barra enxuta
 function aplicaLarguraCanto() {
     if (!pip || !pip.classList.contains('no-canto')) return;
+    aplicaProporcaoPip();
     const escolhida = Number(lePref('clipeLarguraCanto', '')) || 0;
     const cabe = larguraLivreCanto();
     const largura = escolhida && cabe ? Math.min(cabe, Math.max(larguraMinimaPip(proporcaoAtualPip()), escolhida)) : 0;
@@ -3057,6 +3075,7 @@ function aplicaLarguraCanto() {
 function posicionaPip() {
     if (!pip || pip.hidden || !pip.classList.contains('flutuando')) return;
     // Flutuando: largura escolhida (P/M/G ou alça) e posição dentro da janela
+    aplicaProporcaoPip();
     const proporcao = parseFloat(pip.style.getPropertyValue('--pip-prop')) || 16 / 9;
     const largura = Math.round(Math.max(larguraMinimaPip(proporcao), Math.min(Number(lePref('clipeLargura', '360')) || 360, innerWidth - 24, (innerHeight - 24) * proporcao)));
     pip.style.width = largura + 'px';
@@ -3105,6 +3124,7 @@ function ligaPip() {
         if (b.dataset.pip === 'fechar') { fechaPip(true); return desenhaMidia(); }
         if (b.dataset.pip === 'encaixar') return modoPip(false);
         if (b.dataset.pip === 'soltar') desanexaPip();
+        if (b.dataset.pip === 'esticar') { gravaPref('clipeEsticar', lePref('clipeEsticar', '') ? '' : '1'); aplicaProporcaoPip(); }
     });
     pip.addEventListener('pointerdown', (ev) => {
         if (ev.button !== 0 || ev.target.closest('button, .pip-alca, .pip-alca-lado, .clipe-aviso button')) return;
@@ -3115,7 +3135,7 @@ function ligaPip() {
         const emCimaDoPlayer = (e) => { const r = playerMidia.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top - 20 && e.clientY <= r.bottom + 10; };
         // Ponteiro fora da janela do Red Code: soltar ali vira janela solta (como o picture-in-picture do navegador)
         const foraDaJanela = (e) => podeSoltarFora() && (e.clientX < 0 || e.clientY < 0 || e.clientX >= innerWidth || e.clientY >= innerHeight);
-        const mexe = (e) => {
+        acompanhaArraste(pip, (e) => {
             if (!movendo) {
                 if (Math.hypot(e.clientX - x0, e.clientY - y0) < 6) return;
                 movendo = true;
@@ -3129,13 +3149,12 @@ function ligaPip() {
             posicionaPip();
             rodape.classList.toggle('vai-encaixar', emCimaDoPlayer(e));
             pip.classList.toggle('vai-soltar', foraDaJanela(e));
-        };
-        const solta = (e) => {
-            pip.removeEventListener('pointermove', mexe);
+        }, (e, soltou) => {
             pip.classList.remove('arrastando', 'vai-soltar');
             rodape.classList.remove('vai-encaixar');
             if (!movendo) return;
-            pip.__arrastou = true;
+            seguraClique();
+            if (!soltou) return;
             if (foraDaJanela(e)) {
                 // Nasce com o mesmo tamanho, com o ponto que a pessoa segurava embaixo do ponteiro
                 const largura = pip.offsetWidth, altura = pip.offsetHeight;
@@ -3143,14 +3162,12 @@ function ligaPip() {
                 return desanexaPip({ x: e.screenX - px, y: e.screenY - py, width: largura, height: altura });
             }
             if (emCimaDoPlayer(e)) modoPip(false);
-        };
-        pip.addEventListener('pointermove', mexe);
-        pip.addEventListener('pointerup', solta, { once: true });
-        pip.addEventListener('pointercancel', solta, { once: true });
+        });
     });
     // Alça no canto de cima à direita: arrastar para fora aumenta (o quadrinho cresce para cima e para a direita)
     const alca = pip.querySelector('.pip-alca');
     alca.addEventListener('pointerdown', (ev) => {
+        if (ev.button !== 0) return;
         ev.preventDefault();
         ev.stopPropagation();
         alca.setPointerCapture(ev.pointerId);
@@ -3158,7 +3175,7 @@ function ligaPip() {
         const encaixado = pip.classList.contains('no-canto'), cabe = encaixado ? larguraLivreCanto() : Infinity;
         pip.classList.add('redimensionando');
         const baixo0 = pip.getBoundingClientRect().bottom;
-        const mexe = (e) => {
+        acompanhaArraste(alca, (e) => {
             const dx = e.clientX - x0, dy = (y0 - e.clientY) * proporcao;
             if (encaixado) {
                 const largura = Math.round(Math.min(cabe, Math.max(larguraMinimaPip(proporcao), largura0 + (Math.abs(dx) > Math.abs(dy) ? dx : dy))));
@@ -3169,35 +3186,53 @@ function ligaPip() {
             gravaPref('clipeLargura', String(largura));
             gravaPref('clipeY', String(Math.round(baixo0 - largura / proporcao)));
             posicionaPip();
-        };
-        const solta = () => { alca.removeEventListener('pointermove', mexe); pip.classList.remove('redimensionando'); pip.__arrastou = true; setTimeout(() => { pip.__arrastou = false; }, 0); };
-        alca.addEventListener('pointermove', mexe);
-        alca.addEventListener('pointerup', solta, { once: true });
-        alca.addEventListener('pointercancel', solta, { once: true });
+        }, () => { pip.classList.remove('redimensionando'); seguraClique(); });
     });
     alca.addEventListener('dblclick', (ev) => { ev.stopPropagation(); voltaFormatoDoVideo(); });
-    // Borda direita: puxar de lado muda só a largura (a altura fica), o vídeo fica inteiro com faixa preta
+    // Borda direita: puxar de lado muda só a largura (a altura fica); faixa preta ou imagem esticada conforme a escolha
     const alcaLado = pip.querySelector('.pip-alca-lado');
     alcaLado.addEventListener('pointerdown', (ev) => {
+        if (ev.button !== 0) return;
         ev.preventDefault();
         ev.stopPropagation();
         alcaLado.setPointerCapture(ev.pointerId);
         const x0 = ev.clientX, largura0 = pip.offsetWidth, altura0 = pip.offsetHeight;
         const encaixado = pip.classList.contains('no-canto'), cabe = encaixado ? larguraLivreCanto() : Infinity;
         pip.classList.add('redimensionando');
-        const mexe = (e) => {
+        acompanhaArraste(alcaLado, (e) => {
             const largura = Math.round(Math.max(112, Math.min(cabe, largura0 + e.clientX - x0)));
             gravaPref('clipeProp', limitaProporcao(largura, altura0).toFixed(4));
             aplicaProporcaoPip();
             if (encaixado) { gravaPref('clipeLarguraCanto', largura >= cabe ? '' : String(largura)); mostraPip(true); }
             else { gravaPref('clipeLargura', String(largura)); posicionaPip(); }
-        };
-        const solta = () => { alcaLado.removeEventListener('pointermove', mexe); pip.classList.remove('redimensionando'); pip.__arrastou = true; setTimeout(() => { pip.__arrastou = false; }, 0); };
-        alcaLado.addEventListener('pointermove', mexe);
-        alcaLado.addEventListener('pointerup', solta, { once: true });
-        alcaLado.addEventListener('pointercancel', solta, { once: true });
+        }, () => { pip.classList.remove('redimensionando'); seguraClique(); });
     });
     alcaLado.addEventListener('dblclick', (ev) => { ev.stopPropagation(); voltaFormatoDoVideo(); });
+}
+// O clique que vem logo depois de um arraste não vale (não fecha nem encaixa sem querer)
+function seguraClique() {
+    pip.__arrastou = true;
+    setTimeout(() => { pip.__arrastou = false; }, 0);
+}
+// Arraste até soltar o botão; botão já solto, cancelado ou sem captura encerram sem desanexar nem encaixar
+function acompanhaArraste(el, aoMexer, aoSoltar) {
+    let acabou = false;
+    const encerra = (e, soltou) => {
+        if (acabou) return;
+        acabou = true;
+        el.removeEventListener('pointermove', mexe);
+        el.removeEventListener('pointerup', soltouBotao);
+        el.removeEventListener('pointercancel', cancelou);
+        el.removeEventListener('lostpointercapture', cancelou);
+        aoSoltar(e, soltou);
+    };
+    const mexe = (e) => { if (!(e.buttons & 1)) return encerra(e, false); aoMexer(e); };
+    const soltouBotao = (e) => encerra(e, true);
+    const cancelou = (e) => encerra(e, false);
+    el.addEventListener('pointermove', mexe);
+    el.addEventListener('pointerup', soltouBotao);
+    el.addEventListener('pointercancel', cancelou);
+    el.addEventListener('lostpointercapture', cancelou);
 }
 if (SUPORTA_CLIPE && 'BroadcastChannel' in window) {
     // Conversa com a janela desanexada (clipe.html): voltar para o canto, fechar
