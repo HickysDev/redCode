@@ -852,6 +852,12 @@ ipcMain.handle('painel:atualizacao-estado', (ev) => (janela && ev.sender === jan
 ipcMain.handle('painel:atualizacao-acao', async (ev, acao) => {
     if (!janela || ev.sender !== janela.webContents) return null;
     // Botão "Buscar atualizações": confere agora (mesmo se a pessoa dispensou o cartão antes) e diz o que achou
+    // Configurações › Sistema: a versão instalada e a da main do GitHub
+    if (acao === 'versoes') {
+        let github = '', erro = '';
+        try { github = await atualizacao.versaoGithub(); } catch (e) { erro = e.message; }
+        return { atual: VERSAO_APP, github, erro, maisNova: !!github && atualizacao.maisNova(github, VERSAO_APP) };
+    }
     if (acao === 'verificar') {
         dispensadaNestaSessao = '';
         const r = await verificaAtualizacao();

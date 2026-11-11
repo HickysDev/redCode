@@ -115,6 +115,11 @@ async function releaseNova(versaoAtual) {
     if (!zip) return null;
     return { versao, url: zip.browser_download_url, tamanho: zip.size, notas: String(r.body || '').slice(0, 1500), pagina: r.html_url };
 }
+// Versão do package.json na main do GitHub (o que está lá no git, já publicado em release ou não)
+async function versaoGithub() {
+    const r = await pedeJson(`https://raw.githubusercontent.com/${REPO}/main/package.json?t=${Date.now()}`);
+    return String(r.version || '');
+}
 // Baixa e extrai; devolve a pasta "Red Code" nova pronta para copiar por cima da atual
 async function preparaRelease(info, pastaDados, progresso, log) {
     const pasta = path.join(pastaDados, 'atualizacao');
@@ -148,4 +153,4 @@ function aplicaAoSair(novo, pastaApp, exe, reabrir, pastaDados) {
     spawn('cmd.exe', ['/c', 'start', '""', '/min', 'powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', script, '-De', novo, '-Para', pastaApp, '-Exe', exe, '-Abrir', reabrir ? '1' : '0'], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
 }
 
-module.exports = { pelaFonte, atrasoFonte, releaseNova, preparaRelease, aplicaAoSair, maisNova };
+module.exports = { pelaFonte, atrasoFonte, releaseNova, versaoGithub, preparaRelease, aplicaAoSair, maisNova };
