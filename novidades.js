@@ -3,6 +3,12 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.17', data: '2026-11-11', itens: [
+            'Correção da 1.0.16: as perguntas do Claude voltam a aparecer no Red Code (não ficam mais como "responda no VS Code") e o painel volta a se atualizar sozinho',
+            'Botão de extensões de volta no topo da lista',
+        ],
+    },
+    {
         versao: '1.0.16', data: '2026-11-11', itens: [
             'Explorar: botão no topo da lista mostra a árvore da pasta da conversa no lugar da lista; clicar num arquivo abre como aba no ao vivo',
             'Editor no ao vivo: o ao vivo vira o editor de código, com as cores e o tema dele; a edição do Claude anima dentro do editor (vermelho sai, verde entra)',
