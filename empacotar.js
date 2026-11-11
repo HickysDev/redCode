@@ -52,8 +52,6 @@ function principal() {
     fs.mkdirSync(path.join(app, 'desktop'), { recursive: true });
     for (const a of ARQUIVOS_RAIZ) fs.copyFileSync(path.join(RAIZ, a), path.join(app, a));
     for (const a of ARQUIVOS_DESKTOP) fs.copyFileSync(path.join(RAIZ, 'desktop', a), path.join(app, 'desktop', a));
-    // Extensão do navegador (vídeo no canto): o servidor copia para a pasta de dados ao subir
-    fs.cpSync(path.join(RAIZ, 'extensao'), path.join(app, 'extensao'), { recursive: true });
     fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify({
         name: 'red-code', productName: 'Red Code', version: pacote.version,
         main: 'desktop/main.js', dependencies: pacote.dependencies,

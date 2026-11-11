@@ -3,6 +3,13 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.11', data: '2026-11-11', itens: [
+            'Vídeo no canto sem extensão: o vídeo vem da aba do YouTube que estiver selecionada no navegador (pode minimizar ou cobrir a janela)',
+            'Extensão do navegador aposentada: remova pela página de extensões do navegador. Se instalou pelo botão do Red Code, tire também o "--load-extension" do atalho do Brave ou do Edge (Propriedades do atalho)',
+            'Integrações: nova aba em Configurações. O YouTube Music Desktop agora se conecta por lá, com Integrar e Desativar',
+        ],
+    },
+    {
         versao: '1.0.10', data: '2026-11-11', itens: [
             'Tarefas em segundo plano na lista: conversa com um comando ou teste rodando em segundo plano aparece como trabalhando, com o nome da tarefa',
             'Player com disco pela capa: o disco abre só com o mouse parado na capa do álbum; aberto, continua aberto enquanto o mouse estiver no player',

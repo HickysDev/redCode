@@ -44,7 +44,7 @@ assunto está em [docs/](docs/README.md).
 | Como o app é montado (processos, módulos, dados, portas) | [docs/arquitetura.md](docs/arquitetura.md) |
 | Versão, novidades, exe e release; atualização automática | [docs/versoes-e-publicacao.md](docs/versoes-e-publicacao.md) |
 | Testar no app sem mexer no Red Code do usuário | [docs/testes.md](docs/testes.md) |
-| Vídeo no canto (extensão, yt-dlp, YouTube Music Desktop, sincronia) | [docs/video-no-canto.md](docs/video-no-canto.md) |
+| Vídeo no canto (navegador sem extensão, Integrações/YouTube Music Desktop, yt-dlp, sincronia) | [docs/video-no-canto.md](docs/video-no-canto.md) |
 | Player do rodapé (mídia do Windows, disco ao passar o mouse) | [docs/player-de-midia.md](docs/player-de-midia.md) |
 | Atalhos de teclado configuráveis | [docs/atalhos.md](docs/atalhos.md) |
 | Lista de conversas (estados, segundo plano, troca de conversa) | [docs/lista-de-conversas.md](docs/lista-de-conversas.md) |

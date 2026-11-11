@@ -4,6 +4,8 @@ dist/
 # Dados pessoais e de uso (ficam em cada PC)
 dados.json
 vivas.json
+players-externos.json
+ytm-desktop.json
 anexos/
 desktop/janela.json
 desktop/navegador.json

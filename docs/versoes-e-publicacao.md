@@ -50,5 +50,5 @@ module.exports = [
 ## Empacotar
 
 `empacotar.js` copia o Electron de `node_modules`, os arquivos `.js/.html/.svg/.ps1` da raiz, a pasta
-`desktop/`, a `extensao/` e só as dependências de produção. Arquivo novo na raiz com essas extensões
+`desktop/` e só as dependências de produção. Arquivo novo na raiz com essas extensões
 entra sozinho; pasta nova precisa ser acrescentada no `empacotar.js`. `ferramentas/` não vai no exe.

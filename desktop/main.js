@@ -404,7 +404,7 @@ ipcMain.handle('painel:abrir-logs', async (ev) => {
     return (await shell.openPath(PASTA_DADOS)) === '';
 });
 
-// ---------- Vídeo da mídia que está tocando: janela desanexada (o vídeo vem da extensão do navegador, clipe.js) ----------
+// ---------- Vídeo da mídia que está tocando: janela desanexada (o vídeo vem do servidor, clipe.js) ----------
 const janelasClipe = new Set();
 // Onde nasce a próxima janela solta (a página manda logo antes de abrir, ao soltar o vídeo fora do Red Code)
 let posicaoClipe = null;

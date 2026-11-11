@@ -21,6 +21,8 @@ const midia = require('./midia');
 const login = require('./login');
 const plugins = require('./plugins');
 const videoNavegador = require('./video-navegador');
+const videoNativo = require('./video-nativo');
+const playersExternos = require('./players-externos');
 // Nome da pasta de transcripts das conversas Chat (o SDK grava pelo cwd sanitizado)
 const PASTA_CHAT = chat.pastaDoProjeto(chat.CHAT_DIR).toLowerCase();
 // Primeiro nome do usuário do Windows (henrique.freitas -> Henrique), para a saudação do Chat
@@ -1294,13 +1296,9 @@ function requisicaoConfiavel(req) {
 // Favoritas e vínculos entre conversas ("continuação de"), guardados num arquivo ao lado do servidor
 // PAINEL_DADOS: no Red Code.exe, %APPDATA%\Red Code (a pasta do programa é trocada a cada versão)
 const PASTA_DADOS = process.env.PAINEL_DADOS || __dirname;
-// Extensão do navegador (vídeo no canto): copiada para uma pasta fixa, que é a que se carrega no navegador
 videoNavegador.configura(PASTA_DADOS);
-// YouTube Music Desktop (app à parte, sem extensão): o vídeo vem do Companion Server dele, como mais uma aba
-let ytmDesktop = null;
-try { ytmDesktop = require('./ytm-desktop'); ytmDesktop.configura(PASTA_DADOS, videoNavegador.recebe); } catch (e) { ytmDesktop = null; console.log('ytm desktop: ' + e.message); }
-let PASTA_EXTENSAO = null;
-try { PASTA_EXTENSAO = videoNavegador.copiaExtensao(__dirname, PASTA_DADOS); } catch (e) { console.log('extensão do navegador: ' + e.message); }
+videoNativo.configura(videoNavegador.recebe);
+try { playersExternos.configura(PASTA_DADOS, videoNavegador.recebe); } catch (e) { console.log('players externos: ' + e.message); }
 const ARQUIVO_DADOS = path.join(PASTA_DADOS, 'dados.json');
 function leDados() {
     const vazio = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], pastasExtras: [], navegador: 'padrao' };
@@ -2545,25 +2543,17 @@ const servidor = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=3600', 'X-Content-Type-Options': 'nosniff' });
             return res.end(capa);
         }
-        // Vídeo no canto: a extensão do navegador manda o estado (só ela: cabeçalho próprio e origem de extensão,
-        // que página de site não consegue mandar sem a pré-checagem que este servidor não aprova)
-        if (url.pathname === '/api/midia/video' && req.method === 'POST') {
-            const origem = String(req.headers.origin || '');
-            if (req.headers['x-redcode-extensao'] !== '1' || (origem && !/^chrome-extension:\/\/[a-p]{32}$/.test(origem))) return responde(res, 403, { erro: 'só a extensão do Red Code' });
-            try { videoNavegador.recebe(await leCorpo(req, 1e4)); return responde(res, 200, { ok: true }); }
-            catch (e) { return responde(res, 400, { erro: e.message }); }
-        }
+        // Vídeo no canto: a aba do YouTube selecionada em algum navegador (video-nativo) ou um player externo ligado
         if (url.pathname === '/api/midia/video' && req.method === 'GET') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
-            return responde(res, 200, { ...videoNavegador.atual(), ytdlp: !!videoNavegador.caminhoYtdlp(), pastaExtensao: PASTA_EXTENSAO, navegadores: videoNavegador.navegadores(), ytmDesktop: ytmDesktop ? ytmDesktop.estado() : null });
+            videoNativo.usado();
+            return responde(res, 200, { ...videoNavegador.atual(), ytdlp: !!videoNavegador.caminhoYtdlp(), avisosPlayers: playersExternos.avisos() });
         }
-        // Instalar a extensão (a pessoa aceitou na tela): atalhos do navegador com --load-extension e, se pedido, reinicia ele
-        if (url.pathname === '/api/midia/extensao' && req.method === 'POST') {
+        if (url.pathname === '/api/players-externos') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
-            try {
-                const corpo = await leCorpo(req, 1e4);
-                return responde(res, 200, await videoNavegador.instalaExtensao(String(corpo.navegador || ''), PASTA_EXTENSAO, PASTA_DADOS, !!corpo.reiniciar));
-            } catch (e) { return responde(res, 400, { erro: e.message }); }
+            if (req.method === 'GET') return responde(res, 200, playersExternos.lista());
+            try { const corpo = await leCorpo(req, 1e4); return responde(res, 200, playersExternos.executa(String(corpo.id || ''), String(corpo.acao || ''))); }
+            catch (e) { return responde(res, 400, { erro: e.message }); }
         }
         // Opção B: endereço direto só do vídeo (yt-dlp), para vídeo que não deixa incorporar
         if (url.pathname === '/api/midia/video-url' && req.method === 'GET') {
@@ -2618,8 +2608,12 @@ const servidor = http.createServer(async (req, res) => {
         if (url.pathname === '/api/midia') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
             // Com ?versao=: segura a resposta até o estado mudar (play/pausa de fora aparece na hora, sem esperar a próxima pergunta)
-            if (req.method === 'GET' && url.searchParams.has('versao')) return responde(res, 200, await midia.espera(url.searchParams.get('versao'), 20000));
-            if (req.method === 'GET') return responde(res, 200, midia.le());
+            if (req.method === 'GET') {
+                const estado = url.searchParams.has('versao') ? await midia.espera(url.searchParams.get('versao'), 20000) : midia.le();
+                // NAVEGADOR TOCANDO: LIGA O LEITOR ANTES DE ABRIR O VIDEO, PARA O VIDEO E O YT-DLP JA ESTAREM PRONTOS
+                if (videoNativo.ehNavegador(estado.app)) videoNativo.usado();
+                return responde(res, 200, estado);
+            }
             try { const corpo = await leCorpo(req, 1e4); midia.comando(String(corpo.acao || '')); return responde(res, 200, { ok: true }); }
             catch (e) { return responde(res, 400, { erro: e.message }); }
         }
