@@ -1743,12 +1743,15 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .pip-clipe .pip-barra button:hover { background: #ffffff2b; }
 .pip-clipe .pip-barra button.ligado { background: #ffffff38; }
 .pip-clipe .pip-vao { flex: 1; }
-.pip-clipe .pip-alca { position: absolute; right: 0; top: 0; z-index: 1; width: 16px; height: 16px; cursor: nesw-resize; touch-action: none; }
-.pip-clipe .pip-alca::after { content: ""; position: absolute; right: 4px; top: 4px; width: 7px; height: 7px; border-top: 2px solid #fff9; border-right: 2px solid #fff9; border-radius: 0 3px 0 0; opacity: 0; transition: opacity .18s; }
-.pip-clipe:hover .pip-alca::after { opacity: 1; }
-.pip-clipe .pip-alca-lado { position: absolute; right: 0; top: 20px; bottom: 20px; z-index: 1; width: 10px; cursor: ew-resize; touch-action: none; }
-.pip-clipe .pip-alca-lado::after { content: ""; position: absolute; right: 3px; top: 50%; width: 3px; height: 24px; margin-top: -12px; border-radius: 2px; background: #fff9; opacity: 0; transition: opacity .18s; }
-.pip-clipe:hover .pip-alca-lado::after { opacity: 1; }
+/* Alças coladas na borda: o canto é um arco que segue o arredondado da janelinha e o lado um tracinho em cima da borda */
+.pip-clipe .pip-alca { position: absolute; right: 0; top: 0; z-index: 1; width: 22px; height: 22px; cursor: nesw-resize; touch-action: none; }
+.pip-clipe .pip-alca::after { content: ""; position: absolute; right: 0; top: 0; width: 22px; height: 22px; box-sizing: border-box; border-top: 3px solid #fffd; border-right: 3px solid #fffd; border-top-right-radius: 11px; -webkit-mask: linear-gradient(to left, #000 40%, #0000), linear-gradient(to bottom, #000 40%, #0000); -webkit-mask-composite: source-in; mask-composite: intersect; filter: drop-shadow(0 0 2px #000c); opacity: 0; transition: opacity .18s, width .18s, height .18s; }
+.pip-clipe:hover .pip-alca::after { opacity: .8; }
+.pip-clipe .pip-alca:hover::after, .pip-clipe.redimensionando .pip-alca::after { opacity: 1; width: 28px; height: 28px; }
+.pip-clipe .pip-alca-lado { position: absolute; right: 0; top: 26px; bottom: 14px; z-index: 1; width: 10px; cursor: ew-resize; touch-action: none; }
+.pip-clipe .pip-alca-lado::after { content: ""; position: absolute; right: 0; top: 50%; width: 3px; height: 26px; transform: translateY(-50%); border-radius: 3px 0 0 3px; background: #fffd; filter: drop-shadow(0 0 2px #000c); opacity: 0; transition: opacity .18s, height .18s; }
+.pip-clipe:hover .pip-alca-lado::after { opacity: .8; }
+.pip-clipe .pip-alca-lado:hover::after, .pip-clipe.redimensionando .pip-alca-lado::after { opacity: 1; height: 36px; }
 .pip-clipe.redimensionando { user-select: none; }
 /* Limites de uso abertos: sobem para acima do player (senão cobrem os botões) */
 /* Com o vídeo encaixado acima do player, o cartão de uso sobe junto */
