@@ -1539,6 +1539,12 @@ details[open]::details-content { block-size: auto; }
 .pergunta-ext .pe-de { display: block; color: var(--grafite); font-size: 11.5px; margin-bottom: 4px; }
 .pergunta-ext p { margin: 6px 0 10px; color: var(--grafite); font-size: 13px; white-space: pre-wrap; }
 .pergunta-ext input { width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--linha); border-radius: 7px; background: var(--folha); color: var(--tinta); font: 13px var(--sans); }
+.pergunta-ext .pe-sugestoes { display: grid; gap: 4px; margin-top: 10px; }
+.pergunta-ext .pe-sugestoes > small { color: var(--grafite); font-size: 11.5px; }
+.pergunta-ext .pe-sugestoes button { display: flex; align-items: baseline; gap: 8px; padding: 6px 9px; border: 1px solid var(--linha); border-radius: 7px; background: var(--folha); color: var(--tinta); text-align: left; font: 12.5px var(--sans); }
+.pergunta-ext .pe-sugestoes button:hover { border-color: var(--voce); }
+.pergunta-ext .pe-sugestoes code { font: 12px var(--mono); }
+.pergunta-ext .pe-sugestoes span { flex: 1; min-width: 0; color: var(--grafite); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pergunta-ext .pe-bts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .pergunta-ext .pe-bts button { padding: 6px 14px; border-radius: 8px; background: var(--realce); color: var(--tinta); font: 600 12.5px var(--sans); }
 .pergunta-ext .pe-bts button.principal { background: var(--voce); color: #fff; }
@@ -9749,6 +9755,7 @@ function proximaPerguntaExt() {
     if (p.pedido === 'entrada') {
         caixa.innerHTML = `<span class="pe-de">${esc(extNome(p.extId))}</span><h2>${esc(p.dados.titulo || 'Digite')}</h2>${p.dados.prompt ? `<p>${esc(p.dados.prompt)}</p>` : ''}<input type="${p.dados.senha ? 'password' : 'text'}" autocomplete="off" spellcheck="false" placeholder="${esc(p.dados.placeholder)}"><div class="pe-bts"><button type="button" data-pe-cancelar>Cancelar</button><button type="button" class="principal" data-pe-ok>OK</button></div>`;
         caixa.querySelector('input').value = p.dados.valor || '';
+        sugereCredenciaisExt(p, caixa);
     } else {
         caixa.innerHTML = `<span class="pe-de">${esc(extNome(p.extId))}</span><h2>${esc(p.dados.texto)}</h2>${p.dados.detalhe ? `<p>${esc(p.dados.detalhe)}</p>` : ''}<div class="pe-bts"><button type="button" data-pe-cancelar>Cancelar</button>${p.dados.botoes.map((b, i) => `<button type="button" class="${i === 0 ? 'principal' : ''}" data-pe-valor="${esc(b)}">${esc(b)}</button>`).join('')}</div>`;
     }
@@ -9758,6 +9765,14 @@ function proximaPerguntaExt() {
         const n = new Notification(extNome(p.extId), { body: p.dados.titulo || p.dados.texto || 'Esperando você', tag: 'ext-' + p.id });
         n.onclick = () => { window.painelDesktop?.mostrar?.(); window.focus(); n.close(); };
     }
+}
+// A extensão pede uma credencial que já apareceu nas conversas (hoje: chave/token do Trello): lista mascarada para clicar
+async function sugereCredenciaisExt(p, caixa) {
+    let r;
+    try { r = await getPainel(`/api/credenciais-conversas?titulo=${encodeURIComponent(p.dados.titulo || '')}&prompt=${encodeURIComponent(p.dados.prompt || '')}`); } catch (e) { return; }
+    if (!r.tipo || !r.itens.length || extPerguntaAtual !== p) return;
+    const quando = (ms) => new Date(ms).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    caixa.querySelector('input').insertAdjacentHTML('afterend', `<div class="pe-sugestoes"><small>Encontrados nas suas conversas (clique para usar):</small>${r.itens.map(i => `<button type="button" data-pe-sugestao="${esc(i.id)}"><code>${esc(i.mascara)}</code><span>${esc(i.conversa)}${i.conversas > 1 ? ` e mais ${i.conversas - 1}` : ''} · ${quando(i.data)}</span></button>`).join('')}</div>`);
 }
 function respondePerguntaExt(valor) { if (extPerguntaAtual) respondeExt(extPerguntaAtual.id, valor); }
 function respondeExt(id, valor) {
@@ -9781,6 +9796,13 @@ document.getElementById('janelaExtPergunta').addEventListener('click', (ev) => {
     if (!extPerguntaAtual) return;
     if (ev.target.closest('[data-pe-cancelar]') || ev.target.id === 'janelaExtPergunta') return respondePerguntaExt(null);
     if (ev.target.closest('[data-pe-ok]')) return respondePerguntaExt(document.querySelector('#janelaExtPergunta input').value);
+    const sugestao = ev.target.closest('[data-pe-sugestao]');
+    if (sugestao) {
+        api('/api/credenciais-conversas/valor', { id: sugestao.dataset.peSugestao })
+            .then(r => { const campo = document.querySelector('#janelaExtPergunta input'); if (campo) { campo.value = r.valor; campo.focus(); } recado('Preenchido com a credencial da conversa: confira e clique OK'); })
+            .catch(e => recado(e.message));
+        return;
+    }
     const b = ev.target.closest('[data-pe-valor]');
     if (b) respondePerguntaExt(b.dataset.peValor);
 });

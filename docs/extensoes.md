@@ -44,6 +44,16 @@ index.html ──/api/extensoes/*──► server.js (rotaExtensoes) ──► e
 - **Árvores**: a página pede os itens; o clique manda só o `handle` e o host roda o comando **do item
   guardado** (nunca argumentos vindos da página).
 
+## Credenciais já usadas nas conversas
+
+Quando a caixa de digitar de uma extensão pede a **chave de API ou o token do Trello** (título/texto com "Trello"
+e "chave"/"token"), a página chama `GET /api/credenciais-conversas` e mostra "Encontrados nas suas conversas":
+`credenciais-conversas.js` procura nos `.jsonl` do Claude Code (conta do perfil e as outras contas ligadas a
+conversas), só nos que citam o serviço, por formato (chave = 32 hex; token = 64 hex ou `ATTA…`, sempre logo depois
+de `key`/`token`). A lista vai **mascarada** (`d1db…89e5`, conversa e data); o valor inteiro só sai por
+`POST /api/credenciais-conversas/valor {id}` (checagem do painel) quando a pessoa clica, e preenche o campo. Nada vai
+para log. Teste só com conversas inventadas: `node testes/credenciais-conversas.test.js`.
+
 ## Testes
 
 - `node testes/extensoes.test.js [arquivo.vsix]`: sem abrir o app — .vsix malicioso recusado,

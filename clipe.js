@@ -23,7 +23,7 @@
             'so-musica': () => 'Só música: no YouTube Music está no modo "Áudio" (troque para "Vídeo" para ver o clipe).',
             anuncio: () => 'Anúncio no YouTube: o vídeo volta quando ele acabar.',
             carregando: () => 'Carregando o vídeo…',
-            'sem-ytdlp': () => 'Este vídeo não deixa tocar fora do YouTube. Instale o yt-dlp para tocar mesmo assim.',
+            'sem-ytdlp': () => 'Para ver o vídeo aqui, o Red Code usa o yt-dlp (baixa só o vídeo, sem a tela do YouTube).',
             falhou: () => 'Não deu para tocar este vídeo aqui.',
         };
         function mudaEstado(novo) {
@@ -72,7 +72,7 @@
             iframe = document.createElement('iframe');
             iframe.allow = 'autoplay; encrypted-media';
             iframe.referrerPolicy = 'strict-origin-when-cross-origin';
-            iframe.src = `${ORIGEM_YT}/embed/${id}?enablejsapi=1&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&iv_load_policy=3&disablekb=1&fs=0&start=${Math.floor(tempoAgora())}&origin=${encodeURIComponent(location.origin)}`;
+            iframe.src = `${ORIGEM_YT}/embed/${id}?enablejsapi=1&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&iv_load_policy=3&cc_load_policy=0&disablekb=1&fs=0&start=${Math.floor(tempoAgora())}&origin=${encodeURIComponent(location.origin)}`;
             // O player só manda eventos depois de ouvir "listening": repete até ele dizer que está pronto
             iframe.addEventListener('load', () => {
                 let vezes = 0;
@@ -138,6 +138,8 @@
             video = Object.assign(document.createElement('video'), { muted: true, autoplay: true, playsInline: true });
             video.addEventListener('loadedmetadata', () => { video.currentTime = tempoAgora() + 0.3; inicioB = Date.now(); if (opcoes.aoProporcao && video.videoWidth) opcoes.aoProporcao(video.videoWidth / video.videoHeight); });
             video.addEventListener('playing', () => { if (estado === 'carregando') mudaEstado(''); });
+            // Com a música pausada o "playing" não vem: o primeiro quadro já basta para sair do carregando
+            video.addEventListener('loadeddata', () => { if (estado === 'carregando') mudaEstado(''); });
             video.addEventListener('error', () => { if (video) mudaEstado('falhou'); });
             video.src = url;
             tela.appendChild(video);
@@ -259,8 +261,12 @@
                 if (opcoes.aoProporcao) opcoes.aoProporcao(16 / 9);
                 if (opcoes.aoTrocar) opcoes.aoTrocar(v);
                 // Endereço direto já buscado (a fila foi buscada antes): vai direto para o B, que entra em ~1 s
-                if (temYtdlp && v.urlPronta && (window.__clipeAjustes || {}).direto0 !== false) tocaDireto(v.id);
-                else tocaIncorporado(v.id);
+                // Só o endereço direto (yt-dlp): o player do YouTube incorporado mostra título, logo e botão de play por
+                // cima do vídeo (a cada pulo da sincronia) e não dá para esconder. Sem yt-dlp: pede para instalar.
+                // (__clipeAjustes.incorporado liga o player do YouTube só para testes)
+                if ((window.__clipeAjustes || {}).incorporado) tocaIncorporado(v.id);
+                else if (temYtdlp) tocaDireto(v.id);
+                else { limpa(); mudaEstado('sem-ytdlp'); }
             }
             if (v.anuncio) mudaEstado('anuncio');
             else if (estado === 'anuncio') mudaEstado(pronto || (video && !video.paused) ? '' : 'carregando');

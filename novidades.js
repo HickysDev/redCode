@@ -3,6 +3,12 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.15', data: '2026-11-11', itens: [
+            'Credenciais das conversas: quando uma extensão pede a chave ou o token do Trello, a caixa lista (mascarados) os que já apareceram nas suas conversas; um clique preenche',
+            'Vídeo no canto sem a tela do YouTube: o vídeo vem sempre direto (yt-dlp), sem título, logo nem botão de play por cima. Sem o yt-dlp, o canto oferece instalar',
+        ],
+    },
+    {
         versao: '1.0.14', data: '2026-11-11', itens: [
             'Alças do vídeo no canto: coladas na borda (arco no canto de cima e tracinho na borda direita); a alça de baixo saiu e o canto de cima redimensiona também com o vídeo encaixado',
             'Esticar a imagem: com o formato mudado pela alça, um botão escolhe entre faixas pretas e a imagem esticada',

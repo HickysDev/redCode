@@ -1299,6 +1299,7 @@ const PASTA_DADOS = process.env.PAINEL_DADOS || __dirname;
 videoNavegador.configura(PASTA_DADOS);
 // Extensões do VS Code (.vsix) instaladas no Red Code: cada uma num processo próprio, encerrado junto com o servidor
 const extensoes = require('./extensoes');
+const credenciaisConversas = require('./credenciais-conversas');
 extensoes.configura({ pasta: __dirname, pastaDados: PASTA_DADOS, porta: PORTA });
 process.on('exit', () => extensoes.encerraTodas());
 // Corpo binário (o .vsix), com limite
@@ -2685,6 +2686,23 @@ const servidor = http.createServer(async (req, res) => {
             } catch (e) { return responde(res, 400, { erro: e.message }); }
         }
         if (url.pathname.startsWith('/api/extensoes/')) return await rotaExtensoes(req, res, url);
+        // Credenciais já usadas nas conversas (a caixa de digitar de uma extensão pede a chave ou o token do Trello):
+        // a lista vai mascarada; o valor inteiro só pelo id, quando a pessoa clica
+        if (url.pathname === '/api/credenciais-conversas' || url.pathname === '/api/credenciais-conversas/valor') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            try {
+                if (url.pathname === '/api/credenciais-conversas/valor') {
+                    if (req.method !== 'POST') return responde(res, 405, { erro: 'método não permitido' });
+                    const v = credenciaisConversas.valor((await leCorpo(req, 1e3)).id);
+                    return v ? responde(res, 200, { valor: v }) : responde(res, 404, { erro: 'Não achei mais essa credencial: procure de novo.' });
+                }
+                const tipo = credenciaisConversas.tipoDoPedido(url.searchParams.get('titulo'), url.searchParams.get('prompt'));
+                if (!tipo) return responde(res, 200, { tipo: null, itens: [] });
+                const titulos = new Map(listaSessoes().map(s => [s.id, s.titulo]));
+                const raizes = [RAIZ_PROJETOS, ...raizesExtras().map(r => r.raiz)];
+                return responde(res, 200, { tipo, itens: credenciaisConversas.procura(tipo, raizes, (id) => titulos.get(id)) });
+            } catch (e) { return responde(res, 400, { erro: e.message }); }
+        }
         if (url.pathname === '/api/novidades' && req.method === 'GET') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
             let versoes = [], versaoApp = '';
