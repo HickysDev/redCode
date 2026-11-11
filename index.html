@@ -9271,10 +9271,10 @@ function alternaQuebra() {
 elEv('evVscode').addEventListener('click', () => { if (ev.arquivo) { window.open(linkVscode(ev.arquivo, ev.linha)); recado('Abrindo no VS Code'); } });
 elEv('evEditor').addEventListener('click', () => { if (ev.arquivo) abreEditor(ev.arquivo, ev.linha); });
 elEv('evPainel').addEventListener('click', () => document.getElementById('btnLateral').click());
-// Painel lateral por cima do editor: clicar fora fecha
+// Painel lateral por cima do editor: clicar fora fecha (as alças de largura não contam: soltar o arrasto gera um click nelas)
 document.addEventListener('click', (evt) => {
     if (!document.body.classList.contains('layout-editor') || !document.body.classList.contains('lateral-aberta')) return;
-    if (evt.target.closest('.lateral, #btnLateral, #evPainel, .botoes-cantos, .pop-visual')) return;
+    if (evt.target.closest('.lateral, .alca-coluna, #btnLateral, #evPainel, .botoes-cantos, .pop-visual')) return;
     document.getElementById('btnLateral').click();
 });
 // Configuração do visual (⚙ no topo e no editor)
