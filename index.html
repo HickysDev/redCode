@@ -1720,7 +1720,7 @@ body.lista-escondida .rodape-sessoes { display: none; }
 /* Encaixado na lateral, logo acima do player: entra crescendo e empurra a lista de conversas para cima */
 .pip-clipe.no-canto { position: relative; left: auto; bottom: auto; z-index: auto; width: 100%; box-sizing: border-box; max-height: 0; margin: 0 0 0; box-shadow: none; animation: none; opacity: 0; transform: translateY(10px); transition: max-height .45s cubic-bezier(.2, .8, .2, 1), margin .45s cubic-bezier(.2, .8, .2, 1), opacity .3s ease, transform .45s cubic-bezier(.2, .8, .2, 1); }
 .pip-clipe.no-canto.aberto { margin-bottom: 8px; opacity: 1; transform: none; }
-.pip-clipe.no-canto [data-pip-tamanho], .pip-clipe.no-canto .pip-alca, .pip-clipe.no-canto [data-pip="encaixar"] { display: none; }
+.pip-clipe.no-canto [data-pip-tamanho], .pip-clipe.no-canto [data-pip="encaixar"] { display: none; }
 /* Encaixado: alça no canto de baixo à direita para diminuir/aumentar ali mesmo (o canto de cima à esquerda fica parado) */
 .pip-clipe .pip-alca-canto { display: none; position: absolute; right: 0; bottom: 0; z-index: 1; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none; }
 .pip-clipe.no-canto .pip-alca-canto { display: block; }
@@ -3032,6 +3032,9 @@ function aplicaProporcaoPip() {
     pip.style.setProperty('--pip-prop', (escolhida || pip.__propVideo || 16 / 9).toFixed(4));
 }
 const limitaProporcao = (largura, altura) => Math.max(0.5, Math.min(4, largura / Math.max(63, altura)));
+// Esticado para o lado, a largura mínima sobe junto para a altura nunca ficar abaixo de 63px
+const larguraMinimaPip = (proporcao) => Math.max(112, Math.ceil(63 * proporcao));
+const proporcaoAtualPip = () => parseFloat(pip.style.getPropertyValue('--pip-prop')) || 16 / 9;
 function voltaFormatoDoVideo() {
     gravaPref('clipeProp', '');
     aplicaProporcaoPip();
@@ -3049,7 +3052,7 @@ function aplicaLarguraCanto() {
     if (!pip || !pip.classList.contains('no-canto')) return;
     const escolhida = Number(lePref('clipeLarguraCanto', '')) || 0;
     const cabe = larguraLivreCanto();
-    const largura = escolhida && cabe ? Math.max(112, Math.min(escolhida, cabe)) : 0;
+    const largura = escolhida && cabe ? Math.min(cabe, Math.max(larguraMinimaPip(proporcaoAtualPip()), escolhida)) : 0;
     pip.style.width = largura && largura < cabe ? largura + 'px' : '';
     pip.classList.toggle('pequeno', !!largura && largura < 220);
 }
@@ -3058,7 +3061,7 @@ function posicionaPip() {
     if (!pip || pip.hidden || !pip.classList.contains('flutuando')) return;
     // Flutuando: largura escolhida (P/M/G ou alça) e posição dentro da janela
     const proporcao = parseFloat(pip.style.getPropertyValue('--pip-prop')) || 16 / 9;
-    const largura = Math.round(Math.max(112, Math.min(Number(lePref('clipeLargura', '360')) || 360, innerWidth - 24, (innerHeight - 24) * proporcao)));
+    const largura = Math.round(Math.max(larguraMinimaPip(proporcao), Math.min(Number(lePref('clipeLargura', '360')) || 360, innerWidth - 24, (innerHeight - 24) * proporcao)));
     pip.style.width = largura + 'px';
     // Bem pequeno: a barra fica só com encaixar, desanexar e fechar; pet e avisos menores
     pip.classList.toggle('pequeno', largura < 220);
@@ -3160,7 +3163,7 @@ function ligaPip() {
         const mexe = (e) => {
             // Vale o movimento maior: o de lado ou o de cima/baixo (convertido em largura pela proporção do vídeo)
             const dx = e.clientX - x0, dy = (e.clientY - y0) * proporcao;
-            const largura = Math.round(Math.max(112, Math.min(cabe, largura0 + (Math.abs(dx) > Math.abs(dy) ? dx : dy))));
+            const largura = Math.round(Math.min(cabe, Math.max(larguraMinimaPip(proporcao), largura0 + (Math.abs(dx) > Math.abs(dy) ? dx : dy))));
             gravaPref('clipeLarguraCanto', largura >= cabe ? '' : String(largura));
             mostraPip(true);
         };
@@ -3174,17 +3177,25 @@ function ligaPip() {
     const alca = pip.querySelector('.pip-alca');
     alca.addEventListener('pointerdown', (ev) => {
         ev.preventDefault();
+        ev.stopPropagation();
         alca.setPointerCapture(ev.pointerId);
         const x0 = ev.clientX, y0 = ev.clientY, largura0 = pip.offsetWidth, proporcao = pip.offsetWidth / pip.offsetHeight;
+        const encaixado = pip.classList.contains('no-canto'), cabe = encaixado ? larguraLivreCanto() : Infinity;
         pip.classList.add('redimensionando');
         const baixo0 = pip.getBoundingClientRect().bottom;
         const mexe = (e) => {
-            const largura = Math.round(Math.max(112, largura0 + Math.max(e.clientX - x0, (y0 - e.clientY) * proporcao)));
+            const dx = e.clientX - x0, dy = (y0 - e.clientY) * proporcao;
+            if (encaixado) {
+                const largura = Math.round(Math.min(cabe, Math.max(larguraMinimaPip(proporcao), largura0 + (Math.abs(dx) > Math.abs(dy) ? dx : dy))));
+                gravaPref('clipeLarguraCanto', largura >= cabe ? '' : String(largura));
+                return mostraPip(true);
+            }
+            const largura = Math.round(Math.max(larguraMinimaPip(proporcao), largura0 + Math.max(dx, dy)));
             gravaPref('clipeLargura', String(largura));
             gravaPref('clipeY', String(Math.round(baixo0 - largura / proporcao)));
             posicionaPip();
         };
-        const solta = () => { alca.removeEventListener('pointermove', mexe); pip.classList.remove('redimensionando'); };
+        const solta = () => { alca.removeEventListener('pointermove', mexe); pip.classList.remove('redimensionando'); pip.__arrastou = true; setTimeout(() => { pip.__arrastou = false; }, 0); };
         alca.addEventListener('pointermove', mexe);
         alca.addEventListener('pointerup', solta, { once: true });
         alca.addEventListener('pointercancel', solta, { once: true });
