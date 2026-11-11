@@ -1751,6 +1751,9 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .pip-clipe .pip-alca { position: absolute; right: 0; top: 0; z-index: 1; width: 16px; height: 16px; cursor: nesw-resize; touch-action: none; }
 .pip-clipe .pip-alca::after { content: ""; position: absolute; right: 4px; top: 4px; width: 7px; height: 7px; border-top: 2px solid #fff9; border-right: 2px solid #fff9; border-radius: 0 3px 0 0; opacity: 0; transition: opacity .18s; }
 .pip-clipe:hover .pip-alca::after { opacity: 1; }
+.pip-clipe .pip-alca-lado { position: absolute; right: 0; top: 20px; bottom: 20px; z-index: 1; width: 10px; cursor: ew-resize; touch-action: none; }
+.pip-clipe .pip-alca-lado::after { content: ""; position: absolute; right: 3px; top: 50%; width: 3px; height: 24px; margin-top: -12px; border-radius: 2px; background: #fff9; opacity: 0; transition: opacity .18s; }
+.pip-clipe:hover .pip-alca-lado::after { opacity: 1; }
 .pip-clipe.redimensionando { user-select: none; }
 /* Limites de uso abertos: sobem para acima do player (senão cobrem os botões) */
 /* Com o vídeo encaixado acima do player, o cartão de uso sobe junto */
@@ -2982,7 +2985,8 @@ function abrePip() {
                 <button type="button" data-pip="fechar" title="Fechar o vídeo" aria-label="Fechar o vídeo">${ICONE_MIDIA.fechar}</button>
             </div>
             <span class="pip-alca" title="Arraste para mudar o tamanho (duplo clique volta ao formato do vídeo)"></span>
-            <span class="pip-alca-canto" title="Arraste para diminuir ou aumentar (duplo clique volta ao formato do vídeo)"></span>`;
+            <span class="pip-alca-canto" title="Arraste para diminuir ou aumentar (duplo clique volta ao formato do vídeo)"></span>
+            <span class="pip-alca-lado" title="Arraste para os lados para alargar ou estreitar (duplo clique volta ao formato do vídeo)"></span>`;
         // No rodapé da lateral, logo acima do player (a lista de conversas encolhe para dar lugar)
         pip.classList.add('no-canto');
         document.getElementById('rodapeSessoes').insertBefore(pip, playerMidia);
@@ -3101,7 +3105,7 @@ function ligaPip() {
         if (b.dataset.pip === 'soltar') desanexaPip();
     });
     pip.addEventListener('pointerdown', (ev) => {
-        if (ev.button !== 0 || ev.target.closest('button, .pip-alca, .pip-alca-canto, .clipe-aviso button')) return;
+        if (ev.button !== 0 || ev.target.closest('button, .pip-alca, .pip-alca-canto, .pip-alca-lado, .clipe-aviso button')) return;
         const r0 = pip.getBoundingClientRect();
         const dx = ev.clientX - r0.left, dy = ev.clientY - r0.top, x0 = ev.clientX, y0 = ev.clientY;
         let movendo = false;
@@ -3148,15 +3152,14 @@ function ligaPip() {
         ev.preventDefault();
         ev.stopPropagation();
         alcaCanto.setPointerCapture(ev.pointerId);
-        const x0 = ev.clientX, y0 = ev.clientY, largura0 = pip.offsetWidth, altura0 = pip.offsetHeight;
+        const x0 = ev.clientX, y0 = ev.clientY, largura0 = pip.offsetWidth, proporcao = pip.offsetWidth / pip.offsetHeight;
         const cabe = larguraLivreCanto();
         pip.classList.add('redimensionando');
         const mexe = (e) => {
-            // De lado muda só a largura, para cima/baixo só a altura
-            const largura = Math.round(Math.max(112, Math.min(cabe, largura0 + e.clientX - x0)));
+            // Vale o movimento maior: o de lado ou o de cima/baixo (convertido em largura pela proporção do vídeo)
+            const dx = e.clientX - x0, dy = (e.clientY - y0) * proporcao;
+            const largura = Math.round(Math.max(112, Math.min(cabe, largura0 + (Math.abs(dx) > Math.abs(dy) ? dx : dy))));
             gravaPref('clipeLarguraCanto', largura >= cabe ? '' : String(largura));
-            gravaPref('clipeProp', limitaProporcao(largura, altura0 + e.clientY - y0).toFixed(4));
-            aplicaProporcaoPip();
             mostraPip(true);
         };
         const solta = () => { alcaCanto.removeEventListener('pointermove', mexe); pip.classList.remove('redimensionando'); pip.__arrastou = true; setTimeout(() => { pip.__arrastou = false; }, 0); };
@@ -3170,16 +3173,13 @@ function ligaPip() {
     alca.addEventListener('pointerdown', (ev) => {
         ev.preventDefault();
         alca.setPointerCapture(ev.pointerId);
-        const x0 = ev.clientX, y0 = ev.clientY, largura0 = pip.offsetWidth, altura0 = pip.offsetHeight;
+        const x0 = ev.clientX, y0 = ev.clientY, largura0 = pip.offsetWidth, proporcao = pip.offsetWidth / pip.offsetHeight;
         pip.classList.add('redimensionando');
         const baixo0 = pip.getBoundingClientRect().bottom;
         const mexe = (e) => {
-            const largura = Math.round(Math.max(112, largura0 + e.clientX - x0));
-            const proporcao = limitaProporcao(largura, altura0 + y0 - e.clientY);
+            const largura = Math.round(Math.max(112, largura0 + Math.max(e.clientX - x0, (y0 - e.clientY) * proporcao)));
             gravaPref('clipeLargura', String(largura));
-            gravaPref('clipeProp', proporcao.toFixed(4));
             gravaPref('clipeY', String(Math.round(baixo0 - largura / proporcao)));
-            aplicaProporcaoPip();
             posicionaPip();
         };
         const solta = () => { alca.removeEventListener('pointermove', mexe); pip.classList.remove('redimensionando'); };
@@ -3188,6 +3188,28 @@ function ligaPip() {
         alca.addEventListener('pointercancel', solta, { once: true });
     });
     alca.addEventListener('dblclick', (ev) => { ev.stopPropagation(); voltaFormatoDoVideo(); });
+    // Borda direita: puxar de lado muda só a largura (a altura fica), o vídeo fica inteiro com faixa preta
+    const alcaLado = pip.querySelector('.pip-alca-lado');
+    alcaLado.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        alcaLado.setPointerCapture(ev.pointerId);
+        const x0 = ev.clientX, largura0 = pip.offsetWidth, altura0 = pip.offsetHeight;
+        const encaixado = pip.classList.contains('no-canto'), cabe = encaixado ? larguraLivreCanto() : Infinity;
+        pip.classList.add('redimensionando');
+        const mexe = (e) => {
+            const largura = Math.round(Math.max(112, Math.min(cabe, largura0 + e.clientX - x0)));
+            gravaPref('clipeProp', limitaProporcao(largura, altura0).toFixed(4));
+            aplicaProporcaoPip();
+            if (encaixado) { gravaPref('clipeLarguraCanto', largura >= cabe ? '' : String(largura)); mostraPip(true); }
+            else { gravaPref('clipeLargura', String(largura)); posicionaPip(); }
+        };
+        const solta = () => { alcaLado.removeEventListener('pointermove', mexe); pip.classList.remove('redimensionando'); pip.__arrastou = true; setTimeout(() => { pip.__arrastou = false; }, 0); };
+        alcaLado.addEventListener('pointermove', mexe);
+        alcaLado.addEventListener('pointerup', solta, { once: true });
+        alcaLado.addEventListener('pointercancel', solta, { once: true });
+    });
+    alcaLado.addEventListener('dblclick', (ev) => { ev.stopPropagation(); voltaFormatoDoVideo(); });
 }
 if (SUPORTA_CLIPE && 'BroadcastChannel' in window) {
     // Conversa com a janela desanexada (clipe.html): voltar para o canto, fechar
