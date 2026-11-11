@@ -27,5 +27,7 @@ contextBridge.exposeInMainWorld('painelDesktop', {
         soltaEm: (b) => ipcRenderer.invoke('painel:clipe-solta-em', b),
         // Player do YouTube incorporado: tempo exato e velocidade fina (só no app)
         yt: (ritmo) => ipcRenderer.invoke('painel:clipe-yt', ritmo == null ? null : Number(ritmo)),
+        // Janela solta: o ponteiro entrou ou saiu dela (mostra ou esconde a barra)
+        aoPairar: (fn) => ipcRenderer.on('painel:clipe-pairando', (ev, dentro) => fn(!!dentro)),
     },
 });
