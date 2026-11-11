@@ -13,6 +13,18 @@
 html, body { height: 100%; margin: 0; background: var(--papel); color: var(--tinta); font: 13px "Segoe UI", system-ui, sans-serif; }
 body { display: grid; grid-template-columns: 260px 1fr; grid-template-rows: 1fr auto; height: 100vh; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+/* Embutido no ao vivo da janela principal: só o código; abas, trilha e barra de status são as do ao vivo */
+body.embutido { grid-template-columns: 1fr; grid-template-rows: 1fr; background: #1f1f1f; }
+body.embutido[data-tema="claro"] { background: #ffffff; color-scheme: light; }
+body.embutido :is(.arvore, .abas, .barra-acoes, .status, #vazio) { display: none !important; }
+/* Animação da edição do Claude: o que sai fica vermelho, o que entra fica verde (as cores do ao vivo) */
+.dec-sai { background: #f851491f; }
+.dec-sai-margem { border-left: 3px solid #f85149; margin-left: 3px; }
+.dec-entra { background: #3fb95014; }
+.dec-entra-margem { border-left: 3px solid #3fb950; margin-left: 3px; }
+body.embutido[data-tema="claro"] .aviso { background: #fff4e0; color: #8a5300; }
+body.embutido[data-tema="claro"] .problemas { background: #ffffff; border-top-color: #e5e5e5; }
+body.embutido[data-tema="claro"] .problemas button { color: #c4312a; }
 .arvore { grid-row: 1 / 3; border-right: 1px solid var(--linha); overflow: auto; padding: 8px 0; }
 .arvore .raiz { padding: 4px 12px 8px; font-weight: 600; color: var(--voce); word-break: break-all; }
 .no { display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; padding: 2px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -25,6 +37,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .aba { display: flex; align-items: center; gap: 6px; padding: 6px 10px 6px 12px; border-right: 1px solid var(--linha); white-space: nowrap; color: var(--grafite); }
 .aba.ativa { background: var(--papel); color: var(--tinta); box-shadow: inset 0 2px 0 var(--voce); }
 .aba .sujo { width: 8px; height: 8px; border-radius: 50%; background: var(--voce); }
+.aba .trava { font-size: 11px; }
 .aba .fechar { color: var(--grafite); padding: 0 2px; }
 .aba .fechar:hover { color: var(--tinta); }
 .barra-acoes { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--linha); }

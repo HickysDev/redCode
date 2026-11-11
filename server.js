@@ -2528,9 +2528,10 @@ const servidor = http.createServer(async (req, res) => {
             const html = fs.readFileSync(path.join(__dirname, 'editor.html'), 'utf8').replace('__PAINEL_TOKEN__', TOKEN);
             // CSP: nenhum script embutido nem handler inline (onerror=...) roda nesta página.
             // Mitiga o DOMPurify vulnerável que vem embutido no build do Monaco.
+            // Pode ser embutido só pela própria origem (o editor dentro da janela principal).
             res.writeHead(200, {
                 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
-                'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+                'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'",
             });
             return res.end(html);
         }
