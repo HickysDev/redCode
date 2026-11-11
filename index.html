@@ -1721,11 +1721,6 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .pip-clipe.no-canto { position: relative; left: auto; bottom: auto; z-index: auto; width: 100%; box-sizing: border-box; max-height: 0; margin: 0 0 0; box-shadow: none; animation: none; opacity: 0; transform: translateY(10px); transition: max-height .45s cubic-bezier(.2, .8, .2, 1), margin .45s cubic-bezier(.2, .8, .2, 1), opacity .3s ease, transform .45s cubic-bezier(.2, .8, .2, 1); }
 .pip-clipe.no-canto.aberto { margin-bottom: 8px; opacity: 1; transform: none; }
 .pip-clipe.no-canto [data-pip-tamanho], .pip-clipe.no-canto [data-pip="encaixar"] { display: none; }
-/* Encaixado: alça no canto de baixo à direita para diminuir/aumentar ali mesmo (o canto de cima à esquerda fica parado) */
-.pip-clipe .pip-alca-canto { display: none; position: absolute; right: 0; bottom: 0; z-index: 1; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none; }
-.pip-clipe.no-canto .pip-alca-canto { display: block; }
-.pip-clipe .pip-alca-canto::after { content: ""; position: absolute; right: 4px; bottom: 4px; width: 7px; height: 7px; border-bottom: 2px solid #fff9; border-right: 2px solid #fff9; border-radius: 0 0 3px 0; opacity: 0; transition: opacity .18s; }
-.pip-clipe:hover .pip-alca-canto::after { opacity: 1; }
 .pip-clipe.no-canto.redimensionando { transition: none; }
 /* Arrastado para fora do canto: flutua onde a pessoa soltar, com tamanho P/M/G ou pela alça */
 .pip-clipe { cursor: grab; touch-action: none; }
@@ -2987,7 +2982,6 @@ function abrePip() {
                 <button type="button" data-pip="fechar" title="Fechar o vídeo" aria-label="Fechar o vídeo">${ICONE_MIDIA.fechar}</button>
             </div>
             <span class="pip-alca" title="Arraste para mudar o tamanho (duplo clique volta ao formato do vídeo)"></span>
-            <span class="pip-alca-canto" title="Arraste para diminuir ou aumentar (duplo clique volta ao formato do vídeo)"></span>
             <span class="pip-alca-lado" title="Arraste para os lados para alargar ou estreitar (duplo clique volta ao formato do vídeo)"></span>`;
         // No rodapé da lateral, logo acima do player (a lista de conversas encolhe para dar lugar)
         pip.classList.add('no-canto');
@@ -3110,7 +3104,7 @@ function ligaPip() {
         if (b.dataset.pip === 'soltar') desanexaPip();
     });
     pip.addEventListener('pointerdown', (ev) => {
-        if (ev.button !== 0 || ev.target.closest('button, .pip-alca, .pip-alca-canto, .pip-alca-lado, .clipe-aviso button')) return;
+        if (ev.button !== 0 || ev.target.closest('button, .pip-alca, .pip-alca-lado, .clipe-aviso button')) return;
         const r0 = pip.getBoundingClientRect();
         const dx = ev.clientX - r0.left, dy = ev.clientY - r0.top, x0 = ev.clientX, y0 = ev.clientY;
         let movendo = false;
@@ -3151,28 +3145,6 @@ function ligaPip() {
         pip.addEventListener('pointerup', solta, { once: true });
         pip.addEventListener('pointercancel', solta, { once: true });
     });
-    // Encaixado: alça no canto de baixo à direita; para a esquerda ou para cima diminui, o vídeo continua acima do player
-    const alcaCanto = pip.querySelector('.pip-alca-canto');
-    alcaCanto.addEventListener('pointerdown', (ev) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        alcaCanto.setPointerCapture(ev.pointerId);
-        const x0 = ev.clientX, y0 = ev.clientY, largura0 = pip.offsetWidth, proporcao = pip.offsetWidth / pip.offsetHeight;
-        const cabe = larguraLivreCanto();
-        pip.classList.add('redimensionando');
-        const mexe = (e) => {
-            // Vale o movimento maior: o de lado ou o de cima/baixo (convertido em largura pela proporção do vídeo)
-            const dx = e.clientX - x0, dy = (e.clientY - y0) * proporcao;
-            const largura = Math.round(Math.min(cabe, Math.max(larguraMinimaPip(proporcao), largura0 + (Math.abs(dx) > Math.abs(dy) ? dx : dy))));
-            gravaPref('clipeLarguraCanto', largura >= cabe ? '' : String(largura));
-            mostraPip(true);
-        };
-        const solta = () => { alcaCanto.removeEventListener('pointermove', mexe); pip.classList.remove('redimensionando'); pip.__arrastou = true; setTimeout(() => { pip.__arrastou = false; }, 0); };
-        alcaCanto.addEventListener('pointermove', mexe);
-        alcaCanto.addEventListener('pointerup', solta, { once: true });
-        alcaCanto.addEventListener('pointercancel', solta, { once: true });
-    });
-    alcaCanto.addEventListener('dblclick', (ev) => { ev.stopPropagation(); voltaFormatoDoVideo(); });
     // Alça no canto de cima à direita: arrastar para fora aumenta (o quadrinho cresce para cima e para a direita)
     const alca = pip.querySelector('.pip-alca');
     alca.addEventListener('pointerdown', (ev) => {
