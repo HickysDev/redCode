@@ -3,6 +3,13 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.11', data: '2026-11-11', itens: [
+            'Extensões do VS Code: instale um .vsix em Configurações › Extensões e use os painéis dela no botão de peça no topo da lista (extensões de painel, comandos e configurações, como o Royal Trello Diário)',
+            'Arquivos citados como link: quando o Claude cita um arquivo como link do Markdown, dá para clicar e abrir, como os outros caminhos',
+            'Selos da lista: "Agente rodando" e os outros selos longos cabem na lista (o texto inteiro aparece ao parar o mouse em cima)',
+        ],
+    },
+    {
         versao: '1.0.10', data: '2026-11-11', itens: [
             'Tarefas em segundo plano na lista: conversa com um comando ou teste rodando em segundo plano aparece como trabalhando, com o nome da tarefa',
             'Player com disco pela capa: o disco abre só com o mouse parado na capa do álbum; aberto, continua aberto enquanto o mouse estiver no player',

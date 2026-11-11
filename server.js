@@ -1299,6 +1299,74 @@ videoNavegador.configura(PASTA_DADOS);
 // YouTube Music Desktop (app à parte, sem extensão): o vídeo vem do Companion Server dele, como mais uma aba
 let ytmDesktop = null;
 try { ytmDesktop = require('./ytm-desktop'); ytmDesktop.configura(PASTA_DADOS, videoNavegador.recebe); } catch (e) { ytmDesktop = null; console.log('ytm desktop: ' + e.message); }
+// Extensões do VS Code (.vsix) instaladas no Red Code: cada uma num processo próprio, encerrado junto com o servidor
+const extensoes = require('./extensoes');
+extensoes.configura({ pasta: __dirname, pastaDados: PASTA_DADOS, porta: PORTA });
+process.on('exit', () => extensoes.encerraTodas());
+// Corpo binário (o .vsix), com limite
+function leBinario(req, limite) {
+    return new Promise((ok, falha) => {
+        const partes = []; let total = 0;
+        req.on('data', (d) => { total += d.length; if (total > limite) { falha(new Error('Arquivo grande demais (máximo 50 MB).')); req.destroy(); } else partes.push(d); });
+        req.on('end', () => ok(Buffer.concat(partes)));
+        req.on('error', falha);
+    });
+}
+// Webview e arquivos das extensões: sem o cabeçalho do painel (quem pede é o iframe em sandbox), mas só pelo
+// endereço local certo (contra DNS rebinding) e sempre em sandbox, mesmo se abertos direto numa aba
+const CABECALHOS_SANDBOX = { 'Content-Security-Policy': 'sandbox allow-scripts allow-forms', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store' };
+const hostLocal = (req) => [`127.0.0.1:${PORTA}`, `localhost:${PORTA}`].includes(String(req.headers.host || ''));
+async function rotaExtensoes(req, res, url) {
+    const p = url.pathname;
+    const webview = p.match(/^\/api\/extensoes\/webview\/([^/]+)\/([^/]+)$/);
+    const arquivoExt = p.match(/^\/api\/extensoes\/arquivo\/([^/]+)\/(.+)$/);
+    if (webview || arquivoExt) {
+        if (req.method !== 'GET' || !hostLocal(req)) return responde(res, 403, { erro: 'pedido recusado' });
+        if (webview) {
+            res.writeHead(200, { ...CABECALHOS_SANDBOX, 'Content-Type': 'text/html; charset=utf-8' });
+            return res.end(extensoes.htmlWebview(decodeURIComponent(webview[1]), decodeURIComponent(webview[2])));
+        }
+        const a = extensoes.arquivo(decodeURIComponent(arquivoExt[1]), arquivoExt[2]);
+        if (!a) return responde(res, 404, { erro: 'não encontrado' });
+        res.writeHead(200, { ...CABECALHOS_SANDBOX, 'Content-Type': a.tipo });
+        return fs.createReadStream(a.caminho).pipe(res);
+    }
+    if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+    try {
+        if (req.method === 'GET') {
+            if (url.searchParams.has('id') && !/^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/.test(url.searchParams.get('id'))) throw new Error('Extensão inválida.');
+            if (p === '/api/extensoes/estado') return responde(res, 200, extensoes.estado());
+            if (p === '/api/extensoes/eventos') return responde(res, 200, await extensoes.espera(url.searchParams.get('desde'), 20000));
+            if (p === '/api/extensoes/arvore') return responde(res, 200, await extensoes.arvore(url.searchParams.get('id'), url.searchParams.get('viewId'), url.searchParams.get('handle')));
+            if (p === '/api/extensoes/config') return responde(res, 200, extensoes.configDe(url.searchParams.get('id')));
+            if (p === '/api/extensoes/log') return responde(res, 200, extensoes.logsDe(url.searchParams.get('id')));
+            return responde(res, 404, { erro: 'não encontrado' });
+        }
+        if (req.method !== 'POST') return responde(res, 405, { erro: 'método não permitido' });
+        if (p === '/api/extensoes/instalar') return responde(res, 200, extensoes.preparaInstalacao(await leBinario(req, 50 * 1024 * 1024)));
+        const corpo = await leCorpo(req, 2e6);
+        const id = String(corpo.id || '');
+        if (corpo.id !== undefined && !/^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/.test(id)) throw new Error('Extensão inválida.');
+        switch (p) {
+            case '/api/extensoes/confirmar': return responde(res, 200, await extensoes.confirmaInstalacao(corpo.token));
+            case '/api/extensoes/acao': {
+                if (corpo.acao === 'ligar' || corpo.acao === 'desligar') await extensoes.liga(id, corpo.acao === 'ligar');
+                else if (corpo.acao === 'reiniciar') await extensoes.reinicia(id);
+                else if (corpo.acao === 'remover') await extensoes.remove(id);
+                else if (corpo.acao === 'apagar-dados') extensoes.apagaDados(id);
+                else throw new Error('Ação desconhecida.');
+                return responde(res, 200, extensoes.estado());
+            }
+            case '/api/extensoes/visibilidade': await extensoes.visibilidade(id, corpo.viewId, corpo.visivel); return responde(res, 200, { ok: true });
+            case '/api/extensoes/mensagem': await extensoes.mensagem(id, corpo.viewId, corpo.msg); return responde(res, 200, { ok: true });
+            case '/api/extensoes/clique': extensoes.clique(id, corpo.viewId, corpo.handle); return responde(res, 200, { ok: true });
+            case '/api/extensoes/comando': extensoes.comando(id, String(corpo.comando || '')); return responde(res, 200, { ok: true });
+            case '/api/extensoes/config': await extensoes.mudaConfig(id, String(corpo.chave || ''), corpo.valor === undefined ? null : corpo.valor, false); return responde(res, 200, extensoes.configDe(id));
+            case '/api/extensoes/resposta': return responde(res, 200, { ok: extensoes.responde(corpo.pendente, corpo.valor) });
+        }
+        return responde(res, 404, { erro: 'não encontrado' });
+    } catch (e) { return responde(res, 400, { erro: e.message }); }
+}
 let PASTA_EXTENSAO = null;
 try { PASTA_EXTENSAO = videoNavegador.copiaExtensao(__dirname, PASTA_DADOS); } catch (e) { console.log('extensão do navegador: ' + e.message); }
 const ARQUIVO_DADOS = path.join(PASTA_DADOS, 'dados.json');
@@ -2608,6 +2676,7 @@ const servidor = http.createServer(async (req, res) => {
                 return responde(res, 200, dados.visualPets);
             } catch (e) { return responde(res, 400, { erro: e.message }); }
         }
+        if (url.pathname.startsWith('/api/extensoes/')) return await rotaExtensoes(req, res, url);
         if (url.pathname === '/api/novidades' && req.method === 'GET') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
             let versoes = [], versaoApp = '';

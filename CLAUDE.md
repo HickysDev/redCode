@@ -48,3 +48,4 @@ assunto está em [docs/](docs/README.md).
 | Player do rodapé (mídia do Windows, disco ao passar o mouse) | [docs/player-de-midia.md](docs/player-de-midia.md) |
 | Atalhos de teclado configuráveis | [docs/atalhos.md](docs/atalhos.md) |
 | Lista de conversas (estados, segundo plano, troca de conversa) | [docs/lista-de-conversas.md](docs/lista-de-conversas.md) |
+| Extensões do VS Code (.vsix) | [docs/extensoes.md](docs/extensoes.md) |

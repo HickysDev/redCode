@@ -44,6 +44,10 @@ node -e "const s=require('fs').readFileSync('index.html','utf8');const re=/<scri
 ```
 
 - PowerShell (`.ps1`): `[System.Management.Automation.Language.Parser]::ParseFile(...)` sem erros.
+- Testes automáticos ficam em `testes/` (ex.: `node testes/extensoes.test.js`). A pasta não vai no exe
+  (o `empacotar.js` só copia arquivos da raiz): teste novo vai para lá, nunca para a raiz.
+- Iframe em sandbox (painel de extensão) roda em outro processo: pelo CDP, conectar no alvo `iframe` de
+  `/json`, não no da página.
 - Mudança visual: print no tema claro e no escuro.
 - Correção de bug: reproduzir o bug antes (ou trocar a função pela versão antiga só na página de
   teste) e mostrar o antes e o depois.

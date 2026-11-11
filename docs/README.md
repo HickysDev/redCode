@@ -12,5 +12,6 @@ Para quem mexe no código (pessoa ou Claude). O que o app faz para quem usa est�
 | [player-de-midia.md](player-de-midia.md) | Player do rodapé: mídia do Windows, resposta na hora e o disco ao passar o mouse na capa |
 | [atalhos.md](atalhos.md) | Atalhos de teclado configuráveis e o atalho global |
 | [lista-de-conversas.md](lista-de-conversas.md) | Estados da lista, tarefas em segundo plano e a troca de conversa |
+| [extensoes.md](extensoes.md) | Extensões do VS Code (.vsix): instalação, processo de cada uma, API de mentira, webview em sandbox e testes |
 
 `imagens/` guarda os prints usados no README.
