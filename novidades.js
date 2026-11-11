@@ -3,6 +3,13 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.14', data: '2026-11-11', itens: [
+            'Alças do vídeo no canto: coladas na borda (arco no canto de cima e tracinho na borda direita); a alça de baixo saiu e o canto de cima redimensiona também com o vídeo encaixado',
+            'Esticar a imagem: com o formato mudado pela alça, um botão escolhe entre faixas pretas e a imagem esticada',
+            'Arrastar o vídeo ficou à prova de soltar perdido: se o botão do mouse escapar, ele não desanexa nem encaixa sem querer',
+        ],
+    },
+    {
         versao: '1.0.13', data: '2026-11-11', itens: [
             'Tamanho do vídeo no canto: alça nova na borda direita estica só para o lado, o canto de cima também redimensiona com o vídeo encaixado e o duplo clique numa alça volta ao formato do vídeo',
             'Janela solta do vídeo: a barra com os botões aparece ao passar o mouse',
