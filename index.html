@@ -2001,6 +2001,33 @@ body.layout-editor .filtro { font-size: 12px; }
 .ev-fecha:hover { opacity: 1 !important; background: #ffffff1f; }
 html[data-tema-efetivo="claro"] .ev-fecha:hover { background: #0000001a; }
 .ev-sem-abas { align-self: center; padding: 0 14px; color: var(--grafite); font-size: 12.5px; }
+/* Arquivo liberado: o editor (editor.html sem barras) toma o lugar do código ao vivo, com as mesmas abas, trilha e status */
+.ev-embutido { display: none; flex: 1; min-height: 0; }
+.ev-embutido iframe { flex: 1; width: 100%; border: 0; background: transparent; }
+.editor-vivo.editando .ev-embutido { display: flex; }
+.editor-vivo.editando :is(#evCodigo, #evFormatar) { display: none; }
+.ev-aba .ev-sujo { color: var(--voce); font-size: 10px; margin-left: 2px; }
+.ev-aba .ev-cadeado { font-size: 10px; }
+/* Claude editando: abas e código sem clique (inert) até ele terminar; aviso na linha da trilha */
+.editor-vivo.claude-editando .ev-topo, .editor-vivo.claude-editando .ev-codigo, .editor-vivo.claude-editando .ev-embutido { cursor: not-allowed; }
+.editor-vivo.claude-editando .ev-trilha::after { content: "🔒 Claude editando · espere terminar"; margin-left: 12px; padding: 1px 8px; border-radius: 10px; font-size: 11px; color: var(--voce); background: color-mix(in srgb, var(--voce) 14%, transparent); white-space: nowrap; }
+.ev-acoes #evSeguir:disabled { opacity: 1; cursor: not-allowed; }
+/* Explorar: a árvore da pasta da conversa no lugar da lista de conversas (como o Explorer do VS Code) */
+.marca .marca-acoes #btnExplorar[aria-pressed="true"] { color: var(--voce); background: var(--realce); }
+body.explorando .sessoes > :is(#btnNova, #filtro, .atalhos-lateral, .abas, .resumo-status, #listaSessoes) { display: none; }
+.explorador { flex: 1; min-height: 0; overflow: auto; padding: 4px 0 20px; font-size: 13px; }
+.explorador .exp-topo { display: flex; align-items: center; gap: 6px; padding: 6px 12px 6px 16px; font: 600 11px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--grafite); }
+.explorador .exp-topo span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.explorador .exp-topo button { width: 22px; height: 22px; border-radius: 5px; color: var(--grafite); background: none; border: 0; }
+.explorador .exp-topo button:hover { background: var(--realce); color: var(--tinta); }
+.explorador .exp-no { display: flex; align-items: center; gap: 5px; width: 100%; padding: 2px 8px 2px calc(10px + var(--nivel, 0) * 12px); text-align: left; white-space: nowrap; color: var(--tinta); background: none; border: 0; font: inherit; }
+.explorador .exp-no:hover { background: var(--realce); }
+.explorador .exp-no.atual { background: var(--realce); box-shadow: inset 2px 0 0 var(--voce); }
+.explorador .exp-no .exp-seta { width: 10px; flex: none; color: var(--grafite); font-size: 10px; }
+.explorador .exp-no .ic-arq { width: 16px; height: 16px; flex: none; }
+.explorador .exp-no .exp-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.explorador .exp-no.travado .exp-nome::after { content: " 🔒"; font-size: 10px; }
+.explorador .exp-vazio { padding: 8px 16px; color: var(--grafite); }
 .ev-acoes { display: flex; align-items: center; gap: 4px; padding: 0 8px; flex: none; }
 .ev-acoes button { font-size: 12px; padding: 3px 8px; border: 1px solid transparent; border-radius: 6px; color: var(--grafite); background: none; }
 .ev-acoes button:hover { color: var(--tinta); border-color: var(--linha); }
@@ -2247,8 +2274,8 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
         <div class="marca"><strong class="logo" title="Red Code" aria-label="Red Code"><svg width="26" height="26" viewBox="-1.15 -1.15 2.3 2.3" aria-hidden="true"><g stroke="currentColor" stroke-width="0.22" stroke-linecap="round"><line x1="0" y1="0" x2="0.990" y2="0.139"/><line x1="0" y1="0" x2="0.595" y2="0.535"/><line x1="0" y1="0" x2="0.227" y2="0.912"/><line x1="0" y1="0" x2="-0.103" y2="0.733"/><line x1="0" y1="0" x2="-0.602" y2="0.669"/><line x1="0" y1="0" x2="-0.796" y2="0.198"/><line x1="0" y1="0" x2="-0.990" y2="-0.139"/><line x1="0" y1="0" x2="-0.572" y2="-0.515"/><line x1="0" y1="0" x2="-0.223" y2="-0.893"/><line x1="0" y1="0" x2="0.100" y2="-0.713"/><line x1="0" y1="0" x2="0.589" y2="-0.654"/><line x1="0" y1="0" x2="0.815" y2="-0.203"/></g><circle r="0.15" fill="currentColor"/></svg></strong>
             <button type="button" id="chipPerfil" class="chip-perfil" aria-haspopup="menu" aria-label="Perfil em uso"></button>
             <span class="marca-acoes"><button id="btnNotificar" title="Avisar no Windows quando uma conversa terminar ou fizer uma pergunta" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11V7.5a4 4 0 0 1 8 0V11l1 1.5H3z"/><path d="M6.5 14h3"/><path d="M2.5 2.5l11 11"/></svg></button>
-            <button id="btnExtensoes" hidden title="Extensões" aria-label="Extensões"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h2.2a1.3 1.3 0 1 1 2.6 0H13v3.2a1.3 1.3 0 1 1 0 2.6v3.7H9.6a1.3 1.3 0 1 0-2.6 0H3V8.3a1.3 1.3 0 1 0 0-2.6V2.5h3z"/></svg><span class="selo-ext" hidden></span></button>
-            <button id="btnAjuda" title="Atalhos de teclado ( ? )" aria-label="Atalhos de teclado"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M6.2 6.2a1.9 1.9 0 1 1 2.6 1.8c-.5.2-.8.6-.8 1.1v.4"/><path d="M8 11.6v.1"/></svg></button></span>
+            <button id="btnAjuda" title="Atalhos de teclado ( ? )" aria-label="Atalhos de teclado"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M6.2 6.2a1.9 1.9 0 1 1 2.6 1.8c-.5.2-.8.6-.8 1.1v.4"/><path d="M8 11.6v.1"/></svg></button>
+            <button id="btnExplorar" title="Explorar os arquivos da pasta da conversa (volta para a lista de conversas no mesmo botão)" aria-label="Explorar arquivos" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6.5a1 1 0 0 0-1-1H8L6.5 3h-4a1 1 0 0 0-1 1.5z"/></svg></button></span>
             <div class="alternador" role="group" aria-label="Modo do app">
                 <button type="button" id="btnModoChat" aria-pressed="false" title="Chat: conversa comum, sem código nem arquivos" aria-label="Chat"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg></button>
                 <button type="button" id="btnModoCodigo" aria-pressed="true" title="Código: conversas dentro de um projeto, com arquivos e terminal" aria-label="Código"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5"/></svg></button>
@@ -2275,6 +2302,7 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
         <div class="aviso-versao" id="avisoVersao" role="status" hidden></div>
         <div class="resumo-status" id="resumoStatus" aria-live="polite"></div>
         <div class="lista" id="listaSessoes"></div>
+        <div class="explorador" id="explorador" hidden aria-label="Arquivos da pasta da conversa"></div>
         <div class="rodape-sessoes" id="rodapeSessoes">
             <div class="cartao-atualizacao" id="cartaoAtualizacao" hidden></div>
             <div class="player-midia" id="playerMidia" hidden></div>
@@ -2294,6 +2322,7 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
                 <button type="button" id="evVisual" title="Visual das conversas de código" aria-label="Configurar o visual"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
             </div></div>
         <div class="ev-codigo" id="evCodigo"><div class="ev-vazio">Quando o Claude editar um arquivo, ele aparece aqui.</div></div>
+        <div class="ev-embutido" id="evEmbutido"></div>
         <div class="ev-status" id="evStatus"></div>
     </section>
     <div class="pop-visual" id="popVisual" hidden role="dialog" aria-label="Visual das conversas de código"></div>
@@ -8913,9 +8942,218 @@ function querEditor() {
     const trabalhando = !!(d.ativa || (conv && conv.vivo && conv.status === 'rodando'));
     // Parou de trabalhar: o próximo trabalho só abre o editor se mexer em código de novo
     if (!trabalhando) ev.editouNoTrabalho = false;
-    return { pode: true, quer: visualCodigo === 'editor-sempre' || (trabalhando && !!ev.editouNoTrabalho) };
+    // Com arquivo aberto pela pessoa (Explorar), o editor não some sozinho quando o Claude para
+    return { pode: true, quer: visualCodigo === 'editor-sempre' || doUsuarioNaPasta().length > 0 || (trabalhando && !!ev.editouNoTrabalho) };
+}
+
+/* ---------- O ao vivo também edita: arquivo liberado vira editor (editor.html sem barras, num iframe por pasta) ---------- */
+// Enquanto o Claude edita o arquivo (trava) ou a animação roda, fica o código ao vivo, só leitura.
+// Cada pasta tem o seu iframe, guardado ao trocar de conversa: alteração não salva não se perde.
+const editoresEmbutidos = new Map();   // pasta (minúscula) -> iframe
+const abertosPeloUsuario = new Map();  // pasta (minúscula) -> Set de caminhos abertos pelo Explorar
+const infoEditor = new Map();          // pasta (minúscula) -> último estado do editor (posição, não salvos)
+let travadosAgora = new Set();         // caminhos (minúsculos) que o Claude está editando
+const temaEv = () => document.documentElement.dataset.temaEfetivo === 'claro' ? 'claro' : 'escuro';
+const dentroDaPastaEv = (cwd, a) => !!cwd && String(a).toLowerCase().startsWith(cwd.replace(/[\\/]+$/, '').toLowerCase() + '\\');
+const mesmoArquivo = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
+function doUsuarioNaPasta() { const cwd = pastaDaConversa(); return cwd ? [...(abertosPeloUsuario.get(cwd.toLowerCase()) || [])] : []; }
+function iframeEditor(cwd, criar) {
+    const chave = cwd.toLowerCase();
+    let f = editoresEmbutidos.get(chave);
+    if (!f && criar) {
+        f = document.createElement('iframe');
+        f.title = 'Editor de código'; f.hidden = true;
+        f.src = `/editor.html?embutido=1&tema=${temaEv()}&cwd=${encodeURIComponent(cwd)}`;
+        f.addEventListener('load', () => { enviaTravas(); aplicaVistaEv(); });
+        elEv('evEmbutido').appendChild(f);
+        editoresEmbutidos.set(chave, f);
+    }
+    return f;
+}
+// Arquivo da pasta da conversa: sempre no editor (a animação do Claude roda dentro dele, sem trocar de tela).
+// Fora da pasta (o editor não abre): o código ao vivo desenhado pela página, só leitura.
+function aplicaVistaEv(focar) {
+    const cwd = pastaDaConversa(), a = ev.arquivo;
+    const editavel = !!(ev.ligado && a && dentroDaPastaEv(cwd, a));
+    elEv('editorVivo').classList.toggle('editando', editavel);
+    const f = editavel ? iframeEditor(cwd, true) : null;
+    for (const x of editoresEmbutidos.values()) x.hidden = x !== f;
+    if (!editavel) return;
+    if (!mesmoArquivo(f.__arquivo, a) || focar) {
+        f.__arquivo = a;
+        const linha = ev.edicaoMostrada && ev.edicaoMostrada.texto === a ? ev.linha : undefined;
+        // Ainda carregando: o load do iframe chama de novo
+        try { if (f.contentWindow && f.contentWindow.abreArquivoEditor) f.contentWindow.abreArquivoEditor(a, linha, !!focar); else f.__arquivo = null; } catch (e) { f.__arquivo = null; }
+    }
+    statusEditavel();
+}
+// O editor avisa a cada mudança (cursor, texto, salvar): abas ganham o ponto de não salvo e a barra de status acompanha
+window.editorEmbutidoMudou = (cwd, info) => {
+    const chave = String(cwd).toLowerCase(), antes = infoEditor.get(chave);
+    infoEditor.set(chave, info);
+    if (chave !== (pastaDaConversa() || '').toLowerCase()) return;
+    if (!antes || antes.sujos.join('|') !== info.sujos.join('|')) desenhaAbasEv();
+    statusEditavel();
+};
+const naoSalvoEv = (a) => { const i = infoEditor.get((pastaDaConversa() || '').toLowerCase()); return !!(i && i.sujos.some(c => mesmoArquivo(c, a))); };
+function statusEditavel() {
+    if (!elEv('editorVivo').classList.contains('editando')) return;
+    const a = ev.arquivo || '', i = infoEditor.get((pastaDaConversa() || '').toLowerCase()) || {};
+    const desta = mesmoArquivo(i.caminho, a);
+    elEv('evStatus').innerHTML = `<span>${esc(a.split(/[\\/]/).pop())}</span><span>Ln ${desta ? i.linha : 1}, Col ${desta ? i.coluna : 1}</span><span>${esc(LING_EV(a))}</span>`
+        + (desta && i.codificacao ? `<span>${i.codificacao === 'windows-1252' ? 'Latin-1' : 'UTF-8'}</span>` : '')
+        + (desta && i.eol ? `<span>${i.eol === 'misto' ? 'CRLF/LF' : esc(i.eol.toUpperCase())}</span>` : '')
+        + (naoSalvoEv(a) ? '<span class="ev-nota">não salvo · Ctrl+S salva</span>' : '')
+        + `<span class="ev-dir">${travadosAgora.has(a.toLowerCase()) ? '🔒 Só leitura: Claude editando' : 'Editável'} · ✻ Red Code</span>`;
+}
+// Edição do Claude num arquivo da pasta: a animação roda no próprio editor
+async function animaNoEditor(f, e, animar, g) {
+    if (!f.contentWindow || !f.contentWindow.animaEdicao) {
+        await new Promise(ok => { f.addEventListener('load', ok, { once: true }); setTimeout(ok, 15000); });
+    }
+    if (g !== ev.geracao) throw 'cancelado';
+    if (!f.contentWindow || !f.contentWindow.animaEdicao) return;
+    const c = e.codigo || {};
+    const ed = { caminho: e.texto, tipo: c.tipo, trocas: c.tipo === 'diff' ? (c.trocas || []).map(t => ({ antes: t.antes.texto || '', depois: t.depois.texto || '', depoisCortado: !!t.depois.cortado, depoisTotal: t.depois.total || 0 })) : [] };
+    const chave = String(e.texto).toLowerCase();
+    const r = await f.contentWindow.animaEdicao(ed, { animar, linha: ev.ultimaLinha.get(chave) });
+    if (r && r.linha) { ev.linha = r.linha; ev.ultimaLinha.set(chave, r.linha); }
+    if (g !== ev.geracao) throw 'cancelado';
+}
+// Arquivo sem edição do Claude (aberto pelo Explorar): vai direto para o editor
+function mostraSemEdicao(a) {
+    ev.arquivo = a; ev.edicaoMostrada = null; desenhaAbasEv(); trilhaEv(a);
+    elEv('evCodigo').innerHTML = '<div class="ev-vazio">🔒 O Claude está editando este arquivo. Ele aparece aqui quando a edição terminar.</div>';
+    aplicaVistaEv();
+}
+// Clique numa aba ou no Explorar: mostra o arquivo escolhido. O "Seguindo" continua como está:
+// ligado, a próxima edição do Claude troca para o arquivo dele e anima (só o botão desliga)
+function mostraArquivoEv(a, focar) {
+    ev.geracao++; ev.fila = []; ev.rodandoFila = false;
+    const e = ev.ultimaEdicao.get(a);
+    if (!e) return mostraSemEdicao(a), aplicaVistaEv(focar);
+    mostraEdicao(e, false).catch(() => {});
+    if (focar) aplicaVistaEv(true);
+}
+// Tema do Red Code trocou: os editores acompanham
+new MutationObserver(() => { for (const f of editoresEmbutidos.values()) try { f.contentWindow.temaEditor && f.contentWindow.temaEditor(temaEv()); } catch (e) { /* carregando */ } })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema-efetivo'] });
+// Trava: o que o Claude editou desde o último pedido fica só leitura enquanto ele trabalha
+function arquivosTravados() {
+    const d = ultimosDados, conv = conversaRelevante();
+    if (!d || d.__chave !== sessaoAtual || sessaoEhChat()) return [];
+    const trabalhando = !!(d.ativa || (conv && conv.vivo && conv.status === 'rodando'));
+    if (!trabalhando) return [];
+    let inicio = 0;
+    d.eventos.forEach((e, i) => { if (e.tipo === 'pedido') inicio = i; });
+    const desde = d.eventos[inicio] && d.eventos[inicio].tipo === 'pedido' ? Date.parse(d.eventos[inicio].hora) : 0;
+    const lista = new Set();
+    // Inclui a edição ainda em andamento (ou esperando permissão): é justamente quando não pode mexer
+    for (const e of d.eventos.slice(inicio)) if (e.tipo === 'edicao' && e.texto && !e.erro && !ARQUIVO_DE_BASTIDOR.test(String(e.texto))) lista.add(e.texto);
+    // Arquivos que comandos (PowerShell/Bash) gravaram neste pedido
+    for (const e of ev.ultimaEdicao.values()) if (e.porComando && Date.parse(e.hora) >= desde) lista.add(e.texto);
+    return [...lista];
+}
+/* ---------- Explorar: árvore da pasta da conversa na coluna da lista (clicar abre no editor da janela) ---------- */
+let explorando = false, pastaExplorada = '';
+const caminhoExp = (cwd, rel) => cwd.replace(/[\\/]+$/, '') + '\\' + rel.replace(/\//g, '\\');
+async function carregaPastaExp(rel, alvo, nivel) {
+    const cwd = pastaExplorada;
+    let itens;
+    try { itens = await getPainel(`/api/editor/arvore?cwd=${encodeURIComponent(cwd)}&dir=${encodeURIComponent(rel)}`); }
+    catch (e) { alvo.innerHTML = `<div class="exp-vazio">${esc(e.message)}</div>`; return; }
+    if (cwd !== pastaExplorada) return;   // trocou de conversa enquanto carregava
+    alvo.innerHTML = itens.map(i => {
+        const r = rel === '.' ? i.nome : rel + '/' + i.nome;
+        return i.tipo === 'pasta'
+            ? `<div><button type="button" class="exp-no" data-exp-pasta="${esc(r)}" style="--nivel:${nivel}" title="${esc(r)}"><span class="exp-seta">▸</span>${iconesCatppuccin ? imgIcone(i.nome, true) : ''}<span class="exp-nome">${esc(i.nome)}</span></button><div class="exp-filhos" hidden></div></div>`
+            : `<button type="button" class="exp-no" data-exp-arq="${esc(caminhoExp(cwd, r))}" style="--nivel:${nivel}" title="${esc(r)}"><span class="exp-seta"></span>${iconesCatppuccin ? imgIcone(i.nome) : ''}<span class="exp-nome">${esc(i.nome)}</span></button>`;
+    }).join('') || (nivel ? '' : '<div class="exp-vazio">Pasta vazia</div>');
+    marcaTravasExp();
+}
+function desenhaExplorador() {
+    const el = elEv('explorador'), cwd = pastaDaConversa();
+    if (!explorando) return;
+    if (!cwd) { pastaExplorada = ''; el.innerHTML = '<div class="exp-vazio">Abra uma conversa de código para ver os arquivos da pasta dela.</div>'; return; }
+    if (cwd === pastaExplorada) return;
+    pastaExplorada = cwd;
+    el.innerHTML = `<div class="exp-topo"><span title="${esc(cwd)}">${esc(cwd.split(/[\\/]/).filter(Boolean).pop() || cwd)}</span><button type="button" data-exp-recarregar title="Recarregar a árvore" aria-label="Recarregar a árvore">⟳</button></div><div id="expRaiz"></div>`;
+    carregaPastaExp('.', elEv('expRaiz'), 0);
+}
+function alternaExplorador(ligar = !explorando) {
+    explorando = ligar;
+    document.body.classList.toggle('explorando', ligar);
+    elEv('explorador').hidden = !ligar;
+    elEv('btnExplorar').setAttribute('aria-pressed', String(ligar));
+    gravaPref('explorando', ligar ? '1' : '');
+    if (ligar) { pastaExplorada = ''; desenhaExplorador(); }
+}
+elEv('btnExplorar').addEventListener('click', () => alternaExplorador());
+elEv('explorador').addEventListener('click', (evt) => {
+    if (evt.target.closest('[data-exp-recarregar]')) { pastaExplorada = ''; return desenhaExplorador(); }
+    const p = evt.target.closest('[data-exp-pasta]');
+    if (p) {
+        const filhos = p.nextElementSibling, abrir = filhos.hidden;
+        filhos.hidden = !abrir;
+        p.querySelector('.exp-seta').textContent = abrir ? '▾' : '▸';
+        const ic = p.querySelector('.ic-arq');
+        if (ic) ic.outerHTML = imgIcone(p.dataset.expPasta.split('/').pop(), true, abrir);
+        if (abrir && !filhos.dataset.carregado) { filhos.dataset.carregado = '1'; carregaPastaExp(p.dataset.expPasta, filhos, Number(getComputedStyle(p).getPropertyValue('--nivel')) + 1); }
+        return;
+    }
+    const a = evt.target.closest('[data-exp-arq]');
+    if (!a) return;
+    elEv('explorador').querySelectorAll('.exp-no.atual').forEach(n => n.classList.remove('atual'));
+    a.classList.add('atual');
+    // Sem espaço para o editor na janela (janela estreita, conversa de Chat ou visual só conversa): abre na janela do editor
+    if (!querEditor().pode) return abreEditor(a.dataset.expArq);
+    if (travadosAgora.size) { a.classList.remove('atual'); return recado('O Claude está editando. Espere ele terminar para abrir outro arquivo.'); }
+    // Vira uma aba do ao vivo (mesmo arquivo que o Claude já editou: a mesma aba)
+    const cwd = pastaDaConversa(), arq = ev.ordem.find(x => mesmoArquivo(x, a.dataset.expArq)) || a.dataset.expArq;
+    if (!abertosPeloUsuario.has(cwd.toLowerCase())) abertosPeloUsuario.set(cwd.toLowerCase(), new Set());
+    abertosPeloUsuario.get(cwd.toLowerCase()).add(arq);
+    if (!ev.ordem.includes(arq)) ev.ordem.push(arq);
+    atualizaLayoutEditor();   // liga o editor, se estava escondido
+    mostraArquivoEv(arq, true);
+});
+function marcaTravasExp() {
+    if (!explorando) return;
+    const travados = new Set(arquivosTravados().map(c => c.toLowerCase()));
+    for (const n of elEv('explorador').querySelectorAll('[data-exp-arq]')) n.classList.toggle('travado', travados.has(n.dataset.expArq.toLowerCase()));
+}
+if (lePref('explorando', '')) alternaExplorador(true);
+
+// Claude editando: abas e código ficam sem clique até ele terminar tudo, e o Seguindo fica ligado.
+// Assim a tela sempre mostra o arquivo dele com a animação (trocar de aba no meio perdia a edição)
+function bloqueiaEditorEv(bloquear, comecou) {
+    elEv('editorVivo').classList.toggle('claude-editando', bloquear);
+    elEv('evAbas').inert = bloquear; elEv('evCodigo').inert = bloquear; elEv('evEmbutido').inert = bloquear; elEv('evSeguir').disabled = bloquear;
+    if (!bloquear) return;
+    if (!ev.seguir) { ev.seguir = true; atualizaBotaoSeguir(); }
+    // Começou com outro arquivo na tela: pula para a última edição do Claude
+    if (comecou && ev.ligado && !ev.rodandoFila) {
+        const ultimo = [...ev.ultimaEdicao.values()].filter(e => travadosAgora.has(String(e.texto).toLowerCase())).pop();
+        if (ultimo && !mesmoArquivo(ultimo.texto, ev.arquivo)) mostraEdicao(ultimo, false).catch(() => {});
+    }
+}
+function enviaTravas() {
+    marcaTravasExp();
+    const cwd = (pastaDaConversa() || '').toLowerCase(), lista = arquivosTravados();
+    // Travou ou liberou: o arquivo da tela troca entre ao vivo e editor; as abas mostram o cadeado
+    const novos = new Set(lista.map(c => c.toLowerCase()));
+    if ([...novos].join('|') !== [...travadosAgora].join('|')) {
+        const comecou = !travadosAgora.size && novos.size;
+        travadosAgora = novos;
+        bloqueiaEditorEv(novos.size > 0, comecou);
+        if (ev.ligado) { desenhaAbasEv(); aplicaVistaEv(); }
+    }
+    // Os editores de outras pastas não acompanham a conversa da tela: ficam sem trava
+    for (const [chave, f] of editoresEmbutidos) {
+        try { if (f.contentWindow && f.contentWindow.travaArquivos) f.contentWindow.travaArquivos(chave === cwd ? lista : []); } catch (e) { /* ainda carregando */ }
+    }
 }
 function atualizaLayoutEditor() {
+    desenhaExplorador(); enviaTravas();
     const { pode, quer } = querEditor();
     if (quer) { clearTimeout(ev.timerSaida); ev.timerSaida = null; ligaEditor(true); }
     else if (ev.ligado) {
@@ -8944,7 +9182,9 @@ function ligaEditor(ligar) {
     ev.paraAnimar = null;
     // Abriu por causa de uma edição agora: ela é digitada (sem aparecer pronta de uma vez)
     if (animar && ev.seguir) { ev.fila.push(animar); processaFila(); }
-    else if (ultimo) mostraEdicao(ultimo, false).catch(() => {}); else elEv('evCodigo').innerHTML = '<div class="ev-vazio">Quando o Claude editar um arquivo, ele aparece aqui.</div>';
+    else if (ultimo) mostraEdicao(ultimo, false).catch(() => {});
+    else if (ev.ordem.length) mostraSemEdicao(ev.ordem[ev.ordem.length - 1]);
+    else elEv('evCodigo').innerHTML = '<div class="ev-vazio">Quando o Claude editar um arquivo, ele aparece aqui.</div>';
 }
 // Troca de conversa: nada da anterior continua (animação, fila, timer)
 function evTrocaSessao() {
@@ -8987,6 +9227,7 @@ async function perguntaAoVivo(idCmd) {
     }
     if (novas && !ev.ligado) { ev.editouNoTrabalho = true; ev.paraAnimar = ev.ultimaEdicao.get(r.mudancas[r.mudancas.length - 1].arquivo); atualizaLayoutEditor(); }
     if (novas && ev.ligado) { desenhaAbasEv(); processaFila(); }
+    if (novas) enviaTravas();
     return r;
 }
 function acompanhaComandoAoVivo(idCmd) {
@@ -9021,6 +9262,7 @@ async function buscaAlteracoesDoComando(c) {
         atualizaLayoutEditor();
     }
     if (novas && ev.ligado) { desenhaAbasEv(); processaFila(); }
+    if (novas) enviaTravas();
 }
 function registraEdicoes(d) {
     // Durante a troca de conversa, ultimosDados ainda é da anterior: ignora
@@ -9034,7 +9276,14 @@ function registraEdicoes(d) {
         ev.ultimaEdicao.clear(); ev.ordem = []; ev.seguir = true; ev.arquivo = null;
         for (const e of edicoes) guardaEdicao(e);
         ev.geracao++; ev.rodandoFila = false;
-        if (ev.ligado) { desenhaAbasEv(); const u = edicoes[edicoes.length - 1]; if (u) mostraEdicao(u, false).catch(() => {}); else elEv('evCodigo').innerHTML = '<div class="ev-vazio">Quando o Claude editar um arquivo, ele aparece aqui.</div>'; }
+        // Arquivos que a pessoa abriu pelo Explorar nesta pasta voltam como abas
+        for (const a of doUsuarioNaPasta()) if (!ev.ordem.some(x => mesmoArquivo(x, a))) ev.ordem.push(a);
+        if (ev.ligado) {
+            desenhaAbasEv(); const u = edicoes[edicoes.length - 1];
+            if (u) mostraEdicao(u, false).catch(() => {});
+            else if (ev.ordem.length) mostraSemEdicao(ev.ordem[ev.ordem.length - 1]);
+            else { elEv('evCodigo').innerHTML = '<div class="ev-vazio">Quando o Claude editar um arquivo, ele aparece aqui.</div>'; aplicaVistaEv(); }
+        }
         atualizaBotaoSeguir();
         return;
     }
@@ -9071,12 +9320,13 @@ async function processaFila() {
             // Atrasou (mais de 2 na fila): as mais antigas só atualizam a posição, sem animar
             while (ev.fila.length > 2) { const velha = ev.fila.shift(); await localizaSoPosicao(velha); if (g !== ev.geracao) return; }
             const e = ev.fila.shift();
-            if (ev.seguir) await mostraEdicao(e, true);
+            // Sem seguir, o arquivo que está na tela ainda anima a edição dele (os outros só guardam a posição)
+            if (ev.seguir || e.texto === ev.arquivo) await mostraEdicao(e, true);
             else await localizaSoPosicao(e);
         }
     } catch (erro) { if (erro !== 'cancelado') console.error(erro); }
     // Só libera se ninguém trocou a geração (quem troca já libera e pode ter começado outra fila)
-    finally { if (g === ev.geracao) ev.rodandoFila = false; }
+    finally { if (g === ev.geracao) { ev.rodandoFila = false; aplicaVistaEv(); } }
 }
 
 // ---------- Montagem do trecho real do arquivo ----------
@@ -9142,7 +9392,7 @@ async function localizaSoPosicao(e) { if (e.codigo.tipo === 'diff') await montaC
 // ---------- Desenho e animação ----------
 function desenhaAbasEv() {
     // Todos os arquivos editados na conversa (até 40); a faixa rola para o lado
-    elEv('evAbas').innerHTML = ev.ordem.slice(-40).map(a => `<button type="button" class="ev-aba ${a === ev.arquivo ? 'ativa' : ''}" data-ev-arq="${esc(a)}" title="${esc(a)}">${iconesCatppuccin ? imgIcone(a.split(/[\\/]/).pop()) : `<span class="ev-ic">${esc(ICONE_EV[LING_EV(a)] || '≡')}</span>`}${esc(a.split(/[\\/]/).pop())}<span class="ev-fecha" data-ev-fechar title="Fechar (ou clique com o botão do meio)">×</span></button>`).join('')
+    elEv('evAbas').innerHTML = ev.ordem.slice(-40).map(a => `<button type="button" class="ev-aba ${a === ev.arquivo ? 'ativa' : ''}" data-ev-arq="${esc(a)}" title="${esc(a)}">${iconesCatppuccin ? imgIcone(a.split(/[\\/]/).pop()) : `<span class="ev-ic">${esc(ICONE_EV[LING_EV(a)] || '≡')}</span>`}${esc(a.split(/[\\/]/).pop())}${travadosAgora.has(a.toLowerCase()) ? '<span class="ev-cadeado" title="O Claude está editando: só leitura">🔒</span>' : ''}${naoSalvoEv(a) ? '<span class="ev-sujo" title="Não salvo (Ctrl+S salva)">●</span>' : ''}<span class="ev-fecha" data-ev-fechar title="Fechar (ou clique com o botão do meio)">×</span></button>`).join('')
         || '<span class="ev-sem-abas">Nenhum arquivo editado ainda</span>';
     // A aba do arquivo que está na tela fica sempre à vista
     const ativa = elEv('evAbas').querySelector('.ev-aba.ativa');
@@ -9160,6 +9410,7 @@ function desenhaLinhasEv(linhas, rolar) {
     if (rolar) { const a = el.querySelector('.atual') || el.querySelector('.add'); if (a) { const alvo = a.offsetTop - el.clientHeight * 0.45; if (Math.abs(el.scrollTop - alvo) > 30) el.scrollTop = alvo; } }
 }
 function statusEv(info, nota, linha) {
+    if (elEv('editorVivo').classList.contains('editando')) return statusEditavel();
     const a = ev.arquivo || '';
     elEv('evStatus').innerHTML = `<span>${esc(a.split(/[\\/]/).pop() || 'sem arquivo')}</span><span>Ln ${linha || 1}</span><span>${esc(LING_EV(a))}</span>`
         + (info ? `<span>${info.codificacao === 'windows-1252' ? 'Latin-1' : 'UTF-8'}</span>` : '') + (nota ? `<span class="ev-nota">${esc(nota)}</span>` : '')
@@ -9182,7 +9433,11 @@ function linhasFinais(c, comAdd = true) {
 async function mostraEdicao(e, animar) {
     const g = ev.geracao;
     const outroArquivo = ev.arquivo !== e.texto;
-    ev.arquivo = e.texto; ev.edicaoMostrada = e; desenhaAbasEv(); trilhaEv(e.texto);
+    // Arquivo da pasta: quem abre é a animação (sem mostrar a versão final antes de animar)
+    const cwd = pastaDaConversa(), f = ev.ligado && dentroDaPastaEv(cwd, e.texto) ? iframeEditor(cwd, true) : null;
+    if (f) f.__arquivo = e.texto;
+    ev.arquivo = e.texto; ev.edicaoMostrada = e; desenhaAbasEv(); trilhaEv(e.texto); aplicaVistaEv();
+    if (f) return animaNoEditor(f, e, animar, g);
     if (outroArquivo) {
         const cod = elEv('evCodigo');
         cod.classList.remove('ev-abrindo');
@@ -9352,7 +9607,18 @@ elEv('evAbas').addEventListener('wheel', (evt) => {
     evt.preventDefault();
 }, { passive: false });
 // Fechar aba (× ou botão do meio, como no VS Code): sai da faixa até o Claude editar o arquivo de novo
-function fechaAbaEv(a) {
+async function fechaAbaEv(a) {
+    // Aberto no editor com alteração não salva: pergunta antes de perder
+    const cwd = pastaDaConversa(), f = cwd ? iframeEditor(cwd, false) : null;
+    try {
+        if (f && f.contentWindow.fechaArquivoEditor && !f.contentWindow.fechaArquivoEditor(a)) {
+            if (!(await confirmaNaPagina('Fechar sem salvar?', `<p>"${esc(a.split(/[\\/]/).pop())}" tem alterações não salvas. Se fechar, elas se perdem.</p>`, 'Fechar sem salvar'))) return;
+            f.contentWindow.fechaArquivoEditor(a, true);
+        }
+    } catch (e) { /* editor carregando */ }
+    if (f && mesmoArquivo(f.__arquivo, a)) f.__arquivo = null;
+    const meus = cwd && abertosPeloUsuario.get(cwd.toLowerCase());
+    if (meus) for (const x of meus) if (mesmoArquivo(x, a)) meus.delete(x);
     const visiveis = ev.ordem.slice(-40), i = visiveis.indexOf(a);
     ev.ordem = ev.ordem.filter(x => x !== a); ev.ultimaEdicao.delete(a);
     ev.fila = ev.fila.filter(e => e.texto !== a);
@@ -9360,8 +9626,8 @@ function fechaAbaEv(a) {
     // Era a da tela: mostra a vizinha (a da direita; sem ela, a da esquerda)
     ev.geracao++; ev.fila = []; ev.rodandoFila = false;
     const vizinha = visiveis[i + 1] || visiveis[i - 1];
-    if (vizinha) { ev.seguir = false; atualizaBotaoSeguir(); mostraEdicao(ev.ultimaEdicao.get(vizinha), false).catch(() => {}); return; }
-    ev.arquivo = null; ev.edicaoMostrada = null; desenhaAbasEv();
+    if (vizinha) return mostraArquivoEv(vizinha);
+    ev.arquivo = null; ev.edicaoMostrada = null; desenhaAbasEv(); aplicaVistaEv();
     elEv('evTrilha').innerHTML = ''; statusEv(null, '', 1);
     elEv('evCodigo').innerHTML = '<div class="ev-vazio">Quando o Claude editar um arquivo, ele aparece aqui.</div>';
 }
@@ -9374,10 +9640,7 @@ elEv('evAbas').addEventListener('auxclick', (evt) => {
 elEv('evAbas').addEventListener('click', (evt) => {
     const b = evt.target.closest('[data-ev-arq]'); if (!b) return;
     if (evt.target.closest('[data-ev-fechar]')) return fechaAbaEv(b.dataset.evArq);
-    const e = ev.ultimaEdicao.get(b.dataset.evArq); if (!e) return;
-    ev.seguir = false; atualizaBotaoSeguir();
-    ev.geracao++; ev.fila = []; ev.rodandoFila = false;
-    mostraEdicao(e, false).catch(() => {});
+    mostraArquivoEv(b.dataset.evArq);
 });
 elEv('evSeguir').addEventListener('click', () => {
     ev.seguir = !ev.seguir; atualizaBotaoSeguir();
