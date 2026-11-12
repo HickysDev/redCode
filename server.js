@@ -686,6 +686,13 @@ function leIncremental(arquivo, criaEstado, processa) {
 }
 
 // Subagentes da sessão: pasta <sessao>/subagents com .jsonl + .meta.json
+// O que um estado (conversa ou subagente) faz agora: a ferramenta ainda sem resposta; senão o tipo do último evento
+function acaoAtualDoEstado(estado) {
+    const aberta = [...estado.eventos].reverse().find(x => x.id && !x.fim);
+    if (aberta) return { tipo: aberta.tipo, texto: corta(aberta.tipo === 'edicao' || aberta.tipo === 'leitura' ? path.basename(String(aberta.texto)) : aberta.texto, 60) };
+    const ultimo = estado.eventos[estado.eventos.length - 1];
+    return ultimo ? { tipo: ultimo.tipo, texto: '' } : null;
+}
 function leSubagentes(pastaSessao, estadoPai) {
     const pasta = path.join(pastaSessao, 'subagents');
     if (!fs.existsSync(pasta)) return;
@@ -709,6 +716,7 @@ function leSubagentes(pastaSessao, estadoPai) {
         agente.contagem = sub.contagem;
         agente.plano = sub.plano;
         agente.pulsos = sub.pulsos || [];
+        agente.acaoAtual = acaoAtualDoEstado(sub);
         const parado = Date.now() - mtime > 10 * 60 * 1000;
         // O aviso do sistema (<task-notification>) é a fonte mais confiável: diz se terminou ou parou
         const idAgente = nome.replace(/^agent-/, '').replace(/\.meta\.json$/, '');
@@ -872,6 +880,7 @@ function montaTasks(itens) {
             const sub = {
                 id: a.id, tipo: a.tipoAgente || 'agente', descricao: corta(a.descricao, 80), status: a.status, modelo: a.modelo || null,
                 inicio: a.inicio || null, fim: a.fim || null, pulsos: pulsosRecentes(a.pulsos), tarefas: tarefasDoPlano(a.plano),
+                acaoAtual: a.status === 'rodando' ? a.acaoAtual || null : null,
             };
             const pai = tarefas[indiceTarefaPai(estado, a)];
             if (pai) pai.subagentes.push(sub);
@@ -903,7 +912,7 @@ function listaTasks() {
     const versao = itens.map(({ s, estado }) => [
         s.id, s.atualizado, s.ativa, s.esperando, s.titulo, s.modelo, estado.pergunta && estado.pergunta.texto, s.acaoAtual && s.acaoAtual.texto,
         estado.plano.map(t => t.status + t.texto).join(','),
-        Object.values(estado.agentes).map(a => [a.id, a.status, a.modelo, a.fim, (a.plano || []).map(t => t.status).join('')].join(':')).join(','),
+        Object.values(estado.agentes).map(a => [a.id, a.status, a.modelo, a.fim, (a.plano || []).map(t => t.status).join(''), a.acaoAtual && a.acaoAtual.tipo + a.acaoAtual.texto].join(':')).join(','),
     ].join('|')).join('\n') + '|' + seqPulso;
     if (corpoTasks.versao !== versao) {
         const corpo = montaTasks(itens);
