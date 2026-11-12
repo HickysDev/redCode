@@ -38,6 +38,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 .tk-topo .tk-titulo { display: flex; align-items: center; gap: 8px; color: var(--voce); font: 600 18px/1.1 var(--estreita); margin-right: 6px; }
 .tk-topo .tk-titulo svg { width: 20px; height: 20px; }
 .tk-topo .filtros { flex-wrap: nowrap; }
+.tk-topo .filtro, .tk-topo .mini { white-space: nowrap; }
 .tk-topo .tk-modelos { display: flex; gap: 4px; margin-left: 6px; padding-left: 10px; border-left: 1px solid var(--linha); }
 .tk-chip-modelo { display: inline-flex; align-items: center; gap: 4px; font: 500 11px var(--sans); line-height: 16px; padding: 0 7px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--tom) 55%, transparent); color: var(--tom); background: color-mix(in srgb, var(--tom) 7%, transparent); white-space: nowrap; }
 .tk-chip-modelo.n { opacity: .9; }
