@@ -56,6 +56,7 @@ const PASTA_CLAUDE = perfis.pastaClaude();
 const RAIZ_PROJETOS = path.join(PASTA_CLAUDE, 'projects');
 const DIAS_LISTADOS = 7;
 const SEGUNDOS_ATIVA = 90;
+const LIMITE_PULSOS = 40;
 const LIMITE_EVENTOS = 400;
 const LIMITE_TEXTO = 700;
 const LIMITE_CONVERSA = 60000;
@@ -269,6 +270,22 @@ function resumoFerramenta(nome, entrada) {
     return { tipo: 'ferramenta', texto: curto + (principal ? ': ' + principal : '') };
 }
 
+// TaskCreate ganha id sequencial na hora; o resultado ("Task #N created") traz o id real que o TaskUpdate usa
+function acertaIdTarefa(estado, b) {
+    const provisorio = estado.tarefasCriadas && estado.tarefasCriadas[b.tool_use_id];
+    if (!provisorio) return;
+    delete estado.tarefasCriadas[b.tool_use_id];
+    const texto = Array.isArray(b.content) ? b.content.map(c => c.text || '').join('\n') : String(b.content || '');
+    const real = (texto.match(/Task #(\d+) created/) || [])[1];
+    if (!real && !b.is_error) console.warn('TaskCreate sem "Task #N created" no resultado; fica o id sequencial:', texto.slice(0, 80));
+    if (b.is_error || !real || real === provisorio || !estado.tarefas[provisorio] || estado.tarefas[real]) return;
+    const reordenadas = {};
+    for (const [id, t] of Object.entries(estado.tarefas)) reordenadas[id === provisorio ? real : id] = t;
+    estado.tarefas = reordenadas;
+    estado.plano = Object.values(estado.tarefas);
+    estado.ultimaTarefa = Math.max(estado.ultimaTarefa, Number(real));
+}
+
 // Atualiza a lista de progresso a partir das ferramentas de plano/tarefas
 function atualizaPlano(estado, nome, entrada) {
     if (nome === 'TodoWrite' && Array.isArray(entrada.todos)) {
@@ -300,13 +317,17 @@ function atualizaPlano(estado, nome, entrada) {
         return true;
     }
     if (nome === 'TaskCreate') {
-        const id = String(Object.keys(estado.tarefas).length + 1);
+        estado.ultimaTarefa = (estado.ultimaTarefa || 0) + 1;
+        const id = String(estado.ultimaTarefa);
         estado.tarefas[id] = { texto: entrada.subject || entrada.description, status: 'pending' };
         estado.plano = Object.values(estado.tarefas);
         return true;
     }
     if (nome === 'TaskUpdate' && estado.tarefas[entrada.taskId]) {
-        if (entrada.status) estado.tarefas[entrada.taskId].status = entrada.status;
+        const tarefa = estado.tarefas[entrada.taskId];
+        if (entrada.subject) tarefa.texto = entrada.subject;
+        if (entrada.status === 'deleted') delete estado.tarefas[entrada.taskId];
+        else if (entrada.status) tarefa.status = entrada.status;
         estado.plano = Object.values(estado.tarefas);
         return true;
     }
@@ -323,6 +344,15 @@ function somaTokens(estado, modelo, uso) {
     t.chamadas += 1;
 }
 
+// Fluxo com o Claude para os sinais da visão Tasks: "in" = ele recebe, "out" = ele produz
+let seqPulso = Date.now();
+function registraPulso(estado, hora, dir) {
+    if (!hora) return;
+    const pulsos = estado.pulsos || (estado.pulsos = []);
+    pulsos.push({ hora, dir, seq: ++seqPulso });
+    if (pulsos.length > LIMITE_PULSOS) pulsos.splice(0, pulsos.length - LIMITE_PULSOS);
+}
+
 function adicionaEvento(estado, evento) {
     // Liga a mensagem original à reescrita do Haiku (a mais próxima no tempo, até 2 min)
     if (evento.tipo === 'pedido' && estado.reescritas) {
@@ -330,6 +360,9 @@ function adicionaEvento(estado, evento) {
         if (pendente) pendente.original = evento.texto;
         estado.ultimoPedido = evento;
     }
+    const dir = evento.tipo === 'pedido' || evento.tipo === 'retorno' ? 'in'
+        : ['notificacao', 'interrompido', 'compactacao', 'troca', 'capitulo', 'proximo', 'refinado'].includes(evento.tipo) ? '' : 'out';
+    if (dir) registraPulso(estado, evento.hora, dir);
     estado.eventos.push(evento);
     if (evento.id) estado.porId[evento.id] = evento;
     if (estado.eventos.length > LIMITE_EVENTOS * 1.5) {
@@ -350,6 +383,12 @@ function processaRegistro(estado, r, origem) {
         (estado.cwds = estado.cwds || {})[chat.pastaDoProjeto(r.cwd).toLowerCase()] = r.cwd;
     }
     if (r.type === 'ai-title') { estado.titulo = r.aiTitle; return; }
+    if (r.type === 'queue-operation' && r.operation === 'enqueue' && /^\s*<task-notification>/.test(String(r.content || ''))) {
+        const campo = (nome) => ((String(r.content).match(new RegExp(`<${nome}>([\\s\\S]*?)</${nome}>`)) || [])[1] || '').trim();
+        const id = campo('task-id');
+        if (id) { estado.tarefasNotificadas[id] = campo('status'); (estado.horaNotificacao = estado.horaNotificacao || {})[id] = r.timestamp; }
+        return;
+    }
     // Modo de permissão em uso: vem gravado nas suas mensagens
     if (r.type === 'user' && r.permissionMode && !r.isSidechain) estado.modo = r.permissionMode;
     if (r.type === 'cost-state') { estado.custo = r.totalCostUSD; return; }
@@ -404,10 +443,11 @@ function processaRegistro(estado, r, origem) {
     if (r.type === 'user') {
         // Aviso do sistema sobre tarefa/agente (<task-notification>): não é mensagem sua
         const textoBruto = typeof msg.content === 'string' ? msg.content : ((msg.content || []).find(b => b.type === 'text') || {}).text || '';
-        if (!r.isSidechain && /^\s*<task-notification>/.test(textoBruto)) {
+        if (/^\s*<task-notification>/.test(textoBruto)) {
             const campo = (nome) => ((textoBruto.match(new RegExp(`<${nome}>([\\s\\S]*?)</${nome}>`)) || [])[1] || '').trim();
             const situacao = campo('status');
-            if (campo('task-id')) estado.tarefasNotificadas[campo('task-id')] = situacao;
+            if (campo('task-id')) { estado.tarefasNotificadas[campo('task-id')] = situacao; (estado.horaNotificacao = estado.horaNotificacao || {})[campo('task-id')] = r.timestamp; }
+            if (r.isSidechain) return;
             estado.turnoEncerrado = false;
             adicionaEvento(estado, {
                 tipo: 'notificacao', hora: r.timestamp, situacao,
@@ -454,11 +494,14 @@ function processaRegistro(estado, r, origem) {
                 }
             }
             if (b.type === 'tool_result') {
+                registraPulso(estado, r.timestamp, 'in');
                 if (estado.pergunta && estado.pergunta.id === b.tool_use_id) estado.pergunta = null;
+                acertaIdTarefa(estado, b);
                 if (b.is_error && estado.planoAntes && estado.planoAntes.id === b.tool_use_id) {
                     estado.plano = estado.planoAntes.plano;
                     estado.tarefas = estado.planoAntes.tarefas;
                     estado.planoHora = estado.planoAntes.hora;
+                    estado.ultimaTarefa = estado.planoAntes.ultimaTarefa;
                     estado.planoAntes = null;
                 }
                 const alvo = estado.porId[b.tool_use_id];
@@ -560,8 +603,13 @@ function processaRegistro(estado, r, origem) {
                         fim: r.timestamp,
                     });
                 }
-                const planoAntes = { id: b.id, plano: JSON.parse(JSON.stringify(estado.plano)), tarefas: JSON.parse(JSON.stringify(estado.tarefas)), hora: estado.planoHora };
+                const planoAntes = { id: b.id, plano: JSON.parse(JSON.stringify(estado.plano)), tarefas: JSON.parse(JSON.stringify(estado.tarefas)), hora: estado.planoHora, ultimaTarefa: estado.ultimaTarefa };
                 if (atualizaPlano(estado, b.name, b.input || {})) {
+                    registraPulso(estado, r.timestamp, 'out');
+                    if (b.name === 'TaskCreate') {
+                        (estado.tarefasCriadas = estado.tarefasCriadas || {})[b.id] = String(estado.ultimaTarefa);
+                        estado.tarefas[estado.ultimaTarefa].criada = r.timestamp;
+                    }
                     estado.planoAntes = planoAntes;
                     if (!r.isSidechain) estado.planoHora = r.timestamp;
                     continue;
@@ -584,6 +632,8 @@ function processaRegistro(estado, r, origem) {
                         id: b.id, tipoAgente: (b.input || {}).subagent_type || 'general-purpose',
                         descricao: (b.input || {}).description || '', briefing: corta((b.input || {}).prompt, 3000),
                         status: 'rodando', inicio: r.timestamp, modelo: '',
+                        tarefaPai: estado.plano.findIndex(i => i.status === 'in_progress'),
+                        tarefaPaiId: (Object.entries(estado.tarefas).find(([, t]) => t.status === 'in_progress') || [null])[0],
                     };
                 }
             }
@@ -657,6 +707,13 @@ function leIncremental(arquivo, criaEstado, processa) {
 }
 
 // Subagentes da sessão: pasta <sessao>/subagents com .jsonl + .meta.json
+// O que um estado (conversa ou subagente) faz agora: a ferramenta ainda sem resposta; senão o tipo do último evento
+function acaoAtualDoEstado(estado) {
+    const aberta = [...estado.eventos].reverse().find(x => x.id && !x.fim);
+    if (aberta) return { tipo: aberta.tipo, texto: corta(aberta.tipo === 'edicao' || aberta.tipo === 'leitura' ? path.basename(String(aberta.texto)) : aberta.texto, 60) };
+    const ultimo = estado.eventos[estado.eventos.length - 1];
+    return ultimo ? { tipo: ultimo.tipo, texto: '' } : null;
+}
 function leSubagentes(pastaSessao, estadoPai) {
     const pasta = path.join(pastaSessao, 'subagents');
     if (!fs.existsSync(pasta)) return;
@@ -673,20 +730,36 @@ function leSubagentes(pastaSessao, estadoPai) {
             id: chave, tipoAgente: meta.agentType, descricao: meta.description, inicio: sub.inicio, status: 'rodando',
         });
         agente.tipoAgente = meta.agentType || agente.tipoAgente;
-        agente.modelo = sub.modelo || agente.modelo;
+        agente.modelo = sub.modelo || agente.modelo || meta.model || '';
+        // AGENTE ANINHADO (LANCADO POR OUTRO SUBAGENTE): O AVISO DE TERMINO FICA NO TRANSCRIPT DO AGENTE PAI, NAO NO DA CONVERSA
+        const fontes = [estadoPai];
+        if (meta.parentAgentId) { const arqPai = path.join(pasta, `agent-${meta.parentAgentId}.jsonl`); if (fs.existsSync(arqPai)) fontes.push(leIncremental(arqPai, estadoVazio, processaRegistro)); }
         agente.tokens = sub.tokens;
         agente.contexto = sub.ultimoContexto || 0;
         agente.ultimasAcoes = sub.eventos.filter(e => !['pedido', 'pensou'].includes(e.tipo)).slice(-8).map(e => ({ tipo: e.tipo, texto: e.texto }));
         agente.contagem = sub.contagem;
+        agente.plano = sub.plano;
+        agente.pulsos = sub.pulsos || [];
+        agente.acaoAtual = acaoAtualDoEstado(sub);
         const parado = Date.now() - mtime > 10 * 60 * 1000;
         // O aviso do sistema (<task-notification>) é a fonte mais confiável: diz se terminou ou parou
         const idAgente = nome.replace(/^agent-/, '').replace(/\.meta\.json$/, '');
-        const aviso = estadoPai.tarefasNotificadas[idAgente];
+        const horaDe = (e) => (e.horaNotificacao && e.horaNotificacao[idAgente]) || '';
+        const dono = fontes.sort((a, b) => Date.parse(horaDe(b) || 0) - Date.parse(horaDe(a) || 0))[0];
+        const aviso = dono.tarefasNotificadas[idAgente];
         if (aviso && /stopped|failed|killed|error/i.test(aviso)) agente.status = 'interrompido';
         else if (aviso && /completed|finished|done|success/i.test(aviso)) agente.status = 'concluido';
         else if (meta.finished === true || (agente.status === 'rodando' && parado)) {
             agente.status = agente.status === 'erro' ? 'erro' : 'concluido';
         }
+        // Retomado por SendMessage: atividade no transcript depois da última notificação de término e arquivo mexido
+        // há pouco = rodando de novo (vale mais que o aviso antigo e o meta.finished).
+        // SO AGENTE EM SEGUNDO PLANO EMITE task-notification (CONFERIDO NO .jsonl: 15 AGENTES, 5 NOTIFICADOS, TODOS BG);
+        // O DE PRIMEIRO PLANO TERMINA PELO tool_result, ENTAO SEM AVISO SO VALE O STATUS QUE ELE JA TEM
+        const horaAviso = horaDe(dono) || null;
+        const recente = Date.now() - mtime < SEGUNDOS_ATIVA * 1000;
+        const retomado = !!sub.ultimo && recente && !!horaAviso && Date.parse(sub.ultimo) > Date.parse(horaAviso);
+        if (retomado) { agente.status = 'rodando'; agente.fim = null; }
         // Fim = última atividade registrada do agente (vale também para os de segundo plano)
         if (agente.status !== 'rodando' && sub.ultimo) agente.fim = sub.ultimo;
         agente.inicio = agente.inicio || sub.inicio;
@@ -767,7 +840,7 @@ function arquivoDaSessao(projeto, id) {
 function envDeConversa(projeto, id) { return perfis.envDaConversa(entradaDaConversa(projeto, id)); }
 function assinaturaDe(entrada) { return entrada ? (entrada.claude || '') + '|' + (entrada.git || '') : ''; }
 
-function listaSessoes() {
+function listaSessoes(opcoes = {}) {
     registraVivas();
     const limite = Date.now() - DIAS_LISTADOS * 24 * 3600 * 1000;
     const sessoes = [];
@@ -790,7 +863,7 @@ function listaSessoes() {
             if (Date.now() - stat.mtimeMs < 3600 * 1000) leSubagentes(path.join(caminhoPasta, nome.replace('.jsonl', '')), estado);
             const situacao = situacaoSessao(estado, stat.mtimeMs, nome.replace('.jsonl', ''));
             // Conversa trabalhando (aberta ou não): vigia os repositórios dela, para cada comando ser comparado com a versão certa
-            if (situacao.ativa) reposDaSessao(estado, cwdDaPasta(estado, pasta)).forEach(r => vigiaRepo(r));
+            if (situacao.ativa && !opcoes.semVigia) reposDaSessao(estado, cwdDaPasta(estado, pasta)).forEach(r => vigiaRepo(r));
             const pedidos = estado.eventos.filter(e => e.tipo === 'pedido');
             // Conversa criada só por digitar "/mcp" (comando do terminal, não conversa de verdade): fica fora da lista
             if (pedidos.length && pedidos.every(p => String(p.texto).trim().toLowerCase() === '/mcp')) continue;
@@ -802,6 +875,8 @@ function listaSessoes() {
                 custoHoje: stat.mtimeMs >= new Date(diaLocal() + 'T00:00:00').getTime() ? custoHojeSessao(path.join(caminhoPasta, nome.replace('.jsonl', '')), estado) : 0,
                 ativa: situacao.ativa, esperando: situacao.esperando, agentesRodando: situacao.agentesRodando,
                 pergunta: !!estado.pergunta, fimTurno: estado.fimTurno, acompanhando: arquivosAcompanhados(estado),
+                // Selo do botão Tasks na lista (conta sem chamar /api/tasks)
+                tarefasAndamento: (() => { const pd = planoDoPedido(estado); return pd.planoAtual ? pd.tarefas.filter(i => i.status === 'in_progress').length : 0; })(),
                 // O que ela está fazendo agora (ferramenta ainda sem resposta), para a lista lateral
                 acaoAtual: situacao.ativa ? (() => {
                     const e = [...estado.eventos].reverse().find(x => x.id && !x.fim);
@@ -814,6 +889,127 @@ function listaSessoes() {
     }
     }
     return sessoes.sort((a, b) => b.atualizado - a.atualizado);
+}
+
+// Visão Tasks: conversas das últimas 24 h com lista de tarefas ou subagente, montadas do cache já lido.
+// A lista de sessões (e o dados.json) é reaproveitada por ~4,5 s, então a maioria dos polls de 2 s não varre o
+// disco; o corpo só é remontado quando a "versão" (mtime, situação, status dos agentes, seq dos pulsos) muda,
+// e o 304 não serializa nada.
+const HORAS_TASKS = 24;
+const SEGUNDOS_PULSOS = 30;
+const LIMITE_PULSOS_NO = 60;
+const CACHE_SESSOES_TASKS_MS = 4500;
+let sessoesTasks = { hora: 0, lista: [], arquivadas: new Set() };
+let corpoTasks = { versao: null, corpo: null };
+function pulsosRecentes(pulsos) {
+    const desde = Date.now() - SEGUNDOS_PULSOS * 1000;
+    return (pulsos || []).filter(p => Date.parse(p.hora) >= desde).slice(-LIMITE_PULSOS_NO);
+}
+function tarefasDoPlano(plano) {
+    return (plano || []).map(t => ({ texto: corta(t.texto, 120), status: t.status || 'pending' }));
+}
+function sessoesParaTasks() {
+    if (Date.now() - sessoesTasks.hora > CACHE_SESSOES_TASKS_MS) sessoesTasks = { hora: Date.now(), lista: listaSessoes({ semVigia: true }), arquivadas: new Set(leDados().arquivadas || []) };
+    return sessoesTasks.lista;
+}
+// PLANO DO ULTIMO PEDIDO: TASKCREATE ACUMULA NA CONVERSA, ENTAO SAI O QUE FOI CRIADO E CONCLUIDO ANTES DELE;
+// PLANO FEITO ANTES DO ULTIMO PEDIDO (COMO NO CARTAO PLANO DO APP) E ANTIGO
+function planoDoPedido(estado) {
+    const principais = estado.eventos.filter(e => e.tipo === 'pedido' && !e.comentario && e.uuid);
+    const atual = principais[principais.length - 1] || null;
+    const inicio = atual ? Date.parse(atual.hora) : 0;
+    const antigo = !!(estado.planoHora && atual && Date.parse(estado.planoHora) < inicio);
+    const doPedido = (t) => !(t.criada && Date.parse(t.criada) < inicio && t.status === 'completed');
+    const tarefas = estado.plano.filter(doPedido);
+    return { pedidoAtual: atual, planoAtual: !antigo && tarefas.length > 0, doPedido, tarefas };
+}
+// TaskUpdate deleted desloca os índices do plano: o id da tarefa (chave de estado.tarefas) é o que vale
+function indiceTarefaPai(estado, a) {
+    if (a.tarefaPaiId != null) return estado.tarefas[a.tarefaPaiId] ? Object.keys(estado.tarefas).indexOf(a.tarefaPaiId) : -1;
+    return a.tarefaPai;
+}
+// Solicitações da conversa: o pedido que abriu o turno, os comentários entregues no meio dele e o que ainda está na fila
+const normalizaTexto = (s) => limpaTextoUsuario(String(s || '')).replace(/\s+/g, ' ').trim().slice(0, 60);
+function solicitacoes(s, estado) {
+    const pedidos = estado.eventos.filter(e => e.tipo === 'pedido');
+    const principais = pedidos.filter(e => !e.comentario && e.uuid);
+    const atual = principais[principais.length - 1] || null;
+    const complementos = atual ? pedidos.filter(e => e.comentario && Date.parse(e.hora) >= Date.parse(atual.hora)).map(e => ({ texto: corta(e.texto, 200), hora: e.hora })) : [];
+    // Fila: mensagens enviadas pelo painel que ainda não apareceram no transcript (poda as que já chegaram)
+    const info = chat.enfileiradas().find(x => x.sessionId === s.id);
+    let fila = [];
+    if (info) {
+        for (let i = info.itens.length - 1; i >= 0; i--) {
+            const item = info.itens[i];
+            const chegou = pedidos.some(e => Date.parse(e.hora) >= Date.parse(item.hora) - 1000 && normalizaTexto(e.texto) === normalizaTexto(item.texto));
+            if (chegou) info.itens.splice(i, 1);
+        }
+        fila = info.itens.map(i => ({ texto: corta(i.texto, 200), hora: i.hora }));
+    }
+    // Plano "antigo" como no cartão Plano do app: feito antes do último pedido do usuário
+    const planoAtual = !(estado.planoHora && atual && Date.parse(estado.planoHora) < Date.parse(atual.hora));
+    return { pedidoAtual: atual ? { texto: corta(atual.texto, 200), hora: atual.hora } : null, complementos, fila, planoAtual, planoHora: estado.planoHora || null };
+}
+function montaTasks(itens) {
+    const conversas = itens.map(({ s, estado }) => {
+        const sol = solicitacoes(s, estado);
+        const tarefasTodas = tarefasDoPlano(estado.plano).map((t, i) => ({ ...t, subagentes: [], criada: estado.plano[i].criada }));
+        const subagentesSoltos = [];
+        const agentes = Object.values(estado.agentes), rodando = agentes.filter(a => a.status === 'rodando');
+        const concluidos = agentes.filter(a => a.status !== 'rodando').sort((a, b) => Date.parse(b.fim || b.inicio || 0) - Date.parse(a.fim || a.inicio || 0)).slice(0, 5);
+        for (const a of [...rodando, ...concluidos]) {
+            const ativo = a.status === 'rodando', recemTerminado = !ativo && a.fim && Date.now() - Date.parse(a.fim) < SEGUNDOS_PULSOS * 1000;
+            const sub = {
+                id: a.id, tipo: a.tipoAgente || 'agente', descricao: corta(a.descricao, 80), status: a.status, modelo: a.modelo || null,
+                inicio: a.inicio || null, fim: a.fim || null, pulsos: ativo || recemTerminado ? pulsosRecentes(a.pulsos) : [], tarefas: ativo ? tarefasDoPlano(a.plano) : [],
+                acaoAtual: ativo ? a.acaoAtual || null : null,
+            };
+            const pai = tarefasTodas[indiceTarefaPai(estado, a)];
+            if (pai) pai.subagentes.push(sub);
+            else subagentesSoltos.push(sub);
+        }
+        const { doPedido } = planoDoPedido(estado);
+        let tarefas = tarefasTodas.filter(doPedido);
+        if (!tarefas.length) { sol.planoAtual = false; tarefas = tarefasTodas; }
+        else tarefasTodas.filter(t => !doPedido(t)).forEach(t => subagentesSoltos.push(...t.subagentes.filter(x => x.status === 'rodando')));
+        tarefas = tarefas.map(({ criada, ...t }) => t);
+        return {
+            id: s.id, projeto: s.projeto, nomeProjeto: s.nomeProjeto, titulo: s.titulo, modelo: s.modelo,
+            vivo: s.ativa, esperando: !s.ativa && !!estado.pergunta, ultimo: s.atualizado,
+            pergunta: estado.pergunta ? corta(estado.pergunta.texto, 140) : null, acaoAtual: s.acaoAtual || null,
+            ...sol,
+            pulsos: pulsosRecentes(estado.pulsos), tarefas, subagentesSoltos,
+        };
+    });
+    return { conversas };
+}
+function listaTasks() {
+    const limite = Date.now() - HORAS_TASKS * 3600 * 1000;
+    const itens = [];
+    const sessoes = sessoesParaTasks(), arquivadas = sessoesTasks.arquivadas;
+    for (const s of sessoes) {
+        // SO CONVERSA PROCESSANDO OU COM PERGUNTA SEM RESPOSTA: TURNO ENCERRADO NAO PEDE NADA AO USUARIO
+        if (s.atualizado < limite || arquivadas.has(s.projeto + '/' + s.id) || !(s.ativa || s.pergunta)) continue;
+        const achado = arquivoDaSessao(s.projeto, s.id);
+        const item = achado && cache.get(achado.arquivo);
+        if (!item) continue;
+        const estado = item.estado;
+        if (!estado.plano.length && !Object.keys(estado.agentes).length) continue;
+        itens.push({ s, estado });
+    }
+    const versao = itens.map(({ s, estado }) => [
+        s.id, s.atualizado, s.ativa, s.esperando, s.titulo, s.modelo, estado.pergunta && estado.pergunta.texto, s.acaoAtual && s.acaoAtual.texto,
+        JSON.stringify(solicitacoes(s, estado)),
+        estado.plano.map(t => t.status + t.texto).join(','),
+        Object.values(estado.agentes).map(a => [a.id, a.status, a.modelo, a.fim, (a.plano || []).map(t => t.status + t.texto).join(';'), a.acaoAtual && a.acaoAtual.tipo + ':' + a.acaoAtual.texto].join('|')).join(','),
+    ].join('|')).join('\n') + '|' + seqPulso;
+    if (corpoTasks.versao !== versao) {
+        const corpo = montaTasks(itens);
+        corpo.hash = crypto.createHash('md5').update(versao).digest('hex').slice(0, 16);
+        corpo.seq = seqPulso;
+        corpoTasks = { versao, corpo };
+    }
+    return { ...corpoTasks.corpo, agora: new Date().toISOString() };
 }
 
 // cwd que gera o nome da pasta onde está o .jsonl (é nele que o SDK procura ao retomar)
@@ -2627,6 +2823,11 @@ const servidor = http.createServer(async (req, res) => {
             return responde(res, 200, await plugins.estado());
         }
         if (url.pathname === '/api/sessoes') return responde(res, 200, listaSessoes());
+        if (url.pathname === '/api/tasks') {
+            const tasks = listaTasks();
+            if (url.searchParams.get('desde') === tasks.hash) { res.writeHead(304); return res.end(); }
+            return responde(res, 200, tasks);
+        }
         // Player do rodapé: o que está tocando no Windows, a capa e os botões (tocar/pausar, próxima)
         if (url.pathname === '/api/midia/capa' && req.method === 'GET') {
             const capa = midia.capaAtual();
@@ -2673,7 +2874,7 @@ const servidor = http.createServer(async (req, res) => {
             try { return responde(res, 200, { ok: true, caminho: await videoNavegador.instalaYtdlp() }); }
             catch (e) { return responde(res, 502, { erro: e.message }); }
         }
-        if (url.pathname === '/clipe.html' || url.pathname === '/clipe.js') {
+        if (url.pathname === '/clipe.html' || url.pathname === '/clipe.js' || url.pathname === '/tasks.js') {
             res.writeHead(200, { 'Content-Type': url.pathname.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
             return res.end(fs.readFileSync(path.join(__dirname, url.pathname.slice(1))));
         }
