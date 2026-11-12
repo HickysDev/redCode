@@ -147,14 +147,14 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
   <span class="tk-titulo">${marcaSvg(20)}Tasks</span>
   <div class="filtros" id="tkFiltros" role="group" aria-label="Quais conversas mostrar">
     <button class="filtro" data-f="todas" aria-pressed="true">Todas<span class="n">0</span></button>
-    <button class="filtro" data-f="ativas" aria-pressed="false">Ativas<span class="n">0</span></button>
-    <button class="filtro" data-f="esperando" aria-pressed="false">Esperando você<span class="n">0</span></button>
+    <button class="filtro" data-f="ativas" aria-pressed="false">Trabalhando<span class="n">0</span></button>
+    <button class="filtro" data-f="esperando" aria-pressed="false">Pergunta pra você<span class="n">0</span></button>
     <button class="filtro" data-f="agentes" aria-pressed="false">Com agentes<span class="n">0</span></button>
   </div>
   <div class="tk-modelos" id="tkModelos" role="group" aria-label="Filtrar por modelo"></div>
   <input class="tk-busca" id="tkBusca" placeholder="Procurar tarefa ou conversa (Ctrl+K)" aria-label="Procurar">
   <button class="mini" id="tkSinais" aria-pressed="true" title="Mostrar ou esconder os sinais correndo nas trilhas">Sinais</button>
-  <button class="mini" id="tkAbsorvidas" aria-pressed="false" title="Mostrar as conversas concluídas e paradas há mais de ${MINUTOS_ABSORVE} min">Absorvidas<span class="n" id="tkNAbsorvidas"></span></button>
+  <button class="mini" id="tkAbsorvidas" hidden aria-pressed="false" title="Mostrar as conversas concluídas e paradas há mais de ${MINUTOS_ABSORVE} min">Absorvidas<span class="n" id="tkNAbsorvidas"></span></button>
   <button class="mini" id="tkOrganiza" title="Voltar ao arranjo automático (esquece as posições arrastadas)">Organizar</button>
   <button class="mini" id="tkAjusta" title="Ajustar à tela">Ajustar</button>
   <button class="fechar-mapa" id="tkFecha" title="Fechar (Esc)" aria-label="Fechar">×</button>
@@ -222,11 +222,11 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     const ativo = (s) => s.status === 'rodando';
     const agentesAtivos = (c) => todosSubs(c).filter(ativo);
     const progressoConversa = (c) => c.tarefas.length ? c.tarefas.reduce((s, t) => s + progressoTarefa(t), 0) / c.tarefas.length : (todosSubs(c).every(s => s.status !== 'rodando') ? 1 : 0.5);
-    const absorvida = (c) => !c.vivo && progressoConversa(c) >= 1 && Date.now() - c.ultimo > MINUTOS_ABSORVE * 60000;
+    const absorvida = () => false;
     const passaFiltro = (c) => (prefs.filtro === 'todas' || (prefs.filtro === 'ativas' && c.vivo) || (prefs.filtro === 'esperando' && c.esperando) || (prefs.filtro === 'agentes' && agentesAtivos(c).length > 0))
         && (!prefs.filtroModelo || familiaModelo(c.modelo) === prefs.filtroModelo || todosSubs(c).some(s => familiaModelo(s.modelo) === prefs.filtroModelo));
     const visiveisAgora = () => dados.conversas.filter(c => passaFiltro(c) && (prefs.absorvidas || !absorvida(c))).sort((a, b) => a.id.localeCompare(b.id));
-    const situacao = (c) => c.esperando ? 'esperando você' : c.vivo ? 'trabalhando' : 'parada';
+    const situacao = (c) => c.esperando ? 'pergunta pra você' : c.vivo ? 'trabalhando' : 'parada';
     const classeSituacao = (c) => c.esperando ? 'esperando' : c.vivo ? 'viva' : 'parada';
 
     // CARTAO DA CONVERSA: MESMO DNA DO CARTAO "PLANO" (BARRA + PASSOS + MARCADORES)
@@ -723,8 +723,12 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
                 c.tarefas.forEach(t => { if (t.status === 'completed' && statusAntes.has(t.texto) && statusAntes.get(t.texto) !== 'completed') feed.unshift({ cor: 'var(--ok)', texto: `${cortaTexto(c.titulo, 22)} concluiu: ${t.texto}`, hora: Date.now() }); });
                 const idsAntes = new Set(todosSubs(v).map(s => s.id));
                 todosSubs(c).filter(s => !idsAntes.has(s.id)).forEach(s => feed.unshift({ cor: tomModelo(s.modelo), texto: `${s.tipo} abriu em ${cortaTexto(c.titulo, 28)}`, hora: Date.now() }));
-                if (c.esperando && !v.esperando) feed.unshift({ cor: 'var(--atencao)', texto: `${cortaTexto(c.titulo, 30)} espera você`, hora: Date.now() });
+                if (c.esperando && !v.esperando) feed.unshift({ cor: 'var(--atencao)', texto: `${cortaTexto(c.titulo, 30)} fez uma pergunta`, hora: Date.now() });
                 if (absorvida(c) && !absorvida(v)) feed.unshift({ cor: 'var(--grafite)', texto: `${cortaTexto(c.titulo, 30)} foi absorvida`, hora: Date.now() });
+            }
+            const idsAgora = new Set(dados.conversas.map(c => c.id));
+            for (const v of anterior.conversas) {
+                if (!idsAgora.has(v.id)) feed.unshift({ cor: 'var(--ok)', texto: `${cortaTexto(v.titulo, 34)} terminou`, hora: Date.now() });
             }
         }
         feed.splice(5);
@@ -823,7 +827,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     // SELO DO BOTAO TASKS NA LISTA: VEM DO /api/sessoes (A CADA 5 S), SEM CHAMAR /api/tasks COM A VISAO FECHADA
     function atualizaSelo(sessoes) {
         const limite = Date.now() - HORAS_SELO * 3600 * 1000, arquivadas = new Set((typeof dadosPainel !== 'undefined' && dadosPainel.arquivadas) || []);
-        const recentes = (sessoes || []).filter(s => s.atualizado >= limite && !arquivadas.has(s.projeto + '/' + s.id));
+        const recentes = (sessoes || []).filter(s => s.atualizado >= limite && !arquivadas.has(s.projeto + '/' + s.id) && (s.ativa || s.pergunta));
         const andamento = recentes.reduce((n, s) => n + (s.tarefasAndamento || 0), 0), trabalhando = recentes.some(s => s.ativa);
         for (const b of botoesTasks()) {
             const selo = b.querySelector('.selo-tasks'), ponto = b.querySelector('.ponto-tasks');

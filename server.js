@@ -879,7 +879,7 @@ function montaTasks(itens) {
         }
         return {
             id: s.id, projeto: s.projeto, nomeProjeto: s.nomeProjeto, titulo: s.titulo, modelo: s.modelo,
-            vivo: s.ativa, esperando: s.esperando, ultimo: s.atualizado,
+            vivo: s.ativa, esperando: !s.ativa && !!estado.pergunta, ultimo: s.atualizado,
             pergunta: estado.pergunta ? corta(estado.pergunta.texto, 140) : null, acaoAtual: s.acaoAtual || null,
             pulsos: pulsosRecentes(estado.pulsos), tarefas, subagentesSoltos,
         };
@@ -891,7 +891,8 @@ function listaTasks() {
     const itens = [];
     const arquivadas = new Set(leDados().arquivadas || []);
     for (const s of sessoesParaTasks()) {
-        if (s.atualizado < limite || arquivadas.has(s.projeto + '/' + s.id)) continue;
+        // SO CONVERSA PROCESSANDO OU COM PERGUNTA SEM RESPOSTA: TURNO ENCERRADO NAO PEDE NADA AO USUARIO
+        if (s.atualizado < limite || arquivadas.has(s.projeto + '/' + s.id) || !(s.ativa || s.pergunta)) continue;
         const achado = arquivoDaSessao(s.projeto, s.id);
         const item = achado && cache.get(achado.arquivo);
         if (!item) continue;
