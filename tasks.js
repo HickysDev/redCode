@@ -30,7 +30,7 @@
     const chipModelo = (m, extra = '') => `<span class="tk-chip-modelo${extra}" style="--tom:${tomModelo(m)}" title="${escapa(m || 'modelo não informado')}">${glifoModelo(m)}${escapa(nomeModelo(m))}</span>`;
 
     const css = `
-#janelaTasks { position: fixed; top: 0; right: 0; bottom: 0; left: var(--larg-sessoes, 0px); z-index: 65; background: var(--papel); color: var(--tinta); overflow: hidden; font-family: var(--sans); display: flex; flex-direction: column; --tk-nucleo: #fff; }
+#janelaTasks { contain: strict; position: fixed; top: 0; right: 0; bottom: 0; left: var(--larg-sessoes, 0px); z-index: 65; background: var(--papel); color: var(--tinta); overflow: hidden; font-family: var(--sans); display: flex; flex-direction: column; --tk-nucleo: #fff; }
 html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 #janelaTasks, .marca, .trilho-lista { ${Object.entries(IDENTIDADE_MODELO).map(([f, i]) => `--tom-${f}: color-mix(in srgb, ${i.matiz} 62%, var(--tinta)); --tom-${f}-pulso: color-mix(in srgb, ${i.matiz} 88%, var(--tinta));`).join(' ')} }
 #janelaTasks[hidden] { display: none; }
@@ -55,6 +55,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 .tk-trilha { fill: none; stroke: var(--trilha, var(--linha)); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; transition: opacity .2s, stroke .2s; }
 .tk-trilha.acesa { stroke: var(--voce); }
 .tk-pino-ativo { fill: var(--trilha, var(--linha)); }
+.tk-coberto { content-visibility: hidden; }
 .tk-pulso { fill: none; stroke-linecap: round; pointer-events: none; }
 .tk-chip-centro { position: absolute; margin: 0; box-sizing: border-box; width: ${CHIP}px; height: ${CHIP}px; border: 1px solid var(--linha); border-radius: 14px; background: linear-gradient(160deg, color-mix(in srgb, var(--realce) 70%, var(--folha)), var(--folha) 60%); box-shadow: var(--sombra), inset 0 1px 0 color-mix(in srgb, var(--tinta) 6%, transparent); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding-bottom: 14px; cursor: default; user-select: none; transition: opacity .3s; }
 .tk-die { position: absolute; inset: 12px; border-radius: 9px; border: 1px solid color-mix(in srgb, var(--linha) 85%, transparent); background-image: repeating-linear-gradient(0deg, color-mix(in srgb, var(--tinta) 4%, transparent) 0 1px, transparent 1px 8px), repeating-linear-gradient(90deg, color-mix(in srgb, var(--tinta) 4%, transparent) 0 1px, transparent 1px 8px); -webkit-mask: radial-gradient(circle at 50% 46%, transparent 40px, #000 72px); mask: radial-gradient(circle at 50% 46%, transparent 40px, #000 72px); pointer-events: none; }
@@ -177,7 +178,8 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 .tk-subcartao .tk-sub-cab .tk-chip-modelo { flex: none; font-size: 10px; line-height: 14px; padding: 0 5px; }
 .tk-subcartao .tk-sub-desc { font: 11px/1.3 var(--sans); color: var(--grafite); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
 .tk-subcartao .tk-agora { margin: 4px 0 0; }
-.tk-subcartao .tk-agora::before { content: "●"; color: var(--tom); font-size: 8px; animation: pisca-passo 1s ease-in-out infinite; flex: none; }
+.tk-subcartao .tk-agora::before { content: "●"; color: var(--tom); font-size: 8px; flex: none; }
+#janelaTasks .pet-corpo::before, #janelaTasks .pet-corpo::after { animation: none !important; }
 .tk-subcartao .passos { margin-top: 4px; }
 .tk-subcartao .passos li { grid-template-columns: 18px 1fr; align-items: center; padding: 1px 0; text-decoration: none; font-size: 11.5px; line-height: 1.3; color: var(--grafite); }
 .tk-subcartao .passos li::before { content: none; }
@@ -301,6 +303,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     const petDoAgente = (s) => `<span class="tk-pet">${typeof petMini === 'function' ? petMini(s.tipo, s.status === 'rodando') : '◆'}</span>`;
     const chipAgente = (s) => `<span class="tk-agente ${escapa(s.status)}" data-agente="${escapa(s.id)}" style="--tom:${tomModelo(s.modelo)}" title="${escapa(s.descricao || s.tipo)} · ${escapa(s.status)}${s.modelo ? ' · ' + escapa(nomeModelo(s.modelo)) : ''}">${petDoAgente(s)}${escapa(cortaTexto(s.tipo, 24))}${s.modelo ? `<i>${glifoModelo(s.modelo, 11)}${escapa(IDENTIDADE_MODELO[familiaModelo(s.modelo)].nome)}</i>` : ''}</span>`;
     // "AGORA" DO CARTAO: A PERGUNTA PENDENTE (ESPERANDO VOCE) OU A ACAO EM CURSO (TRABALHANDO)
+    const ACAO_SEM_TEXTO = { pensou: 'Pensando', fala: 'Escrevendo', pedido: 'Lendo o pedido', comando: 'Rodando um comando', edicao: 'Editando um arquivo', leitura: 'Lendo um arquivo', busca: 'Procurando', agente: 'Chamando um agente', web: 'Acessando a web', skill: 'Usando uma skill', ferramenta: 'Usando uma ferramenta' };
     const VERBO_ACAO = { comando: 'Rodando:', edicao: 'Editando', leitura: 'Lendo', busca: 'Procurando', agente: 'Agente:', web: 'Acessando', skill: 'Skill:', ferramenta: 'Usando' };
     function htmlAgora(c) {
         if (c.esperando && c.pergunta) return `<div class="tk-agora pergunta" title="${escapa(c.pergunta)}"><b>?</b><span>${escapa(c.pergunta)}</span></div>`;
@@ -332,7 +335,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     // SUB-CARTAO DO AGENTE RODANDO: MASCOTE, TIPO, MODELO, DESCRICAO, O QUE FAZ AGORA E A MINI-LISTA DELE
     function htmlAgoraAgente(s) {
         const a = s.acaoAtual;
-        const rotulo = !a ? 'Pensando' : a.texto ? (VERBO_ACAO[a.tipo] || a.tipo) : ({ pensou: 'Pensando', fala: 'Escrevendo', pedido: 'Lendo o pedido' }[a.tipo] || VERBO_ACAO[a.tipo] || a.tipo);
+        const rotulo = !a ? 'Pensando' : a.texto ? (VERBO_ACAO[a.tipo] || a.tipo) : (ACAO_SEM_TEXTO[a.tipo] || 'Trabalhando');
         return `<div class="tk-agora acao" title="${escapa(a && a.texto ? a.texto : rotulo)}"><b>${escapa(rotulo)}</b>${a && a.texto ? `<span>${escapa(a.texto)}</span>` : ''}</div>`;
     }
     function htmlSubCartao(s) {
@@ -887,7 +890,9 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
             if (t < 1) return quadro(passo);
             camadas.forEach(c => c.el.remove());
             emVoo.set(fonte, Math.max(0, (emVoo.get(fonte) || 1) - 1));
-            if (trilha.isConnected) clarao(trilha.getPointAtLength(paraOrigem ? 0 : len), cor, esmaece);
+            if (!trilha.isConnected) return;
+            if (!elo.pontas || elo.pontas.d !== d) elo.pontas = { d, ini: trilha.getPointAtLength(0), fim: trilha.getPointAtLength(len) };
+            clarao(paraOrigem ? elo.pontas.ini : elo.pontas.fim, cor, esmaece);
             if (elo.padEl && paraOrigem) acendePad(elo, cor);
         };
         quadro(passo);
@@ -986,9 +991,22 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         finally { buscando = false; }
     }
     const botoesTasks = () => [document.getElementById('btnModoTasks'), document.querySelector('.trilho-lista [data-trilho="btnModoTasks"]')].filter(Boolean);
+    // O QUE FICA DEBAIXO DA VISAO PARA DE SER RENDERIZADO (CONTENT-VISIBILITY GUARDA O ESTADO PARA QUANDO FECHAR)
+    function cobreFundo(liga) {
+        document.querySelectorAll('.tk-coberto').forEach(e => e.classList.remove('tk-coberto'));
+        if (!liga) return;
+        const borda = janela.getBoundingClientRect().left - 1, pai = document.querySelector('.coluna-centro');
+        if (!pai || !pai.parentElement) return;
+        for (const e of pai.parentElement.children) {
+            if (e === janela || e.hidden || e.closest('#janelaTasks')) continue;
+            const r = e.getBoundingClientRect();
+            if (r.width && r.left >= borda) e.classList.add('tk-coberto');
+        }
+    }
     function abre() {
         if (!janela.hidden) return;
         janela.hidden = false;
+        cobreFundo(true);
         botoesTasks().forEach(b => b.setAttribute('aria-pressed', 'true'));
         if (!vistaValida(vista)) vista = vistaValida(prefs.vista) ? prefs.vista : null;
         // DADOS JA EM MEMORIA (REABERTURA): DESENHA NA HORA, O POLL SO CONFIRMA (304) OU ATUALIZA
@@ -999,6 +1017,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     }
     function fecha() {
         janela.hidden = true;
+        cobreFundo(false);
         clearInterval(timer);
         timer = null;
         clearTimeout(cliqueTimer);
