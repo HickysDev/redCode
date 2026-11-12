@@ -4749,6 +4749,9 @@ function situacaoItem(s) {
     if (s.ativa) return { icone: '', classe: 'trabalhando', selo: 'Trabalhando', texto: 'agora' };
     const fundo = tarefasFundoDe(s);
     if (fundo.length) return { icone: '', classe: 'trabalhando', selo: 'Em segundo plano', texto: 'agora', fazendo: fundo.length > 1 ? `${fundo.length} tarefas em segundo plano` : `Em segundo plano: ${fundo[0].descricao || 'tarefa'}` };
+    // Processo solto que o Claude mandou acompanhar (ACOMPANHAR): enquanto o arquivo de andamento estiver sendo escrito
+    const soltos = s.acompanhando || [];
+    if (soltos.length) return { icone: '', classe: 'trabalhando', selo: 'Em segundo plano', texto: 'agora', fazendo: soltos.length > 1 ? `${soltos.length} processos em segundo plano` : `Em segundo plano: ${soltos[0].nome}` };
     if (s.esperando && Date.now() - s.atualizado < 30 * 60 * 1000 && !jaViu(s)) return { icone: '✓', classe: 'respondeu', selo: 'Respondeu', texto: haQuanto(s.atualizado) };
     return { icone: '', classe: 'parada', selo: '', texto: haQuanto(s.atualizado) };
 }

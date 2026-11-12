@@ -465,6 +465,15 @@ function processaRegistro(estado, r, origem) {
                 const idsImagens = guardaImagens(b.content, origem, b.tool_use_id);
                 if (alvo && idsImagens.length) alvo.imagens = idsImagens;
                 const conteudo = Array.isArray(b.content) ? b.content.map(c => c.text || '').join('\n') : String(b.content || '');
+                // Processo solto (Start-Process) que o Claude mandou acompanhar: a lista mostra a conversa em
+                // segundo plano enquanto o arquivo de andamento continuar sendo escrito (arquivosAcompanhados)
+                const acompanhar = conteudo.match(/ACOMPANHAR:\s*([A-Za-z]:\\[^'"`$;&|<>\r\n*?]+?\.[A-Za-z0-9]{1,8})(?=["'\s]|$)/);
+                if (acompanhar && !r.isSidechain) {
+                    estado.acompanhados = estado.acompanhados || {};
+                    estado.acompanhados[acompanhar[1]] = r.timestamp;
+                    const nomes = Object.keys(estado.acompanhados);
+                    if (nomes.length > 5) delete estado.acompanhados[nomes[0]];
+                }
                 if (alvo) {
                     alvo.fim = r.timestamp;
                     alvo.erro = !!b.is_error;
@@ -713,6 +722,16 @@ function situacaoSessao(estado, mtime, id) {
     return { ativa, esperando: !ativa && (estado.turnoEncerrado || !!estado.pergunta), agentesRodando };
 }
 
+// Arquivos de andamento (ACOMPANHAR) ainda sendo escritos: mexido nos últimos 2 min, pedido nas últimas 24 h
+function arquivosAcompanhados(estado) {
+    const lista = [];
+    for (const [arquivo, hora] of Object.entries(estado.acompanhados || {})) {
+        if (Date.now() - Date.parse(hora || 0) > 24 * 3600 * 1000) continue;
+        try { if (Date.now() - fs.statSync(arquivo).mtimeMs < 120 * 1000) lista.push({ arquivo, nome: path.basename(arquivo) }); } catch (e) { /* apagado */ }
+    }
+    return lista;
+}
+
 // ---------- Conta e Git por conversa ----------
 // dados.porConversa["projeto/sessao" minúsculo] = { claude, git, projeto, sessao } (escolha absoluta feita na tela)
 const chaveConversa = (projeto, sessao) => (String(projeto) + '/' + String(sessao)).toLowerCase();
@@ -782,7 +801,7 @@ function listaSessoes() {
                 compactacoes: estado.compactacoes.length, inicio: estado.inicio, cwd: cwdDaPasta(estado, pasta), custo: estado.custo,
                 custoHoje: stat.mtimeMs >= new Date(diaLocal() + 'T00:00:00').getTime() ? custoHojeSessao(path.join(caminhoPasta, nome.replace('.jsonl', '')), estado) : 0,
                 ativa: situacao.ativa, esperando: situacao.esperando, agentesRodando: situacao.agentesRodando,
-                pergunta: !!estado.pergunta, fimTurno: estado.fimTurno,
+                pergunta: !!estado.pergunta, fimTurno: estado.fimTurno, acompanhando: arquivosAcompanhados(estado),
                 // O que ela está fazendo agora (ferramenta ainda sem resposta), para a lista lateral
                 acaoAtual: situacao.ativa ? (() => {
                     const e = [...estado.eventos].reverse().find(x => x.id && !x.fim);
