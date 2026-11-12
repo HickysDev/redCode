@@ -154,12 +154,16 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 .tk-sub small { margin-left: auto; font: 11px var(--mono); flex: none; }
 .tk-sub.erro small, .tk-sub.interrompido small { color: var(--erro); }
 .tk-sub + .passos { margin-left: 22px; }
-.tk-feed { right: 16px; bottom: 14px; width: 320px; padding: 10px 14px; font-size: 12.5px; }
+.tk-feed { right: 16px; bottom: 14px; width: 360px; padding: 10px 14px; font-size: 12.5px; }
 .tk-feed h4 { font: 600 11px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--grafite); margin: 0 0 6px; }
 .tk-feed p { margin: 0; color: var(--grafite); }
 .tk-feed div { display: flex; gap: 8px; align-items: center; margin: 3px 0; min-width: 0; }
 .tk-feed div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tk-feed div i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.tk-feed div.fala { align-items: flex-start; }
+.tk-feed div.fala i { margin-top: 5px; }
+.tk-feed div.fala span { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--tinta); line-height: 1.38; }
+.tk-feed div.fala span em { font-style: normal; color: var(--grafite); }
 .tk-feed div small { margin-left: auto; font: 11px var(--mono); color: var(--grafite); flex: none; }
 .tk-legenda { position: absolute; z-index: 3; left: 16px; bottom: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font: 11.5px var(--sans); color: var(--grafite); background: color-mix(in srgb, var(--papel) 85%, transparent); padding: 6px 10px; border-radius: 8px; max-width: calc(100% - 370px); }
 .tk-legenda span { display: inline-flex; align-items: center; gap: 6px; }
@@ -267,6 +271,8 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     const tocados = new Map();
     const emVoo = new Map();
     const feed = [];
+    // CONVERSA -> HORA DA ULTIMA RESPOSTA DO CLAUDE JA POSTA NO FEED
+    const falasVistas = new Map();
     let anterior = null;
     let temporizadores = new Set(), quadros = new Set();
 
@@ -949,6 +955,15 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 
     // FEED "AGORA": DIFERENCA ENTRE DOIS POLLS (TAREFAS COMPARADAS PELO TEXTO, NAO PELA POSICAO)
     function registraFeed() {
+        // RESPOSTAS DO CLAUDE: AS NOVAS DESDE O ULTIMO POLL (AO ABRIR, SO A ULTIMA DE CADA CONVERSA), DA MAIS VELHA PARA A MAIS NOVA
+        const novasFalas = [];
+        for (const c of dados.conversas) {
+            const falas = c.falas || [], vista = falasVistas.get(c.id);
+            const novas = vista === undefined ? falas.slice(-1) : falas.filter(f => f.hora > vista);
+            if (falas.length) falasVistas.set(c.id, falas[falas.length - 1].hora);
+            novas.forEach(f => novasFalas.push({ cor: tomModelo(c.modelo), quem: cortaTexto(c.titulo, 26), texto: f.texto, fala: true, hora: Date.parse(f.hora) || Date.now() }));
+        }
+        novasFalas.sort((a, b) => a.hora - b.hora).forEach(f => feed.unshift(f));
         if (anterior) {
             const antes = new Map(anterior.conversas.map(c => [c.id, c]));
             for (const c of dados.conversas) {
@@ -971,7 +986,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         feed.splice(5);
         anterior = dados;
         const quando = (ms) => { const s = Math.round((Date.now() - ms) / 1000); return s < 60 ? s + ' s' : Math.round(s / 60) + ' min'; };
-        $('tkFeed').innerHTML = '<h4>Agora</h4>' + (feed.length ? feed.map(f => `<div><i style="background:${f.cor}"></i><span>${escapa(f.texto)}</span><small>${quando(f.hora)}</small></div>`).join('') : '<p>Nada ainda.</p>');
+        $('tkFeed').innerHTML = '<h4>Agora</h4>' + (feed.length ? feed.map(f => `<div class="${f.fala ? 'fala' : ''}"${f.fala ? ` title="${escapa(f.quem + ': ' + f.texto)}"` : ''}><i style="background:${f.cor}"></i><span>${f.fala ? `<em>${escapa(f.quem)}:</em> ` : ''}${escapa(f.texto)}</span><small>${quando(f.hora)}</small></div>`).join('') : '<p>Nada ainda.</p>');
     }
 
     // POLLING SO COM A VISAO ABERTA E A JANELA VISIVEL; UMA REQUISICAO POR VEZ E RESPOSTA DESCARTADA SE A VISAO FECHOU

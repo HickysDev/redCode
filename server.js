@@ -950,6 +950,13 @@ function solicitacoes(s, estado) {
     const planoAtual = !(estado.planoHora && atual && Date.parse(estado.planoHora) < Date.parse(atual.hora));
     return { pedidoAtual: atual ? { texto: corta(atual.texto, 200), hora: atual.hora } : null, complementos, fila, planoAtual, planoHora: estado.planoHora || null };
 }
+// Últimas respostas do Claude (para o painel "Agora" da Tasks): texto corrido, sem markdown, sem aviso do Claude Code
+function falasRecentes(estado) {
+    return estado.eventos.filter(e => e.tipo === 'fala' && e.modelo !== 'aviso do Claude Code').slice(-3).map(e => ({
+        hora: e.hora,
+        texto: corta(String(e.texto || '').replace(/```[\s\S]*?```/g, ' ').replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_`#>|]+/g, '').replace(/\s+/g, ' ').trim(), 220),
+    })).filter(f => f.texto);
+}
 function montaTasks(itens) {
     const conversas = itens.map(({ s, estado, fundo = [] }) => {
         const sol = solicitacoes(s, estado);
@@ -979,7 +986,7 @@ function montaTasks(itens) {
             vivo: s.ativa || fundo.length > 0, esperando: !s.ativa && !!estado.pergunta, ultimo: s.atualizado, segundoPlano: fundo,
             pergunta: estado.pergunta ? corta(estado.pergunta.texto, 140) : null, acaoAtual: s.acaoAtual || null,
             ...sol,
-            pulsos: pulsosRecentes(estado.pulsos), tarefas, subagentesSoltos,
+            pulsos: pulsosRecentes(estado.pulsos), tarefas, subagentesSoltos, falas: falasRecentes(estado),
         };
     });
     return { conversas };
