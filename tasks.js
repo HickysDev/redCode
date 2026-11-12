@@ -90,9 +90,11 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 .tk-agentes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
 .tk-agente { display: inline-flex; align-items: center; gap: 4px; font: 500 11px var(--sans); line-height: 16px; padding: 0 7px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--tom) 55%, transparent); color: var(--tom); background: color-mix(in srgb, var(--tom) 7%, transparent); max-width: 100%; white-space: nowrap; overflow: visible; }
 .tk-agente i { font-style: normal; color: var(--tom); display: inline-flex; align-items: center; gap: 2px; opacity: .85; }
-.tk-agente .pet-mini { zoom: .45; width: 40px; height: 36px; margin: -4px 0 -6px -3px; }
-.tk-agente.rodando { border-color: var(--tom); }
-.tk-agente.rodando::after { content: "●"; font-size: 8px; animation: pisca-passo 1s ease-in-out infinite; }
+.tk-agente { box-sizing: border-box; height: 20px; padding: 0 8px 0 3px; }
+.tk-pet { flex: none; width: 16px; height: 16px; display: inline-flex; align-items: flex-end; justify-content: center; }
+.tk-pet .pet-mini { zoom: .4; width: 40px; height: 40px; margin: 0; }
+.tk-agente.rodando { border-color: var(--tom); margin-left: 0; font-size: 11px; color: var(--tom); }
+.tk-agente.rodando::after { content: "●"; font-size: 8px; line-height: 1; animation: pisca-passo 1s ease-in-out infinite; }
 .tk-agente.erro, .tk-agente.interrompido { color: var(--erro); border-color: color-mix(in srgb, var(--erro) 55%, transparent); }
 .tk-agente.concluido { opacity: .75; }
 .tk-agente.pisca { background: color-mix(in srgb, var(--tom) 35%, transparent); }
@@ -217,9 +219,11 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         return t.status === 'pending' ? 0 : 0.5;
     };
     const todosSubs = (c) => [...c.tarefas.flatMap(t => t.subagentes), ...c.subagentesSoltos];
+    const ativo = (s) => s.status === 'rodando';
+    const agentesAtivos = (c) => todosSubs(c).filter(ativo);
     const progressoConversa = (c) => c.tarefas.length ? c.tarefas.reduce((s, t) => s + progressoTarefa(t), 0) / c.tarefas.length : (todosSubs(c).every(s => s.status !== 'rodando') ? 1 : 0.5);
     const absorvida = (c) => !c.vivo && progressoConversa(c) >= 1 && Date.now() - c.ultimo > MINUTOS_ABSORVE * 60000;
-    const passaFiltro = (c) => (prefs.filtro === 'todas' || (prefs.filtro === 'ativas' && c.vivo) || (prefs.filtro === 'esperando' && c.esperando) || (prefs.filtro === 'agentes' && todosSubs(c).length > 0))
+    const passaFiltro = (c) => (prefs.filtro === 'todas' || (prefs.filtro === 'ativas' && c.vivo) || (prefs.filtro === 'esperando' && c.esperando) || (prefs.filtro === 'agentes' && agentesAtivos(c).length > 0))
         && (!prefs.filtroModelo || familiaModelo(c.modelo) === prefs.filtroModelo || todosSubs(c).some(s => familiaModelo(s.modelo) === prefs.filtroModelo));
     const visiveisAgora = () => dados.conversas.filter(c => passaFiltro(c) && (prefs.absorvidas || !absorvida(c))).sort((a, b) => a.id.localeCompare(b.id));
     const situacao = (c) => c.esperando ? 'esperando você' : c.vivo ? 'trabalhando' : 'parada';
@@ -236,7 +240,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     }
     const itemPasso = (t) => `<li class="${escapa(t.status)}"><i class="marcador"></i><span>${escapa(t.texto)}</span></li>`;
     // MASCOTE DO AGENTE: O MESMO petMini DO APP (COM A PERSONALIZACAO DO USUARIO); SEM ELE, VOLTA AO LOSANGO
-    const petDoAgente = (s) => typeof petMini === 'function' ? petMini(s.tipo, s.status === 'rodando') : '◆ ';
+    const petDoAgente = (s) => `<span class="tk-pet">${typeof petMini === 'function' ? petMini(s.tipo, s.status === 'rodando') : '◆'}</span>`;
     const chipAgente = (s) => `<span class="tk-agente ${escapa(s.status)}" data-agente="${escapa(s.id)}" style="--tom:${tomModelo(s.modelo)}" title="${escapa(s.descricao || s.tipo)} · ${escapa(s.status)}${s.modelo ? ' · ' + escapa(nomeModelo(s.modelo)) : ''}">${petDoAgente(s)}${escapa(cortaTexto(s.tipo, 24))}${s.modelo ? `<i>${glifoModelo(s.modelo, 11)}${escapa(IDENTIDADE_MODELO[familiaModelo(s.modelo)].nome)}</i>` : ''}</span>`;
     // "AGORA" DO CARTAO: A PERGUNTA PENDENTE (ESPERANDO VOCE) OU A ACAO EM CURSO (TRABALHANDO)
     const VERBO_ACAO = { comando: 'Rodando:', edicao: 'Editando', leitura: 'Lendo', busca: 'Procurando', agente: 'Agente:', web: 'Acessando', skill: 'Skill:', ferramenta: 'Usando' };
@@ -249,7 +253,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         const feitas = c.tarefas.filter(t => t.status === 'completed').length, p = progressoConversa(c);
         const { inicio, fim } = janelaTarefas(c.tarefas);
         const passos = c.tarefas.length ? `<ol class="passos">${inicio > 0 ? `<li class="mais" data-n="${inicio}">${inicio === 1 ? 'anterior' : 'anteriores'}</li>` : ''}${c.tarefas.slice(inicio, fim).map(itemPasso).join('')}${fim < c.tarefas.length ? `<li class="mais" data-n="${c.tarefas.length - fim}">${c.tarefas.length - fim === 1 ? 'restante' : 'restantes'}</li>` : ''}</ol>` : '<p class="tk-meta" style="margin:0">Sem lista de tarefas</p>';
-        const subs = todosSubs(c);
+        const subs = agentesAtivos(c);
         return `<div class="tk-cab"><b title="${escapa(c.titulo)}">${escapa(c.titulo)}</b><span class="tk-pct">${Math.round(p * 100)}%</span></div>
             <div class="tk-meta">${chipModelo(c.modelo)}<span class="tk-sit">${situacao(c)}</span><span>· ${feitas} de ${c.tarefas.length}</span></div>
             ${htmlAgora(c)}<div class="barra"><div style="width:${Math.round(p * 100)}%"></div></div>${passos}
@@ -451,7 +455,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     }
     function atualizaContadores() {
         const base = dados.conversas.filter(c => prefs.absorvidas || !absorvida(c));
-        const conta = { todas: base.length, ativas: base.filter(c => c.vivo).length, esperando: base.filter(c => c.esperando).length, agentes: base.filter(c => todosSubs(c).length).length };
+        const conta = { todas: base.length, ativas: base.filter(c => c.vivo).length, esperando: base.filter(c => c.esperando).length, agentes: base.filter(c => agentesAtivos(c).length).length };
         for (const b of $('tkFiltros').querySelectorAll('button')) { b.querySelector('.n').textContent = conta[b.dataset.f]; b.setAttribute('aria-pressed', String(b.dataset.f === prefs.filtro)); }
         const familias = new Map();
         for (const c of base) for (const f of new Set([familiaModelo(c.modelo), ...todosSubs(c).map(s => familiaModelo(s.modelo))])) familias.set(f, (familias.get(f) || 0) + 1);
@@ -601,8 +605,8 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
             <div class="acoes"><button class="botao principal" data-tk-abrir>Abrir conversa</button></div>
             <div class="cabeca-plano"><span>Tarefas</span><span>${feitas} de ${c.tarefas.length} · ${Math.round(p * 100)}%</span></div>
             <div class="barra"><div style="width:${Math.round(p * 100)}%"></div></div>
-            ${c.tarefas.map(t => `<ol class="passos">${itemPasso(t)}</ol>${subs(t.subagentes)}`).join('') || '<p class="nota">Sem lista de tarefas.</p>'}
-            ${c.subagentesSoltos.length ? '<h4>Subagentes da conversa</h4>' + subs(c.subagentesSoltos) : ''}`;
+            ${c.tarefas.map(t => `<ol class="passos">${itemPasso(t)}</ol>${subs(t.subagentes.filter(ativo))}`).join('') || '<p class="nota">Sem lista de tarefas.</p>'}
+            ${c.subagentesSoltos.some(ativo) ? '<h4>Subagentes da conversa</h4>' + subs(c.subagentesSoltos.filter(ativo)) : ''}`;
         if (novo !== htmlGaveta) {
             const rolagem = gaveta.scrollTop, focado = document.activeElement && gaveta.contains(document.activeElement) ? [...gaveta.querySelectorAll('button')].indexOf(document.activeElement) : -1;
             gaveta.innerHTML = novo;
@@ -818,7 +822,8 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 
     // SELO DO BOTAO TASKS NA LISTA: VEM DO /api/sessoes (A CADA 5 S), SEM CHAMAR /api/tasks COM A VISAO FECHADA
     function atualizaSelo(sessoes) {
-        const limite = Date.now() - HORAS_SELO * 3600 * 1000, recentes = (sessoes || []).filter(s => s.atualizado >= limite);
+        const limite = Date.now() - HORAS_SELO * 3600 * 1000, arquivadas = new Set((typeof dadosPainel !== 'undefined' && dadosPainel.arquivadas) || []);
+        const recentes = (sessoes || []).filter(s => s.atualizado >= limite && !arquivadas.has(s.projeto + '/' + s.id));
         const andamento = recentes.reduce((n, s) => n + (s.tarefasAndamento || 0), 0), trabalhando = recentes.some(s => s.ativa);
         for (const b of botoesTasks()) {
             const selo = b.querySelector('.selo-tasks'), ponto = b.querySelector('.ponto-tasks');

@@ -889,8 +889,9 @@ function montaTasks(itens) {
 function listaTasks() {
     const limite = Date.now() - HORAS_TASKS * 3600 * 1000;
     const itens = [];
+    const arquivadas = new Set(leDados().arquivadas || []);
     for (const s of sessoesParaTasks()) {
-        if (s.atualizado < limite) continue;
+        if (s.atualizado < limite || arquivadas.has(s.projeto + '/' + s.id)) continue;
         const achado = arquivoDaSessao(s.projeto, s.id);
         const item = achado && cache.get(achado.arquivo);
         if (!item) continue;
