@@ -190,7 +190,8 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 .tk-subcartao .tk-pet { width: 18px; height: 18px; }
 .tk-subcartao .tk-pet .pet-mini { zoom: .45; }
 @media (prefers-reduced-motion: reduce) { .tk-subcartao .tk-agora::before, .tk-subcartao .pet-corpo, .tk-subcartao .pet-item, .tk-subcartao .pet-corpo::before, .tk-subcartao .pet-corpo::after { animation: none !important; } }
-#btnModoTasks { position: relative; }
+#btnModoTasks { position: relative; min-width: 0; overflow: hidden; }
+#btnModoTasks > span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 #btnModoTasks .ponto-tasks { position: absolute; top: 3px; left: 5px; }
 .selo-tasks { font: 600 10.5px/15px var(--mono); min-width: 15px; padding: 0 5px; border-radius: 8px; background: color-mix(in srgb, var(--tinta) 10%, transparent); color: var(--tinta); text-align: center; }
 .trilho-lista .selo-tasks { position: absolute; top: 1px; right: 1px; background: var(--voce); color: #fff; font-size: 9.5px; line-height: 14px; min-width: 14px; padding: 0 4px; }
@@ -290,9 +291,9 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     const classeSituacao = (c) => c.esperando ? 'esperando' : c.vivo ? 'viva' : 'parada';
 
     // CARTAO DA CONVERSA: MESMO DNA DO CARTAO "PLANO" (BARRA + PASSOS + MARCADORES)
-    function janelaTarefas(tarefas) {
+    function janelaTarefas(tarefas, linhas = LINHAS_CARTAO) {
         const n = tarefas.length, atual = Math.max(0, tarefas.findIndex(t => t.status === 'in_progress'));
-        let inicio = Math.max(0, Math.min(atual - 1, n - LINHAS_CARTAO)), fim = Math.min(n, inicio + LINHAS_CARTAO);
+        let inicio = Math.max(0, Math.min(atual - 1, n - linhas)), fim = Math.min(n, inicio + linhas);
         if (inicio > 0) { inicio += 1; }
         if (fim < n) { fim -= 1; }
         if (inicio > 0 && fim <= inicio) fim = inicio + 1;
@@ -339,9 +340,8 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         return `<div class="tk-agora acao" title="${escapa(a && a.texto ? a.texto : rotulo)}"><b>${escapa(rotulo)}</b>${a && a.texto ? `<span>${escapa(a.texto)}</span>` : ''}</div>`;
     }
     function htmlSubCartao(s) {
-        const n = s.tarefas.length, atual = Math.max(0, s.tarefas.findIndex(t => t.status === 'in_progress'));
-        const inicio = Math.max(0, Math.min(atual - 1, n - LINHAS_SUB)), fim = Math.min(n, inicio + LINHAS_SUB - (n > LINHAS_SUB ? 1 : 0));
-        const passos = n ? `<ol class="passos">${s.tarefas.slice(inicio, fim).map(itemPasso).join('')}${fim < n ? `<li class="mais" data-n="${n - fim}">${n - fim === 1 ? 'restante' : 'restantes'}</li>` : ''}</ol>` : '';
+        const n = s.tarefas.length, { inicio, fim } = janelaTarefas(s.tarefas, LINHAS_SUB);
+        const passos = n ? `<ol class="passos">${inicio > 0 ? `<li class="mais" data-n="${inicio}">${inicio === 1 ? 'anterior' : 'anteriores'}</li>` : ''}${s.tarefas.slice(inicio, fim).map(itemPasso).join('')}${fim < n ? `<li class="mais" data-n="${n - fim}">${n - fim === 1 ? 'restante' : 'restantes'}</li>` : ''}</ol>` : '';
         return `<div class="tk-sub-cab">${petDoAgente(s)}<b title="${escapa(s.tipo)}">${escapa(s.tipo)}</b>${s.modelo ? chipModelo(s.modelo) : ''}</div>
             ${s.descricao ? `<div class="tk-sub-desc" title="${escapa(s.descricao)}">${escapa(s.descricao)}</div>` : ''}
             ${htmlAgoraAgente(s)}${passos}`;
@@ -388,7 +388,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     }
     // RETANGULO OCUPADO PELO CARTAO E SEUS SUB-CARTOES
     function pegada(k) {
-        const extra = extraSubs(k), esquerda = k.lado < 0 || (k.fixo && k.x + LARGURA_CARTAO / 2 < centro().x);
+        const extra = extraSubs(k), esquerda = k.fixo ? k.x + LARGURA_CARTAO / 2 < centro().x : k.lado < 0;
         return { x: esquerda ? k.x - extra : k.x, y: k.y, w: LARGURA_CARTAO + extra, h: alturaTotal(k) };
     }
     // CARTAO AUTOMATICO QUE CAIU EM CIMA DE UM FIXADO (OU DO CHIP) DESCE ATE ACHAR LUGAR
@@ -648,7 +648,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         // ANEL: UM SEGMENTO POR CONVERSA, PREENCHIDO PELO PROGRESSO DELA NA COR DO MODELO (SEM SEGMENTO = SO O FUNDO)
         const n = visiveis.length, folga = n > 1 ? 3 : 0, cada = 100 / Math.max(n, 1);
         const segmentos = visiveis.map((c, i) => {
-            const ini = i * cada + folga / 2, comp = cada - folga, p = progressoConversa(c), cor = tomModelo(c.modelo);
+            const ini = i * cada + folga / 2, comp = Math.max(0.5, cada - folga), p = progressoConversa(c), cor = tomModelo(c.modelo);
             return `<circle cx="31" cy="31" r="27" pathLength="100" stroke-dasharray="${comp} 100" stroke-dashoffset="${-ini}" style="stroke:color-mix(in srgb, ${cor} 35%, var(--linha))"/>`
                 + (p > 0 ? `<circle class="trilho-seg" cx="31" cy="31" r="27" pathLength="100" stroke-dasharray="${(comp * p).toFixed(2)} 100" stroke-dashoffset="${-ini}" style="stroke:${c.esperando ? 'var(--atencao)' : cor}"/>` : '');
         }).join('');
@@ -801,7 +801,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         const { width, height } = entrada.contentRect;
         const antes = tamanhoPalco;
         tamanhoPalco = width && height ? { width, height } : null;
-        if (antes && tamanhoPalco && (antes.width !== width || antes.height !== height) && !janela.hidden && dados) ajusta();
+        if (antes && tamanhoPalco && (antes.width !== width || antes.height !== height) && !janela.hidden) { cobreFundo(true); if (dados) ajusta(); }
     }).observe(palco);
 
     function aplicaFoco() {
@@ -860,6 +860,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         quadros.forEach(cancelAnimationFrame); quadros = new Set();
         gPulsos.textContent = '';
         emVoo.clear();
+        for (const [id, u] of subsPorId) if (u.saindo) { u.el.remove(); u.trilha.remove(); subsPorId.delete(id); }
     }
     // PULSO NUMA TRILHA: A DA CONVERSA (PINO -> CARTAO) OU A DO AGENTE (CARTAO -> SUB-CARTAO).
     // "IN" E "BACK" CORREM CONTRA O PATH (RUMO A QUEM RECEBE), "OUT" E "SPAWN" A FAVOR
@@ -889,7 +890,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
             }
             if (t < 1) return quadro(passo);
             camadas.forEach(c => c.el.remove());
-            emVoo.set(fonte, Math.max(0, (emVoo.get(fonte) || 1) - 1));
+            if ((emVoo.get(fonte) || 0) <= 1) emVoo.delete(fonte); else emVoo.set(fonte, emVoo.get(fonte) - 1);
             if (!trilha.isConnected) return;
             if (!elo.pontas || elo.pontas.d !== d) elo.pontas = { d, ini: trilha.getPointAtLength(0), fim: trilha.getPointAtLength(len) };
             clarao(paraOrigem ? elo.pontas.ini : elo.pontas.fim, cor, esmaece);

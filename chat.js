@@ -590,9 +590,16 @@ async function acaoMcp(sessionId, servidor, acao) {
 // Mensagem entregue à fila do processo e ainda não vista no transcript: a Tasks mostra como "na fila"
 function registraEnfileirada(viva, texto) {
     (viva.enfileiradas = viva.enfileiradas || []).push({ texto: String(texto || '').slice(0, 400), hora: new Date().toISOString() });
+    if (viva.enfileiradas.length > 20) viva.enfileiradas.splice(0, viva.enfileiradas.length - 20);
 }
 // Listas vivas (por referência) para o servidor podar o que já apareceu no transcript
 function enfileiradas() {
+    const limite = Date.now() - 10 * 60 * 1000;
+    for (const c of conversas.values()) {
+        if (!c.enfileiradas || !c.enfileiradas.length) continue;
+        const rodando = c.vivo && (c.status === 'rodando' || c.status === 'parando');
+        c.enfileiradas = rodando ? c.enfileiradas.filter(i => Date.parse(i.hora) >= limite) : [];
+    }
     return [...conversas.values()].filter(c => c.vivo && c.enfileiradas && c.enfileiradas.length).map(c => ({ sessionId: c.sessionId, chave: c.chave, itens: c.enfileiradas }));
 }
 function estado() {

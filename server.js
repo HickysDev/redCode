@@ -277,10 +277,12 @@ function acertaIdTarefa(estado, b) {
     delete estado.tarefasCriadas[b.tool_use_id];
     const texto = Array.isArray(b.content) ? b.content.map(c => c.text || '').join('\n') : String(b.content || '');
     const real = (texto.match(/Task #(\d+) created/) || [])[1];
+    if (!real && !b.is_error) console.warn('TaskCreate sem "Task #N created" no resultado; fica o id sequencial:', texto.slice(0, 80));
     if (b.is_error || !real || real === provisorio || !estado.tarefas[provisorio] || estado.tarefas[real]) return;
     const reordenadas = {};
     for (const [id, t] of Object.entries(estado.tarefas)) reordenadas[id === provisorio ? real : id] = t;
     estado.tarefas = reordenadas;
+    estado.plano = Object.values(estado.tarefas);
     estado.ultimaTarefa = Math.max(estado.ultimaTarefa, Number(real));
 }
 
@@ -381,6 +383,12 @@ function processaRegistro(estado, r, origem) {
         (estado.cwds = estado.cwds || {})[chat.pastaDoProjeto(r.cwd).toLowerCase()] = r.cwd;
     }
     if (r.type === 'ai-title') { estado.titulo = r.aiTitle; return; }
+    if (r.type === 'queue-operation' && r.operation === 'enqueue' && /^\s*<task-notification>/.test(String(r.content || ''))) {
+        const campo = (nome) => ((String(r.content).match(new RegExp(`<${nome}>([\\s\\S]*?)</${nome}>`)) || [])[1] || '').trim();
+        const id = campo('task-id');
+        if (id) { estado.tarefasNotificadas[id] = campo('status'); (estado.horaNotificacao = estado.horaNotificacao || {})[id] = r.timestamp; }
+        return;
+    }
     // Modo de permissão em uso: vem gravado nas suas mensagens
     if (r.type === 'user' && r.permissionMode && !r.isSidechain) estado.modo = r.permissionMode;
     if (r.type === 'cost-state') { estado.custo = r.totalCostUSD; return; }
@@ -435,10 +443,11 @@ function processaRegistro(estado, r, origem) {
     if (r.type === 'user') {
         // Aviso do sistema sobre tarefa/agente (<task-notification>): não é mensagem sua
         const textoBruto = typeof msg.content === 'string' ? msg.content : ((msg.content || []).find(b => b.type === 'text') || {}).text || '';
-        if (!r.isSidechain && /^\s*<task-notification>/.test(textoBruto)) {
+        if (/^\s*<task-notification>/.test(textoBruto)) {
             const campo = (nome) => ((textoBruto.match(new RegExp(`<${nome}>([\\s\\S]*?)</${nome}>`)) || [])[1] || '').trim();
             const situacao = campo('status');
             if (campo('task-id')) { estado.tarefasNotificadas[campo('task-id')] = situacao; (estado.horaNotificacao = estado.horaNotificacao || {})[campo('task-id')] = r.timestamp; }
+            if (r.isSidechain) return;
             estado.turnoEncerrado = false;
             adicionaEvento(estado, {
                 tipo: 'notificacao', hora: r.timestamp, situacao,
@@ -712,7 +721,10 @@ function leSubagentes(pastaSessao, estadoPai) {
             id: chave, tipoAgente: meta.agentType, descricao: meta.description, inicio: sub.inicio, status: 'rodando',
         });
         agente.tipoAgente = meta.agentType || agente.tipoAgente;
-        agente.modelo = sub.modelo || agente.modelo;
+        agente.modelo = sub.modelo || agente.modelo || meta.model || '';
+        // AGENTE ANINHADO (LANCADO POR OUTRO SUBAGENTE): O AVISO DE TERMINO FICA NO TRANSCRIPT DO AGENTE PAI, NAO NO DA CONVERSA
+        const fontes = [estadoPai];
+        if (meta.parentAgentId) { const arqPai = path.join(pasta, `agent-${meta.parentAgentId}.jsonl`); if (fs.existsSync(arqPai)) fontes.push(leIncremental(arqPai, estadoVazio, processaRegistro)); }
         agente.tokens = sub.tokens;
         agente.contexto = sub.ultimoContexto || 0;
         agente.ultimasAcoes = sub.eventos.filter(e => !['pedido', 'pensou'].includes(e.tipo)).slice(-8).map(e => ({ tipo: e.tipo, texto: e.texto }));
@@ -723,16 +735,21 @@ function leSubagentes(pastaSessao, estadoPai) {
         const parado = Date.now() - mtime > 10 * 60 * 1000;
         // O aviso do sistema (<task-notification>) é a fonte mais confiável: diz se terminou ou parou
         const idAgente = nome.replace(/^agent-/, '').replace(/\.meta\.json$/, '');
-        const aviso = estadoPai.tarefasNotificadas[idAgente];
+        const horaDe = (e) => (e.horaNotificacao && e.horaNotificacao[idAgente]) || '';
+        const dono = fontes.sort((a, b) => Date.parse(horaDe(b) || 0) - Date.parse(horaDe(a) || 0))[0];
+        const aviso = dono.tarefasNotificadas[idAgente];
         if (aviso && /stopped|failed|killed|error/i.test(aviso)) agente.status = 'interrompido';
         else if (aviso && /completed|finished|done|success/i.test(aviso)) agente.status = 'concluido';
         else if (meta.finished === true || (agente.status === 'rodando' && parado)) {
             agente.status = agente.status === 'erro' ? 'erro' : 'concluido';
         }
-        // Retomado por SendMessage: atividade no transcript depois da última notificação e arquivo mexido há pouco
-        // = rodando de novo (vale mais que o aviso antigo, o meta.finished e o status do tool_result)
-        const horaAviso = estadoPai.horaNotificacao && estadoPai.horaNotificacao[idAgente];
-        const retomado = sub.ultimo && (!horaAviso || Date.parse(sub.ultimo) > Date.parse(horaAviso)) && Date.now() - mtime < SEGUNDOS_ATIVA * 1000;
+        // Retomado por SendMessage: atividade no transcript depois da última notificação de término e arquivo mexido
+        // há pouco = rodando de novo (vale mais que o aviso antigo e o meta.finished).
+        // SO AGENTE EM SEGUNDO PLANO EMITE task-notification (CONFERIDO NO .jsonl: 15 AGENTES, 5 NOTIFICADOS, TODOS BG);
+        // O DE PRIMEIRO PLANO TERMINA PELO tool_result, ENTAO SEM AVISO SO VALE O STATUS QUE ELE JA TEM
+        const horaAviso = horaDe(dono) || null;
+        const recente = Date.now() - mtime < SEGUNDOS_ATIVA * 1000;
+        const retomado = !!sub.ultimo && recente && !!horaAviso && Date.parse(sub.ultimo) > Date.parse(horaAviso);
         if (retomado) { agente.status = 'rodando'; agente.fim = null; }
         // Fim = última atividade registrada do agente (vale também para os de segundo plano)
         if (agente.status !== 'rodando' && sub.ultimo) agente.fim = sub.ultimo;
@@ -840,7 +857,7 @@ function listaSessoes(opcoes = {}) {
                 ativa: situacao.ativa, esperando: situacao.esperando, agentesRodando: situacao.agentesRodando,
                 pergunta: !!estado.pergunta, fimTurno: estado.fimTurno,
                 // Selo do botão Tasks na lista (conta sem chamar /api/tasks)
-                tarefasAndamento: estado.plano.filter(i => i.status === 'in_progress').length,
+                tarefasAndamento: (() => { const pd = planoDoPedido(estado); return pd.planoAtual ? pd.tarefas.filter(i => i.status === 'in_progress').length : 0; })(),
                 // O que ela está fazendo agora (ferramenta ainda sem resposta), para a lista lateral
                 acaoAtual: situacao.ativa ? (() => {
                     const e = [...estado.eventos].reverse().find(x => x.id && !x.fim);
@@ -856,13 +873,14 @@ function listaSessoes(opcoes = {}) {
 }
 
 // Visão Tasks: conversas das últimas 24 h com lista de tarefas ou subagente, montadas do cache já lido.
-// A lista de sessões é reaproveitada por 2 s e o corpo só é remontado quando a "versão" (mtime, situação,
-// status dos agentes, seq dos pulsos) muda: o 304 sai sem varrer disco nem serializar nada.
+// A lista de sessões (e o dados.json) é reaproveitada por ~4,5 s, então a maioria dos polls de 2 s não varre o
+// disco; o corpo só é remontado quando a "versão" (mtime, situação, status dos agentes, seq dos pulsos) muda,
+// e o 304 não serializa nada.
 const HORAS_TASKS = 24;
 const SEGUNDOS_PULSOS = 30;
 const LIMITE_PULSOS_NO = 60;
-const CACHE_SESSOES_TASKS_MS = 2000;
-let sessoesTasks = { hora: 0, lista: [] };
+const CACHE_SESSOES_TASKS_MS = 4500;
+let sessoesTasks = { hora: 0, lista: [], arquivadas: new Set() };
 let corpoTasks = { versao: null, corpo: null };
 function pulsosRecentes(pulsos) {
     const desde = Date.now() - SEGUNDOS_PULSOS * 1000;
@@ -872,16 +890,27 @@ function tarefasDoPlano(plano) {
     return (plano || []).map(t => ({ texto: corta(t.texto, 120), status: t.status || 'pending' }));
 }
 function sessoesParaTasks() {
-    if (Date.now() - sessoesTasks.hora > CACHE_SESSOES_TASKS_MS) sessoesTasks = { hora: Date.now(), lista: listaSessoes({ semVigia: true }) };
+    if (Date.now() - sessoesTasks.hora > CACHE_SESSOES_TASKS_MS) sessoesTasks = { hora: Date.now(), lista: listaSessoes({ semVigia: true }), arquivadas: new Set(leDados().arquivadas || []) };
     return sessoesTasks.lista;
+}
+// PLANO DO ULTIMO PEDIDO: TASKCREATE ACUMULA NA CONVERSA, ENTAO SAI O QUE FOI CRIADO E CONCLUIDO ANTES DELE;
+// PLANO FEITO ANTES DO ULTIMO PEDIDO (COMO NO CARTAO PLANO DO APP) E ANTIGO
+function planoDoPedido(estado) {
+    const principais = estado.eventos.filter(e => e.tipo === 'pedido' && !e.comentario && e.uuid);
+    const atual = principais[principais.length - 1] || null;
+    const inicio = atual ? Date.parse(atual.hora) : 0;
+    const antigo = !!(estado.planoHora && atual && Date.parse(estado.planoHora) < inicio);
+    const doPedido = (t) => !(t.criada && Date.parse(t.criada) < inicio && t.status === 'completed');
+    const tarefas = estado.plano.filter(doPedido);
+    return { pedidoAtual: atual, planoAtual: !antigo && tarefas.length > 0, doPedido, tarefas };
 }
 // TaskUpdate deleted desloca os índices do plano: o id da tarefa (chave de estado.tarefas) é o que vale
 function indiceTarefaPai(estado, a) {
-    if (a.tarefaPaiId != null && estado.tarefas[a.tarefaPaiId]) return Object.keys(estado.tarefas).indexOf(a.tarefaPaiId);
+    if (a.tarefaPaiId != null) return estado.tarefas[a.tarefaPaiId] ? Object.keys(estado.tarefas).indexOf(a.tarefaPaiId) : -1;
     return a.tarefaPai;
 }
 // Solicitações da conversa: o pedido que abriu o turno, os comentários entregues no meio dele e o que ainda está na fila
-const normalizaTexto = (s) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+const normalizaTexto = (s) => limpaTextoUsuario(String(s || '')).replace(/\s+/g, ' ').trim().slice(0, 60);
 function solicitacoes(s, estado) {
     const pedidos = estado.eventos.filter(e => e.tipo === 'pedido');
     const principais = pedidos.filter(e => !e.comentario && e.uuid);
@@ -907,19 +936,20 @@ function montaTasks(itens) {
         const sol = solicitacoes(s, estado);
         const tarefasTodas = tarefasDoPlano(estado.plano).map((t, i) => ({ ...t, subagentes: [], criada: estado.plano[i].criada }));
         const subagentesSoltos = [];
-        for (const a of Object.values(estado.agentes)) {
+        const agentes = Object.values(estado.agentes), rodando = agentes.filter(a => a.status === 'rodando');
+        const concluidos = agentes.filter(a => a.status !== 'rodando').sort((a, b) => Date.parse(b.fim || b.inicio || 0) - Date.parse(a.fim || a.inicio || 0)).slice(0, 5);
+        for (const a of [...rodando, ...concluidos]) {
+            const ativo = a.status === 'rodando', recemTerminado = !ativo && a.fim && Date.now() - Date.parse(a.fim) < SEGUNDOS_PULSOS * 1000;
             const sub = {
                 id: a.id, tipo: a.tipoAgente || 'agente', descricao: corta(a.descricao, 80), status: a.status, modelo: a.modelo || null,
-                inicio: a.inicio || null, fim: a.fim || null, pulsos: pulsosRecentes(a.pulsos), tarefas: tarefasDoPlano(a.plano),
-                acaoAtual: a.status === 'rodando' ? a.acaoAtual || null : null,
+                inicio: a.inicio || null, fim: a.fim || null, pulsos: ativo || recemTerminado ? pulsosRecentes(a.pulsos) : [], tarefas: ativo ? tarefasDoPlano(a.plano) : [],
+                acaoAtual: ativo ? a.acaoAtual || null : null,
             };
             const pai = tarefasTodas[indiceTarefaPai(estado, a)];
             if (pai) pai.subagentes.push(sub);
             else subagentesSoltos.push(sub);
         }
-        // PLANO DO ULTIMO PEDIDO: TASKCREATE ACUMULA NA CONVERSA, ENTAO SAI O QUE FOI CRIADO E CONCLUIDO ANTES DELE
-        const inicioPedido = sol.pedidoAtual ? Date.parse(sol.pedidoAtual.hora) : 0;
-        const doPedido = (t) => !(t.criada && Date.parse(t.criada) < inicioPedido && t.status === 'completed');
+        const { doPedido } = planoDoPedido(estado);
         let tarefas = tarefasTodas.filter(doPedido);
         if (!tarefas.length) { sol.planoAtual = false; tarefas = tarefasTodas; }
         else tarefasTodas.filter(t => !doPedido(t)).forEach(t => subagentesSoltos.push(...t.subagentes.filter(x => x.status === 'rodando')));
@@ -937,8 +967,8 @@ function montaTasks(itens) {
 function listaTasks() {
     const limite = Date.now() - HORAS_TASKS * 3600 * 1000;
     const itens = [];
-    const arquivadas = new Set(leDados().arquivadas || []);
-    for (const s of sessoesParaTasks()) {
+    const sessoes = sessoesParaTasks(), arquivadas = sessoesTasks.arquivadas;
+    for (const s of sessoes) {
         // SO CONVERSA PROCESSANDO OU COM PERGUNTA SEM RESPOSTA: TURNO ENCERRADO NAO PEDE NADA AO USUARIO
         if (s.atualizado < limite || arquivadas.has(s.projeto + '/' + s.id) || !(s.ativa || s.pergunta)) continue;
         const achado = arquivoDaSessao(s.projeto, s.id);
@@ -952,7 +982,7 @@ function listaTasks() {
         s.id, s.atualizado, s.ativa, s.esperando, s.titulo, s.modelo, estado.pergunta && estado.pergunta.texto, s.acaoAtual && s.acaoAtual.texto,
         JSON.stringify(solicitacoes(s, estado)),
         estado.plano.map(t => t.status + t.texto).join(','),
-        Object.values(estado.agentes).map(a => [a.id, a.status, a.modelo, a.fim, (a.plano || []).map(t => t.status).join(''), a.acaoAtual && a.acaoAtual.tipo + a.acaoAtual.texto].join(':')).join(','),
+        Object.values(estado.agentes).map(a => [a.id, a.status, a.modelo, a.fim, (a.plano || []).map(t => t.status + t.texto).join(';'), a.acaoAtual && a.acaoAtual.tipo + ':' + a.acaoAtual.texto].join('|')).join(','),
     ].join('|')).join('\n') + '|' + seqPulso;
     if (corpoTasks.versao !== versao) {
         const corpo = montaTasks(itens);
