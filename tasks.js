@@ -447,8 +447,9 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         for (const [lado, lista] of Object.entries(grupos)) {
             const horizontal = lado === 'dir' || lado === 'esq', sinal = lado === 'dir' || lado === 'baixo' ? 1 : -1;
             const ordenada = lista.slice().sort((a, b) => horizontal ? a.cy - b.cy : a.cx - b.cx), n = ordenada.length;
+            const pinos = pinosAlinhados(ordenada.map(k => (horizontal ? k.cy - o.y : k.cx - o.x)));
             ordenada.forEach((k, i) => {
-                const { t, pad } = posPino(i, n);
+                const { t, pad } = pinos[i];
                 k.pinoX = horizontal ? o.x + sinal * CHIP / 2 : o.x + t;
                 k.pinoY = horizontal ? o.y + t : o.y + sinal * CHIP / 2;
                 k.padEl = pad == null ? null : pads[lado][pad];
@@ -613,6 +614,15 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         }
     }
     // PINO DA TRILHA i DE n NUM LADO: ENCAIXA NOS PADS (CENTRADOS, ESPACADOS DE 2 EM 2 QUANDO CABE); ACIMA DE 9, DISTRIBUI CONTINUO
+    // CADA TRILHA SAI DO PAD MAIS ALINHADO COM O CARTAO, SEM REPETIR PAD E SEM CRUZAR (ORDEM PRESERVADA)
+    function pinosAlinhados(deslocamentos) {
+        const n = deslocamentos.length;
+        if (n > N_PADS) return deslocamentos.map((_, i) => posPino(i, n));
+        const meio = (N_PADS - 1) / 2, idx = deslocamentos.map(d => Math.max(0, Math.min(N_PADS - 1, Math.round(meio + d / PASSO_PAD))));
+        for (let i = 1; i < n; i++) idx[i] = Math.max(idx[i], idx[i - 1] + 1);
+        for (let i = n - 1; i >= 0; i--) idx[i] = Math.min(idx[i], (i === n - 1 ? N_PADS - 1 : idx[i + 1] - 1));
+        return idx.map(p => ({ t: (p - meio) * PASSO_PAD, pad: p }));
+    }
     function posPino(i, n) {
         if (n > N_PADS) return { t: (i - (n - 1) / 2) * Math.min(PASSO_PAD, (CHIP - 44) / (n - 1)), pad: null };
         const salto = n * 2 - 1 <= N_PADS ? 2 : 1, idx = Math.round((N_PADS - 1) / 2 + (i - (n - 1) / 2) * salto);
