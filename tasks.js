@@ -54,14 +54,24 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 .tk-svg { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
 .tk-trilha { fill: none; stroke: var(--trilha, var(--linha)); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; transition: opacity .2s, stroke .2s; }
 .tk-trilha.acesa { stroke: var(--voce); }
-.tk-pino { stroke: var(--linha); stroke-width: 1.5; stroke-linecap: round; }
+.tk-pino { fill: color-mix(in srgb, var(--linha) 80%, var(--grafite)); }
 .tk-pino-ativo { fill: var(--trilha, var(--linha)); }
 .tk-pulso { fill: none; stroke-linecap: round; pointer-events: none; }
-.tk-chip-centro { position: absolute; width: ${CHIP}px; height: ${CHIP}px; border: 1px solid var(--linha); border-radius: 12px; background: var(--folha); box-shadow: var(--sombra); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; cursor: grab; user-select: none; }
-.tk-chip-centro svg { width: 34px; height: 34px; color: var(--voce); margin-bottom: 4px; }
-.tk-chip-centro b { font: 600 14px var(--sans); }
-.tk-chip-centro .tk-pct { font: 600 20px var(--sans); }
-.tk-chip-centro small { font: 11px/1.3 var(--mono); color: var(--grafite); padding: 0 8px; }
+.tk-chip-centro { position: absolute; margin: 0; box-sizing: border-box; width: ${CHIP}px; height: ${CHIP}px; border: 1px solid var(--linha); border-radius: 16px; background: linear-gradient(160deg, color-mix(in srgb, var(--realce) 70%, var(--folha)), var(--folha) 60%); box-shadow: var(--sombra), inset 0 1px 0 color-mix(in srgb, var(--tinta) 6%, transparent); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-align: center; cursor: grab; user-select: none; }
+.tk-chip-centro::before { content: ""; position: absolute; inset: 12px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--linha) 70%, transparent); pointer-events: none; }
+.tk-chip-centro::after { content: ""; position: absolute; top: 19px; left: 19px; width: 5px; height: 5px; border-radius: 50%; background: var(--linha); }
+.tk-chip-nucleo { position: relative; width: 62px; height: 62px; display: grid; place-items: center; margin-bottom: 2px; }
+.tk-chip-nucleo .tk-anel { position: absolute; inset: 0; width: 62px; height: 62px; transform: rotate(-90deg); }
+.tk-anel circle { fill: none; stroke-width: 3; }
+.tk-anel .fundo { stroke: color-mix(in srgb, var(--linha) 70%, transparent); }
+.tk-anel .arco { stroke: var(--voce); stroke-linecap: round; transition: stroke-dasharray .6s var(--entrada, ease); }
+.tk-chip-nucleo > svg:not(.tk-anel) { width: 28px; height: 28px; color: var(--voce); }
+.tk-chip-centro.trabalhando .tk-chip-nucleo > svg:not(.tk-anel) { animation: tk-gira-marca 9s linear infinite; }
+@keyframes tk-gira-marca { to { transform: rotate(360deg); } }
+.tk-chip-centro b { font: 600 13px var(--sans); letter-spacing: .2px; }
+.tk-chip-centro .tk-pct { font: 600 11px var(--mono); color: var(--voce); }
+.tk-chip-centro small { font: 10.5px/1.35 var(--mono); color: var(--grafite); white-space: pre-line; }
+@media (prefers-reduced-motion: reduce) { .tk-chip-centro.trabalhando .tk-chip-nucleo > svg { animation: none; } }
 .tk-cartao { position: absolute; user-select: none; width: ${LARGURA_CARTAO}px; border: 1px solid var(--linha); border-radius: 10px; background: var(--folha); box-shadow: var(--sombra); padding: 10px 14px 10px 16px; cursor: pointer; transition: opacity .2s, border-color .2s; }
 .tk-cartao::before { content: ""; position: absolute; left: -1px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 2px 2px 0; background: var(--tom); }
 .tk-cartao:hover, .tk-cartao.sel { border-color: var(--grafite); }
@@ -185,7 +195,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 <div class="tk-palco" id="tkPalco">
   <div class="tk-mundo" id="tkMundo">
     <svg class="tk-svg" xmlns="${NS}"><g id="tkPinos"></g><g id="tkTrilhas"></g><g id="tkPulsos"></g></svg>
-    <div class="tk-chip-centro" id="tkChip">${marcaSvg(34)}<b>Claude</b><span class="tk-pct" id="tkPct">0%</span><small id="tkResumo"></small></div>
+    <div class="tk-chip-centro" id="tkChip"><div class="tk-chip-nucleo"><svg class="tk-anel" viewBox="0 0 62 62" aria-hidden="true"><circle class="fundo" cx="31" cy="31" r="28"/><circle class="arco" id="tkArco" cx="31" cy="31" r="28" pathLength="100" stroke-dasharray="0 100"/></svg>${marcaSvg(28)}</div><b>Claude</b><span class="tk-pct" id="tkPct">0%</span><small id="tkResumo"></small></div>
     <div id="tkCartoes"></div>
   </div>
   <div class="tk-caixa tk-gaveta" id="tkGaveta" hidden></div>
@@ -549,20 +559,23 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         }
     }
     function desenhaPinos() {
-        const meio = CHIP / 2, n = 7, passo = (CHIP - 44) / (n - 1), comp = 9;
+        const meio = CHIP / 2, n = 9, passo = (CHIP - 48) / (n - 1), comp = 7, larg = 4;
         for (let i = 0; i < n; i++) {
-            const t = (i - (n - 1) / 2) * passo;
-            el('line', { x1: -meio, y1: t, x2: -meio - comp, y2: t, class: 'tk-pino' }, gPinos);
-            el('line', { x1: meio, y1: t, x2: meio + comp, y2: t, class: 'tk-pino' }, gPinos);
-            el('line', { x1: t, y1: -meio, x2: t, y2: -meio - comp, class: 'tk-pino' }, gPinos);
-            el('line', { x1: t, y1: meio, x2: t, y2: meio + comp, class: 'tk-pino' }, gPinos);
+            const t = (i - (n - 1) / 2) * passo - larg / 2;
+            el('rect', { x: -meio - comp, y: t, width: comp, height: larg, rx: 1.5, class: 'tk-pino' }, gPinos);
+            el('rect', { x: meio, y: t, width: comp, height: larg, rx: 1.5, class: 'tk-pino' }, gPinos);
+            el('rect', { x: t, y: -meio - comp, width: larg, height: comp, rx: 1.5, class: 'tk-pino' }, gPinos);
+            el('rect', { x: t, y: meio, width: larg, height: comp, rx: 1.5, class: 'tk-pino' }, gPinos);
         }
     }
     function atualizaCentro(visiveis) {
         const todas = visiveis.flatMap(c => c.tarefas);
         const pct = todas.length ? todas.reduce((s, t) => s + progressoTarefa(t), 0) / todas.length : 0;
+        const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
         $('tkPct').textContent = Math.round(pct * 100) + '%';
-        $('tkResumo').textContent = `${todas.length} tarefas · ${visiveis.length} conversas`;
+        $('tkArco').setAttribute('stroke-dasharray', `${Math.round(pct * 100)} 100`);
+        $('tkResumo').textContent = `${plural(todas.length, 'tarefa', 'tarefas')}\n${plural(visiveis.length, 'conversa', 'conversas')}`;
+        $('tkChip').classList.toggle('trabalhando', visiveis.some(c => c.vivo));
     }
     function atualizaContadores() {
         const base = dados.conversas.filter(c => prefs.absorvidas || !absorvida(c));
