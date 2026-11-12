@@ -710,7 +710,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     }, { passive: false });
     let arrasto = null, arrastoCartao = null, ultimoClique = { id: null, hora: 0 }, cliqueTimer = null;
     palco.addEventListener('pointerdown', (ev) => {
-        if (ev.button !== 0 || ev.target.closest('.tk-caixa, .tk-legenda') || !vistaValida(vista)) return;
+        if (ev.button !== 0 || ev.target.closest('.tk-caixa, .tk-legenda, .tk-chip-centro') || !vistaValida(vista)) return;
         const cartao = ev.target.closest('.tk-cartao'), subEl = ev.target.closest('.tk-subcartao');
         if (subEl) {
             const u = subsPorId.get(subEl.dataset.agente);
