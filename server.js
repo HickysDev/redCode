@@ -277,7 +277,7 @@ function acertaIdTarefa(estado, b) {
     delete estado.tarefasCriadas[b.tool_use_id];
     const texto = Array.isArray(b.content) ? b.content.map(c => c.text || '').join('\n') : String(b.content || '');
     const real = (texto.match(/Task #(\d+) created/) || [])[1];
-    if (b.is_error || !real || real === provisorio || !estado.tarefas[provisorio]) return;
+    if (b.is_error || !real || real === provisorio || !estado.tarefas[provisorio] || estado.tarefas[real]) return;
     const reordenadas = {};
     for (const [id, t] of Object.entries(estado.tarefas)) reordenadas[id === provisorio ? real : id] = t;
     estado.tarefas = reordenadas;
@@ -343,10 +343,11 @@ function somaTokens(estado, modelo, uso) {
 }
 
 // Fluxo com o Claude para os sinais da visão Tasks: "in" = ele recebe, "out" = ele produz
+let seqPulso = Date.now();
 function registraPulso(estado, hora, dir) {
     if (!hora) return;
     const pulsos = estado.pulsos || (estado.pulsos = []);
-    pulsos.push({ hora, dir });
+    pulsos.push({ hora, dir, seq: ++seqPulso });
     if (pulsos.length > LIMITE_PULSOS) pulsos.splice(0, pulsos.length - LIMITE_PULSOS);
 }
 
@@ -491,6 +492,7 @@ function processaRegistro(estado, r, origem) {
                     estado.plano = estado.planoAntes.plano;
                     estado.tarefas = estado.planoAntes.tarefas;
                     estado.planoHora = estado.planoAntes.hora;
+                    estado.ultimaTarefa = estado.planoAntes.ultimaTarefa;
                     estado.planoAntes = null;
                 }
                 const alvo = estado.porId[b.tool_use_id];
@@ -583,7 +585,7 @@ function processaRegistro(estado, r, origem) {
                         fim: r.timestamp,
                     });
                 }
-                const planoAntes = { id: b.id, plano: JSON.parse(JSON.stringify(estado.plano)), tarefas: JSON.parse(JSON.stringify(estado.tarefas)), hora: estado.planoHora };
+                const planoAntes = { id: b.id, plano: JSON.parse(JSON.stringify(estado.plano)), tarefas: JSON.parse(JSON.stringify(estado.tarefas)), hora: estado.planoHora, ultimaTarefa: estado.ultimaTarefa };
                 if (atualizaPlano(estado, b.name, b.input || {})) {
                     registraPulso(estado, r.timestamp, 'out');
                     if (b.name === 'TaskCreate') (estado.tarefasCriadas = estado.tarefasCriadas || {})[b.id] = String(estado.ultimaTarefa);
@@ -610,6 +612,7 @@ function processaRegistro(estado, r, origem) {
                         descricao: (b.input || {}).description || '', briefing: corta((b.input || {}).prompt, 3000),
                         status: 'rodando', inicio: r.timestamp, modelo: '',
                         tarefaPai: estado.plano.findIndex(i => i.status === 'in_progress'),
+                        tarefaPaiId: (Object.entries(estado.tarefas).find(([, t]) => t.status === 'in_progress') || [null])[0],
                     };
                 }
             }
@@ -785,7 +788,7 @@ function arquivoDaSessao(projeto, id) {
 function envDeConversa(projeto, id) { return perfis.envDaConversa(entradaDaConversa(projeto, id)); }
 function assinaturaDe(entrada) { return entrada ? (entrada.claude || '') + '|' + (entrada.git || '') : ''; }
 
-function listaSessoes() {
+function listaSessoes(opcoes = {}) {
     registraVivas();
     const limite = Date.now() - DIAS_LISTADOS * 24 * 3600 * 1000;
     const sessoes = [];
@@ -808,7 +811,7 @@ function listaSessoes() {
             if (Date.now() - stat.mtimeMs < 3600 * 1000) leSubagentes(path.join(caminhoPasta, nome.replace('.jsonl', '')), estado);
             const situacao = situacaoSessao(estado, stat.mtimeMs, nome.replace('.jsonl', ''));
             // Conversa trabalhando (aberta ou não): vigia os repositórios dela, para cada comando ser comparado com a versão certa
-            if (situacao.ativa) reposDaSessao(estado, cwdDaPasta(estado, pasta)).forEach(r => vigiaRepo(r));
+            if (situacao.ativa && !opcoes.semVigia) reposDaSessao(estado, cwdDaPasta(estado, pasta)).forEach(r => vigiaRepo(r));
             const pedidos = estado.eventos.filter(e => e.tipo === 'pedido');
             // Conversa criada só por digitar "/mcp" (comando do terminal, não conversa de verdade): fica fora da lista
             if (pedidos.length && pedidos.every(p => String(p.texto).trim().toLowerCase() === '/mcp')) continue;
@@ -836,10 +839,15 @@ function listaSessoes() {
     return sessoes.sort((a, b) => b.atualizado - a.atualizado);
 }
 
-// Visão Tasks: conversas das últimas 24 h com lista de tarefas ou subagente, montadas do cache já lido
+// Visão Tasks: conversas das últimas 24 h com lista de tarefas ou subagente, montadas do cache já lido.
+// A lista de sessões é reaproveitada por 2 s e o corpo só é remontado quando a "versão" (mtime, situação,
+// status dos agentes, seq dos pulsos) muda: o 304 sai sem varrer disco nem serializar nada.
 const HORAS_TASKS = 24;
 const SEGUNDOS_PULSOS = 30;
-const LIMITE_PULSOS_NO = 12;
+const LIMITE_PULSOS_NO = 60;
+const CACHE_SESSOES_TASKS_MS = 2000;
+let sessoesTasks = { hora: 0, lista: [] };
+let corpoTasks = { versao: null, corpo: null };
 function pulsosRecentes(pulsos) {
     const desde = Date.now() - SEGUNDOS_PULSOS * 1000;
     return (pulsos || []).filter(p => Date.parse(p.hora) >= desde).slice(-LIMITE_PULSOS_NO);
@@ -847,37 +855,61 @@ function pulsosRecentes(pulsos) {
 function tarefasDoPlano(plano) {
     return (plano || []).map(t => ({ texto: corta(t.texto, 120), status: t.status || 'pending' }));
 }
+function sessoesParaTasks() {
+    if (Date.now() - sessoesTasks.hora > CACHE_SESSOES_TASKS_MS) sessoesTasks = { hora: Date.now(), lista: listaSessoes({ semVigia: true }) };
+    return sessoesTasks.lista;
+}
+// TaskUpdate deleted desloca os índices do plano: o id da tarefa (chave de estado.tarefas) é o que vale
+function indiceTarefaPai(estado, a) {
+    if (a.tarefaPaiId != null && estado.tarefas[a.tarefaPaiId]) return Object.keys(estado.tarefas).indexOf(a.tarefaPaiId);
+    return a.tarefaPai;
+}
+function montaTasks(itens) {
+    const conversas = itens.map(({ s, estado }) => {
+        const tarefas = tarefasDoPlano(estado.plano).map(t => ({ ...t, subagentes: [] }));
+        const subagentesSoltos = [];
+        for (const a of Object.values(estado.agentes)) {
+            const sub = {
+                id: a.id, tipo: a.tipoAgente || 'agente', descricao: corta(a.descricao, 80), status: a.status, modelo: a.modelo || null,
+                inicio: a.inicio || null, fim: a.fim || null, pulsos: pulsosRecentes(a.pulsos), tarefas: tarefasDoPlano(a.plano),
+            };
+            const pai = tarefas[indiceTarefaPai(estado, a)];
+            if (pai) pai.subagentes.push(sub);
+            else subagentesSoltos.push(sub);
+        }
+        return {
+            id: s.id, projeto: s.projeto, nomeProjeto: s.nomeProjeto, titulo: s.titulo, modelo: s.modelo,
+            vivo: s.ativa, esperando: s.esperando, ultimo: s.atualizado,
+            pergunta: estado.pergunta ? corta(estado.pergunta.texto, 140) : null, acaoAtual: s.acaoAtual || null,
+            pulsos: pulsosRecentes(estado.pulsos), tarefas, subagentesSoltos,
+        };
+    });
+    return { conversas };
+}
 function listaTasks() {
     const limite = Date.now() - HORAS_TASKS * 3600 * 1000;
-    const conversas = [];
-    for (const s of listaSessoes()) {
+    const itens = [];
+    for (const s of sessoesParaTasks()) {
         if (s.atualizado < limite) continue;
         const achado = arquivoDaSessao(s.projeto, s.id);
         const item = achado && cache.get(achado.arquivo);
         if (!item) continue;
         const estado = item.estado;
-        const agentes = Object.values(estado.agentes);
-        if (!estado.plano.length && !agentes.length) continue;
-        const tarefas = tarefasDoPlano(estado.plano).map(t => ({ ...t, subagentes: [] }));
-        const subagentesSoltos = [];
-        for (const a of agentes) {
-            const sub = {
-                id: a.id, tipo: a.tipoAgente || 'agente', descricao: corta(a.descricao, 80), status: a.status, modelo: a.modelo || null,
-                inicio: a.inicio || null, fim: a.fim || null, pulsos: pulsosRecentes(a.pulsos), tarefas: tarefasDoPlano(a.plano),
-            };
-            if (tarefas[a.tarefaPai]) tarefas[a.tarefaPai].subagentes.push(sub);
-            else subagentesSoltos.push(sub);
-        }
-        conversas.push({
-            id: s.id, projeto: s.projeto, nomeProjeto: s.nomeProjeto, titulo: s.titulo, modelo: s.modelo,
-            vivo: s.ativa, esperando: s.esperando, ultimo: s.atualizado,
-            pulsos: pulsosRecentes(estado.pulsos), tarefas, subagentesSoltos,
-        });
+        if (!estado.plano.length && !Object.keys(estado.agentes).length) continue;
+        itens.push({ s, estado });
     }
-    const corpo = { conversas };
-    corpo.hash = crypto.createHash('md5').update(JSON.stringify(corpo)).digest('hex').slice(0, 16);
-    corpo.agora = new Date().toISOString();
-    return corpo;
+    const versao = itens.map(({ s, estado }) => [
+        s.id, s.atualizado, s.ativa, s.esperando, s.titulo, s.modelo, estado.pergunta && estado.pergunta.texto, s.acaoAtual && s.acaoAtual.texto,
+        estado.plano.map(t => t.status + t.texto).join(','),
+        Object.values(estado.agentes).map(a => [a.id, a.status, a.modelo, a.fim, (a.plano || []).map(t => t.status).join('')].join(':')).join(','),
+    ].join('|')).join('\n') + '|' + seqPulso;
+    if (corpoTasks.versao !== versao) {
+        const corpo = montaTasks(itens);
+        corpo.hash = crypto.createHash('md5').update(versao).digest('hex').slice(0, 16);
+        corpo.seq = seqPulso;
+        corpoTasks = { versao, corpo };
+    }
+    return { ...corpoTasks.corpo, agora: new Date().toISOString() };
 }
 
 // cwd que gera o nome da pasta onde está o .jsonl (é nele que o SDK procura ao retomar)

@@ -5,10 +5,10 @@
     const NS = 'http://www.w3.org/2000/svg';
     const INTERVALO_POLL = 2000;
     const MINUTOS_ABSORVE = 10, HORAS_SELO = 24;
-    const DURACAO_PULSO = 480, MAX_PULSOS_TRILHA = 3, LOTE_MAX_MS = 2000;
+    const DURACAO_PULSO = 480, MAX_PULSOS_TRILHA = 3, LOTE_MAX_MS = 2000, JANELA_PRIMEIRO_POLL_MS = 3000;
     const LARGURA_CARTAO = 300, CHIP = 164, CANAL = 140, FOLGA_Y = 18, MAX_POR_COLUNA = 4, LINHAS_CARTAO = 4, CHANFRO = 10;
+    const DUPLO_CLIQUE_MS = 320;
     const semMovimento = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const sinaisLigados = () => localStorage.getItem('tasksSinais') !== '0';
 
     // Identidade visual por família de modelo: matiz próprio misturado com a tinta do tema (funciona no claro e no escuro)
     const IDENTIDADE_MODELO = {
@@ -28,7 +28,8 @@
     const chipModelo = (m, extra = '') => `<span class="tk-chip-modelo${extra}" style="--tom:${tomModelo(m)}" title="${escapa(m || 'modelo não informado')}">${glifoModelo(m)}${escapa(nomeModelo(m))}</span>`;
 
     const css = `
-#janelaTasks { position: fixed; top: 0; right: 0; bottom: 0; left: var(--larg-sessoes, 0px); z-index: 65; background: var(--papel); color: var(--tinta); overflow: hidden; font-family: var(--sans); display: flex; flex-direction: column; }
+#janelaTasks { position: fixed; top: 0; right: 0; bottom: 0; left: var(--larg-sessoes, 0px); z-index: 65; background: var(--papel); color: var(--tinta); overflow: hidden; font-family: var(--sans); display: flex; flex-direction: column; --tk-nucleo: #fff; }
+html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 #janelaTasks, .marca, .trilho-lista { ${Object.entries(IDENTIDADE_MODELO).map(([f, i]) => `--tom-${f}: color-mix(in srgb, ${i.matiz} 62%, var(--tinta));`).join(' ')} }
 #janelaTasks[hidden] { display: none; }
 .tk-topo { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--linha); background: var(--papel); }
@@ -43,6 +44,7 @@
 .tk-busca { margin-left: auto; width: 240px; height: 30px; padding: 0 11px; border: 1px solid var(--linha); border-radius: 8px; background: var(--folha); color: var(--tinta); font: 13px var(--sans); }
 .tk-busca:focus-visible { outline: none; border-color: var(--voce); box-shadow: 0 0 0 2px color-mix(in srgb, var(--voce) 22%, transparent); }
 .tk-topo .fechar-mapa { margin-left: 4px; }
+.tk-topo .mini .n { font: 11px var(--mono); opacity: .75; margin-left: 4px; }
 .tk-palco { flex: 1; position: relative; overflow: hidden; cursor: grab; background-image: radial-gradient(var(--linha) 1px, transparent 1px); background-size: 28px 28px; background-position: 14px 14px; }
 .tk-palco.arrastando { cursor: grabbing; }
 .tk-mundo { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
@@ -52,7 +54,7 @@
 .tk-pino { stroke: var(--linha); stroke-width: 1.5; stroke-linecap: round; }
 .tk-pino-ativo { fill: var(--trilha, var(--linha)); }
 .tk-pulso { fill: none; stroke-linecap: round; pointer-events: none; }
-.tk-chip-centro { position: absolute; left: ${-CHIP / 2}px; top: ${-CHIP / 2}px; width: ${CHIP}px; height: ${CHIP}px; border: 1px solid var(--linha); border-radius: 12px; background: var(--folha); box-shadow: var(--sombra); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; }
+.tk-chip-centro { position: absolute; width: ${CHIP}px; height: ${CHIP}px; border: 1px solid var(--linha); border-radius: 12px; background: var(--folha); box-shadow: var(--sombra); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; cursor: grab; user-select: none; }
 .tk-chip-centro svg { width: 34px; height: 34px; color: var(--voce); margin-bottom: 4px; }
 .tk-chip-centro b { font: 600 14px var(--sans); }
 .tk-chip-centro .tk-pct { font: 600 20px var(--sans); }
@@ -65,10 +67,6 @@
 .tk-cartao.sel { outline: 2px solid var(--voce); outline-offset: 1px; }
 .tk-cartao.arrastando, .tk-chip-centro.arrastando { cursor: grabbing; box-shadow: var(--sombra), 0 0 0 2px color-mix(in srgb, var(--voce) 35%, transparent); transition: none; z-index: 2; }
 .tk-palco.arrastando-cartao .tk-trilha { transition: none; }
-.tk-chip-centro { cursor: grab; }
-.tk-agente { overflow: visible; }
-.tk-agente .pet-mini { zoom: .45; width: 40px; height: 36px; margin: -4px 0 -6px -3px; }
-@media (prefers-reduced-motion: reduce) { .tk-agente .pet-corpo, .tk-agente .pet-item, .tk-agente .pet-corpo::before, .tk-agente .pet-corpo::after { animation: none !important; } }
 .tk-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .tk-cab b { font: 600 13.5px/1.3 var(--sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .tk-cab .tk-pct { font: 600 12px var(--mono); color: var(--grafite); flex: none; }
@@ -76,6 +74,11 @@
 .tk-meta .tk-sit::before { content: "●"; margin-right: 4px; font-size: 9px; }
 .tk-cartao.viva .tk-sit { color: var(--voce); }
 .tk-cartao.esperando .tk-sit { color: var(--atencao); }
+.tk-agora { display: flex; align-items: center; gap: 6px; margin: -3px 0 7px; font: 11px var(--mono); color: var(--grafite); white-space: nowrap; overflow: hidden; }
+.tk-agora span { overflow: hidden; text-overflow: ellipsis; }
+.tk-agora.pergunta { font: 12px var(--sans); color: var(--atencao); }
+.tk-agora.pergunta b { font: 700 12px var(--sans); flex: none; }
+.tk-agora.acao b { font-weight: 600; color: var(--tinta); flex: none; }
 .tk-cartao .barra { margin-bottom: 7px; }
 .tk-cartao .passos li, .tk-gaveta .passos li { grid-template-columns: 22px 1fr; align-items: center; padding: 2px 0; text-decoration: none; font-size: 12.5px; line-height: 1.3; }
 .tk-cartao .passos li::before, .tk-gaveta .passos li::before { content: none; }
@@ -85,13 +88,15 @@
 .tk-cartao .passos li.mais, .tk-gaveta .passos li.mais { font: 11px var(--mono); color: var(--grafite); }
 .tk-cartao .passos li.mais::before { content: "+" attr(data-n); color: var(--grafite); font: 11px var(--mono); text-align: center; }
 .tk-agentes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
-.tk-agente { display: inline-flex; align-items: center; gap: 4px; font: 500 11px var(--sans); line-height: 16px; padding: 0 7px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--agente) 55%, transparent); color: var(--agente); background: color-mix(in srgb, var(--agente) 7%, transparent); max-width: 100%; white-space: nowrap; }
-.tk-agente i { font-style: normal; color: var(--tom); display: inline-flex; align-items: center; gap: 2px; }
-.tk-agente.rodando { border-color: var(--agente); }
+.tk-agente { display: inline-flex; align-items: center; gap: 4px; font: 500 11px var(--sans); line-height: 16px; padding: 0 7px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--tom) 55%, transparent); color: var(--tom); background: color-mix(in srgb, var(--tom) 7%, transparent); max-width: 100%; white-space: nowrap; overflow: visible; }
+.tk-agente i { font-style: normal; color: var(--tom); display: inline-flex; align-items: center; gap: 2px; opacity: .85; }
+.tk-agente .pet-mini { zoom: .45; width: 40px; height: 36px; margin: -4px 0 -6px -3px; }
+.tk-agente.rodando { border-color: var(--tom); }
 .tk-agente.rodando::after { content: "●"; font-size: 8px; animation: pisca-passo 1s ease-in-out infinite; }
 .tk-agente.erro, .tk-agente.interrompido { color: var(--erro); border-color: color-mix(in srgb, var(--erro) 55%, transparent); }
 .tk-agente.concluido { opacity: .75; }
-.tk-agente.pisca { background: color-mix(in srgb, var(--agente) 35%, transparent); }
+.tk-agente.pisca { background: color-mix(in srgb, var(--tom) 35%, transparent); }
+@media (prefers-reduced-motion: reduce) { .tk-agente .pet-corpo, .tk-agente .pet-item, .tk-agente .pet-corpo::before, .tk-agente .pet-corpo::after, .tk-agente.rodando::after, .ponto-tasks { animation: none !important; } }
 #janelaTasks.focando .tk-cartao.esmaece, #janelaTasks.focando .tk-trilha.esmaece, #janelaTasks.focando .tk-pulso.esmaece { opacity: .3; }
 #janelaTasks.buscando .tk-cartao.nao-achado { opacity: .25; }
 .tk-caixa { position: absolute; z-index: 3; background: var(--realce); border: 1px solid var(--linha); border-radius: 12px; box-shadow: var(--sombra); box-sizing: border-box; }
@@ -103,6 +108,7 @@
 .tk-gaveta h4 { font: 600 11px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--grafite); margin: 12px 0 6px; }
 .tk-gaveta .passos li.in_progress { background: color-mix(in srgb, var(--tinta) 5%, transparent); border-radius: 5px; }
 .tk-gaveta .passos li span { white-space: normal; }
+.tk-gaveta .tk-agora { margin: 0 0 10px; white-space: normal; }
 .tk-sub { display: flex; align-items: center; gap: 8px; padding: 3px 0 3px 22px; font-size: 12.5px; color: var(--grafite); }
 .tk-sub span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tk-sub .tk-agente { flex: none; }
@@ -116,7 +122,7 @@
 .tk-feed div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tk-feed div i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 .tk-feed div small { margin-left: auto; font: 11px var(--mono); color: var(--grafite); flex: none; }
-.tk-legenda { position: absolute; z-index: 3; left: 16px; bottom: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font: 11.5px var(--sans); color: var(--grafite); background: color-mix(in srgb, var(--papel) 85%, transparent); padding: 6px 10px; border-radius: 8px; }
+.tk-legenda { position: absolute; z-index: 3; left: 16px; bottom: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font: 11.5px var(--sans); color: var(--grafite); background: color-mix(in srgb, var(--papel) 85%, transparent); padding: 6px 10px; border-radius: 8px; max-width: calc(100% - 370px); }
 .tk-legenda span { display: inline-flex; align-items: center; gap: 6px; }
 .tk-legenda .passos { display: contents; }
 .tk-legenda .passos li { display: inline-flex; gap: 6px; padding: 0; align-items: center; font-weight: 400; color: var(--grafite); }
@@ -126,13 +132,11 @@
 .tk-vazio { position: absolute; z-index: 3; left: 50%; top: 50%; transform: translate(-50%, -50%); color: var(--grafite); font-size: 13.5px; text-align: center; }
 #btnModoTasks { position: relative; }
 #btnModoTasks .ponto-tasks { position: absolute; top: 3px; left: 5px; }
-.tk-topo .mini .n { font: 11px var(--mono); opacity: .75; margin-left: 4px; }
 .selo-tasks { font: 600 10.5px/15px var(--mono); min-width: 15px; padding: 0 5px; border-radius: 8px; background: color-mix(in srgb, var(--tinta) 10%, transparent); color: var(--tinta); text-align: center; }
 .trilho-lista .selo-tasks { position: absolute; top: 1px; right: 1px; background: var(--voce); color: #fff; font-size: 9.5px; line-height: 14px; min-width: 14px; padding: 0 4px; }
 .trilho-lista [data-trilho="btnModoTasks"] { position: relative; }
 .ponto-tasks { width: 6px; height: 6px; border-radius: 50%; background: var(--voce); animation: pisca-passo 1s ease-in-out infinite; }
 .trilho-lista .ponto-tasks { position: absolute; left: 5px; top: 5px; }
-@media (prefers-reduced-motion: reduce) { .ponto-tasks, .tk-agente.rodando::after { animation: none; } }
 `;
 
     const marcaSvg = (t) => `<svg width="${t}" height="${t}" viewBox="-1.15 -1.15 2.3 2.3" aria-hidden="true"><g stroke="currentColor" stroke-width="0.22" stroke-linecap="round"><line x1="0" y1="0" x2="0.990" y2="0.139"/><line x1="0" y1="0" x2="0.595" y2="0.535"/><line x1="0" y1="0" x2="0.227" y2="0.912"/><line x1="0" y1="0" x2="-0.103" y2="0.733"/><line x1="0" y1="0" x2="-0.602" y2="0.669"/><line x1="0" y1="0" x2="-0.796" y2="0.198"/><line x1="0" y1="0" x2="-0.990" y2="-0.139"/><line x1="0" y1="0" x2="-0.572" y2="-0.515"/><line x1="0" y1="0" x2="-0.223" y2="-0.893"/><line x1="0" y1="0" x2="0.100" y2="-0.713"/><line x1="0" y1="0" x2="0.589" y2="-0.654"/><line x1="0" y1="0" x2="0.815" y2="-0.203"/></g><circle r="0.15" fill="currentColor"/></svg>`;
@@ -185,15 +189,25 @@
         if (pai) pai.appendChild(e);
         return e;
     };
-    const varCss = (nome) => getComputedStyle(janela).getPropertyValue(nome).trim();
     const cortaTexto = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 
-    let dados = null, hash = '', timer = null, filtro = 'todas', filtroModelo = null, busca = '', foco = null, selecionada = null, mostraAbsorvidas = false;
-    let vista = null;
-    let trilhas = new Map();
+    // PREFERENCIAS LEMBRADAS ENTRE ABERTURAS: VISTA (ZOOM/PAN), FILTROS, ABSORVIDAS E SINAIS
+    const CHAVE_PREFS = 'tasksPrefs', CHAVE_POSICOES = 'tasksPosicoes';
+    const lePref = (chave, padrao) => { try { const v = JSON.parse(localStorage.getItem(chave) || 'null'); return v == null ? padrao : v; } catch (e) { return padrao; } };
+    const gravaPref = (chave, valor) => { try { localStorage.setItem(chave, JSON.stringify(valor)); } catch (e) { /* sem armazenamento */ } };
+    const prefs = { vista: null, filtro: 'todas', filtroModelo: null, absorvidas: false, sinais: localStorage.getItem('tasksSinais') !== '0', ...lePref(CHAVE_PREFS, {}) };
+    const gravaPrefs = () => gravaPref(CHAVE_PREFS, prefs);
+    const sinaisLigados = () => prefs.sinais !== false;
+
+    let dados = null, hash = '', ultimoSeq = 0, timer = null, busca = '', foco = null, selecionada = null;
+    let vista = null, buscando = false;
+    const cartoesPorId = new Map();
+    let cartoesAtuais = [], chaveVisiveis = '';
     const tocados = new Map();
+    const emVoo = new Map();
     const feed = [];
     let anterior = null;
+    let temporizadores = new Set(), quadros = new Set();
 
     // PROGRESSO
     const progressoTarefa = (t) => {
@@ -205,8 +219,9 @@
     const todosSubs = (c) => [...c.tarefas.flatMap(t => t.subagentes), ...c.subagentesSoltos];
     const progressoConversa = (c) => c.tarefas.length ? c.tarefas.reduce((s, t) => s + progressoTarefa(t), 0) / c.tarefas.length : (todosSubs(c).every(s => s.status !== 'rodando') ? 1 : 0.5);
     const absorvida = (c) => !c.vivo && progressoConversa(c) >= 1 && Date.now() - c.ultimo > MINUTOS_ABSORVE * 60000;
-    const passaFiltro = (c) => (filtro === 'todas' || (filtro === 'ativas' && c.vivo) || (filtro === 'esperando' && c.esperando) || (filtro === 'agentes' && todosSubs(c).length > 0))
-        && (!filtroModelo || familiaModelo(c.modelo) === filtroModelo || todosSubs(c).some(s => familiaModelo(s.modelo) === filtroModelo));
+    const passaFiltro = (c) => (prefs.filtro === 'todas' || (prefs.filtro === 'ativas' && c.vivo) || (prefs.filtro === 'esperando' && c.esperando) || (prefs.filtro === 'agentes' && todosSubs(c).length > 0))
+        && (!prefs.filtroModelo || familiaModelo(c.modelo) === prefs.filtroModelo || todosSubs(c).some(s => familiaModelo(s.modelo) === prefs.filtroModelo));
+    const visiveisAgora = () => dados.conversas.filter(c => passaFiltro(c) && (prefs.absorvidas || !absorvida(c))).sort((a, b) => a.id.localeCompare(b.id));
     const situacao = (c) => c.esperando ? 'esperando você' : c.vivo ? 'trabalhando' : 'parada';
     const classeSituacao = (c) => c.esperando ? 'esperando' : c.vivo ? 'viva' : 'parada';
 
@@ -222,7 +237,14 @@
     const itemPasso = (t) => `<li class="${escapa(t.status)}"><i class="marcador"></i><span>${escapa(t.texto)}</span></li>`;
     // MASCOTE DO AGENTE: O MESMO petMini DO APP (COM A PERSONALIZACAO DO USUARIO); SEM ELE, VOLTA AO LOSANGO
     const petDoAgente = (s) => typeof petMini === 'function' ? petMini(s.tipo, s.status === 'rodando') : '◆ ';
-    const chipAgente = (s) => `<span class="tk-agente ${escapa(s.status)}" style="--tom:${tomModelo(s.modelo)}" title="${escapa(s.descricao || s.tipo)} · ${escapa(s.status)}${s.modelo ? ' · ' + escapa(nomeModelo(s.modelo)) : ''}">${petDoAgente(s)}${escapa(cortaTexto(s.tipo, 24))}${s.modelo ? `<i>${glifoModelo(s.modelo, 11)}${escapa(IDENTIDADE_MODELO[familiaModelo(s.modelo)].nome)}</i>` : ''}</span>`;
+    const chipAgente = (s) => `<span class="tk-agente ${escapa(s.status)}" data-agente="${escapa(s.id)}" style="--tom:${tomModelo(s.modelo)}" title="${escapa(s.descricao || s.tipo)} · ${escapa(s.status)}${s.modelo ? ' · ' + escapa(nomeModelo(s.modelo)) : ''}">${petDoAgente(s)}${escapa(cortaTexto(s.tipo, 24))}${s.modelo ? `<i>${glifoModelo(s.modelo, 11)}${escapa(IDENTIDADE_MODELO[familiaModelo(s.modelo)].nome)}</i>` : ''}</span>`;
+    // "AGORA" DO CARTAO: A PERGUNTA PENDENTE (ESPERANDO VOCE) OU A ACAO EM CURSO (TRABALHANDO)
+    const VERBO_ACAO = { comando: 'Rodando:', edicao: 'Editando', leitura: 'Lendo', busca: 'Procurando', agente: 'Agente:', web: 'Acessando', skill: 'Skill:', ferramenta: 'Usando' };
+    function htmlAgora(c) {
+        if (c.esperando && c.pergunta) return `<div class="tk-agora pergunta" title="${escapa(c.pergunta)}"><b>?</b><span>${escapa(c.pergunta)}</span></div>`;
+        if (c.vivo && c.acaoAtual && c.acaoAtual.texto) return `<div class="tk-agora acao" title="${escapa(c.acaoAtual.texto)}"><b>${escapa(VERBO_ACAO[c.acaoAtual.tipo] || c.acaoAtual.tipo)}</b><span>${escapa(c.acaoAtual.texto)}</span></div>`;
+        return '';
+    }
     function htmlCartao(c) {
         const feitas = c.tarefas.filter(t => t.status === 'completed').length, p = progressoConversa(c);
         const { inicio, fim } = janelaTarefas(c.tarefas);
@@ -230,16 +252,14 @@
         const subs = todosSubs(c);
         return `<div class="tk-cab"><b title="${escapa(c.titulo)}">${escapa(c.titulo)}</b><span class="tk-pct">${Math.round(p * 100)}%</span></div>
             <div class="tk-meta">${chipModelo(c.modelo)}<span class="tk-sit">${situacao(c)}</span><span>· ${feitas} de ${c.tarefas.length}</span></div>
-            <div class="barra"><div style="width:${Math.round(p * 100)}%"></div></div>${passos}
+            ${htmlAgora(c)}<div class="barra"><div style="width:${Math.round(p * 100)}%"></div></div>${passos}
             ${subs.length ? `<div class="tk-agentes">${subs.map(chipAgente).join('')}</div>` : ''}`;
     }
 
     // POSICOES FIXADAS PELO USUARIO (NO ESPACO DO MUNDO) E O CENTRO DO CHIP
-    const CHAVE_POSICOES = 'tasksPosicoes';
-    let fixas = { cartoes: {}, chip: null };
-    try { fixas = { cartoes: {}, chip: null, ...JSON.parse(localStorage.getItem(CHAVE_POSICOES) || '{}') }; } catch (e) { /* sem armazenamento */ }
+    let fixas = { cartoes: {}, chip: null, ...lePref(CHAVE_POSICOES, {}) };
     const centro = () => fixas.chip || { x: 0, y: 0 };
-    function gravaPosicoes() { try { localStorage.setItem(CHAVE_POSICOES, JSON.stringify(fixas)); } catch (e) { /* sem armazenamento */ } }
+    const gravaPosicoes = () => gravaPref(CHAVE_POSICOES, fixas);
 
     // LAYOUT DETERMINISTICO: COLUNAS A DIREITA E A ESQUERDA DO CHIP, SEM SOBREPOSICAO; CARTAO FIXADO FICA ONDE O USUARIO DEIXOU
     function posiciona(cartoes) {
@@ -255,7 +275,7 @@
                 const total = itens.reduce((s, k) => s + k.h, 0) + FOLGA_Y * (itens.length - 1);
                 let y = -total / 2;
                 for (const k of itens) {
-                    Object.assign(k, { lado, coluna: j, y: o.y + y, x: o.x + (lado > 0 ? xColuna(j) : -xColuna(j) - LARGURA_CARTAO) });
+                    Object.assign(k, { lado, coluna: j, y: o.y + y, x: o.x + (lado > 0 ? xColuna(j) : -xColuna(j) - LARGURA_CARTAO), contorno: null });
                     y += k.h + FOLGA_Y;
                 }
                 alturas.push(total);
@@ -341,35 +361,47 @@
         return d + ` L${fim[0]},${fim[1]}`;
     }
 
-    let cartoesAtuais = [];
+    // DESENHA POR DIFERENCA: CARTAO, TRILHA E PINO PERSISTEM POR ID; SO O HTML QUE MUDOU E RETROCADO,
+    // E AS ALTURAS SAO MEDIDAS EM LOTE DEPOIS DE TODAS AS ESCRITAS NO DOM
     function desenha() {
-        const visiveis = dados.conversas.filter(c => passaFiltro(c) && (mostraAbsorvidas || !absorvida(c))).sort((a, b) => a.id.localeCompare(b.id));
-        caixaCartoes.textContent = '';
+        if (!dados) return;
+        const visiveis = visiveisAgora();
+        chaveVisiveis = visiveis.map(c => c.id).join(',');
+        const vivos = new Set(visiveis.map(c => c.id));
+        for (const [id, k] of cartoesPorId) if (!vivos.has(id)) { k.el.remove(); k.trilha.remove(); k.pino.remove(); cartoesPorId.delete(id); }
         const cartoes = visiveis.map(c => {
-            const e = document.createElement('article');
-            e.className = `tk-cartao ${classeSituacao(c)}${selecionada === c.id ? ' sel' : ''}`;
-            e.dataset.conversa = c.id;
-            e.style.setProperty('--tom', tomModelo(c.modelo));
-            e.dataset.busca = [c.titulo, c.nomeProjeto, nomeModelo(c.modelo), ...c.tarefas.map(t => t.texto), ...todosSubs(c).flatMap(s => [s.tipo, s.descricao, ...s.tarefas.map(t => t.texto)])].join(' ').toLowerCase();
-            e.innerHTML = htmlCartao(c);
-            caixaCartoes.appendChild(e);
+            let k = cartoesPorId.get(c.id);
+            const corpo = htmlCartao(c), classe = `tk-cartao ${classeSituacao(c)}${selecionada === c.id ? ' sel' : ''}`;
+            if (!k) {
+                const e = document.createElement('article');
+                e.dataset.conversa = c.id;
+                caixaCartoes.appendChild(e);
+                k = { el: e, corpo: null, trilha: el('path', { class: 'tk-trilha', 'data-conversa': c.id }, gTrilhas), pino: el('circle', { r: 2.6, class: 'tk-pino-ativo' }, gTrilhas) };
+                cartoesPorId.set(c.id, k);
+            }
+            k.c = c;
+            if (k.el.className !== classe) k.el.className = classe;
+            if (k.corpo !== corpo) {
+                k.corpo = corpo;
+                k.el.innerHTML = corpo;
+                k.el.style.setProperty('--tom', tomModelo(c.modelo));
+                k.el.dataset.busca = [c.titulo, c.nomeProjeto, nomeModelo(c.modelo), ...c.tarefas.map(t => t.texto), ...todosSubs(c).flatMap(s => [s.tipo, s.descricao, ...s.tarefas.map(t => t.texto)])].join(' ').toLowerCase();
+                k.mediu = false;
+                const tom = tomModelo(c.modelo);
+                k.trilha.setAttribute('style', `--trilha: color-mix(in srgb, ${tom} 45%, var(--linha))`);
+                if (c.vivo || c.esperando) k.trilha.removeAttribute('stroke-dasharray'); else k.trilha.setAttribute('stroke-dasharray', '4 5');
+                k.pino.setAttribute('style', `--trilha: color-mix(in srgb, ${tom} 70%, var(--linha))`);
+            }
             const fixa = fixas.cartoes[c.id];
-            return { c, el: e, h: e.offsetHeight, fixo: !!fixa, x: fixa ? fixa.x : 0, y: fixa ? fixa.y : 0 };
+            Object.assign(k, { fixo: !!fixa, x: fixa ? fixa.x : 0, y: fixa ? fixa.y : 0 });
+            return k;
         });
+        for (const k of cartoes) if (!k.mediu) { k.h = k.el.offsetHeight; k.mediu = true; }
         posiciona(cartoes);
         cartoesAtuais = cartoes;
         posicionaChip();
-        gPinos.textContent = ''; gTrilhas.textContent = '';
-        desenhaPinos();
-        trilhas = new Map();
-        for (const k of cartoes) {
-            k.el.style.left = k.x + 'px';
-            k.el.style.top = k.y + 'px';
-            const tom = tomModelo(k.c.modelo);
-            k.trilha = el('path', { class: 'tk-trilha', 'data-conversa': k.c.id, style: `--trilha: color-mix(in srgb, ${tom} 45%, var(--linha))`, 'stroke-dasharray': k.c.vivo || k.c.esperando ? null : '4 5' }, gTrilhas);
-            k.pino = el('circle', { r: 2.6, class: 'tk-pino-ativo', style: `--trilha: color-mix(in srgb, ${tom} 70%, var(--linha))` }, gTrilhas);
-            trilhas.set(k.c.id, { el: k.trilha, d: '', conversa: k.c.id });
-        }
+        if (!gPinos.childElementCount) desenhaPinos();
+        for (const k of cartoes) { k.el.style.left = k.x + 'px'; k.el.style.top = k.y + 'px'; }
         atualizaTrilhas();
         atualizaCentro(visiveis);
         atualizaContadores();
@@ -379,6 +411,11 @@
         $('tkVazio').hidden = visiveis.length > 0;
         if (!vista) ajusta();
         if (selecionada) desenhaGaveta();
+    }
+    // ABSORVIDA DEPENDE DO RELOGIO E NAO ENTRA NO HASH: REAVALIA A CADA POLL, MESMO COM 304
+    function desenhaSeMudou() {
+        if (!dados) return;
+        if (visiveisAgora().map(c => c.id).join(',') !== chaveVisiveis) desenha();
     }
     function posicionaChip() {
         const o = centro();
@@ -391,11 +428,9 @@
         roteia(cartoesAtuais);
         for (const k of cartoesAtuais) {
             const d = caminhoChanfrado(k.pontos);
-            k.trilha.setAttribute('d', d);
+            if (k.d !== d) { k.d = d; k.len = 0; k.trilha.setAttribute('d', d); }
             k.pino.setAttribute('cx', k.pinoX);
             k.pino.setAttribute('cy', k.pinoY);
-            const f = trilhas.get(k.c.id);
-            f.d = d; f.len = 0;
         }
     }
     function desenhaPinos() {
@@ -415,52 +450,58 @@
         $('tkResumo').textContent = `${todas.length} tarefas · ${visiveis.length} conversas`;
     }
     function atualizaContadores() {
-        const base = dados.conversas.filter(c => mostraAbsorvidas || !absorvida(c));
+        const base = dados.conversas.filter(c => prefs.absorvidas || !absorvida(c));
         const conta = { todas: base.length, ativas: base.filter(c => c.vivo).length, esperando: base.filter(c => c.esperando).length, agentes: base.filter(c => todosSubs(c).length).length };
-        for (const b of $('tkFiltros').querySelectorAll('button')) { b.querySelector('.n').textContent = conta[b.dataset.f]; b.setAttribute('aria-pressed', String(b.dataset.f === filtro)); }
+        for (const b of $('tkFiltros').querySelectorAll('button')) { b.querySelector('.n').textContent = conta[b.dataset.f]; b.setAttribute('aria-pressed', String(b.dataset.f === prefs.filtro)); }
         const familias = new Map();
         for (const c of base) for (const f of new Set([familiaModelo(c.modelo), ...todosSubs(c).map(s => familiaModelo(s.modelo))])) familias.set(f, (familias.get(f) || 0) + 1);
-        if (filtroModelo && !familias.has(filtroModelo)) filtroModelo = null;
-        $('tkModelos').innerHTML = [...familias].sort().map(([f, n]) => `<button class="tk-chip-modelo n" data-modelo="${f}" aria-pressed="${filtroModelo === f}" style="--tom:var(--tom-${f})" title="Só conversas e agentes com ${IDENTIDADE_MODELO[f].nome}">${glifoModelo(f)}${IDENTIDADE_MODELO[f].nome}<span class="n">${n}</span></button>`).join('');
+        if (prefs.filtroModelo && !familias.has(prefs.filtroModelo)) prefs.filtroModelo = null;
+        const htmlModelos = [...familias].sort().map(([f, n]) => `<button class="tk-chip-modelo n" data-modelo="${f}" aria-pressed="${prefs.filtroModelo === f}" style="--tom:var(--tom-${f})" title="Só conversas e agentes com ${IDENTIDADE_MODELO[f].nome}">${glifoModelo(f)}${IDENTIDADE_MODELO[f].nome}<span class="n">${n}</span></button>`).join('');
+        if ($('tkModelos').innerHTML !== htmlModelos) $('tkModelos').innerHTML = htmlModelos;
         $('tkSinais').setAttribute('aria-pressed', String(sinaisLigados()));
-        $('tkAbsorvidas').setAttribute('aria-pressed', String(mostraAbsorvidas));
+        $('tkAbsorvidas').setAttribute('aria-pressed', String(!!prefs.absorvidas));
         const absorvidas = dados.conversas.filter(absorvida).length;
         $('tkNAbsorvidas').textContent = absorvidas || '';
     }
     function desenhaLegenda(visiveis) {
         const familias = [...new Set(visiveis.flatMap(c => [familiaModelo(c.modelo), ...todosSubs(c).map(s => familiaModelo(s.modelo))]))].sort();
-        const traco = (cor) => `<svg width="26" height="8" aria-hidden="true"><line x1="2" y1="4" x2="24" y2="4" stroke="var(--linha)" stroke-width="1.5"/><line x1="6" y1="4" x2="16" y2="4" stroke="${cor}" stroke-width="2.5" stroke-linecap="round"/></svg>`;
-        $('tkLegenda').innerHTML = `<ol class="passos"><li class="completed"><i class="marcador"></i>feita</li><li class="in_progress"><i class="marcador"></i>em andamento</li><li class="pending"><i class="marcador"></i>a fazer</li></ol>
-            <i class="sep"></i><span>${traco('var(--voce)')}entrada</span><span>${traco('var(--tinta)')}saída</span><span>${traco('var(--agente)')}agente (cor do modelo)</span>
+        const traco = (cor, tracejado) => `<svg width="26" height="8" aria-hidden="true"><line x1="2" y1="4" x2="24" y2="4" stroke="var(--linha)" stroke-width="1.5"${tracejado ? ' stroke-dasharray="4 3"' : ''}/>${cor ? `<line x1="6" y1="4" x2="16" y2="4" stroke="${cor}" stroke-width="2.5" stroke-linecap="round"/>` : ''}</svg>`;
+        const htmlLegenda = `<ol class="passos"><li class="completed"><i class="marcador"></i>feita</li><li class="in_progress"><i class="marcador"></i>em andamento</li><li class="pending"><i class="marcador"></i>a fazer</li></ol>
+            <i class="sep"></i><span>${traco('var(--voce)')}entrada</span><span>${traco('var(--tinta)')}saída</span><span>${traco('var(--tom-haiku)')}agente e seu chip: tom do modelo</span><span>${traco(null, true)}conversa parada</span>
             ${familias.length ? '<i class="sep"></i>' + familias.map(f => `<span style="--tom:var(--tom-${f});color:var(--tom)">${glifoModelo(f, 13)}${IDENTIDADE_MODELO[f].nome}</span>`).join('') : ''}`;
+        if ($('tkLegenda').innerHTML !== htmlLegenda) $('tkLegenda').innerHTML = htmlLegenda;
     }
 
-    // ZOOM E ARRASTE: UMA TRANSFORMACAO SO PARA AS TRILHAS (SVG) E OS CARTOES (HTML)
-    function aplicaVista() { mundo.style.transform = `translate(${vista.x}px, ${vista.y}px) scale(${vista.k})`; }
+    // ZOOM E ARRASTE: UMA TRANSFORMACAO SO PARA AS TRILHAS (SVG) E OS CARTOES (HTML); A VISTA E LEMBRADA
+    function aplicaVista() {
+        mundo.style.transform = `translate(${vista.x}px, ${vista.y}px) scale(${vista.k})`;
+        prefs.vista = vista;
+        gravaPrefs();
+    }
     function ajusta() {
-        const cartoes = [...caixaCartoes.children];
         const o = centro();
         let minX = o.x - CHIP / 2 - 12, maxX = o.x + CHIP / 2 + 12, minY = o.y - CHIP / 2 - 12, maxY = o.y + CHIP / 2 + 12;
-        for (const e of cartoes) {
-            minX = Math.min(minX, e.offsetLeft); maxX = Math.max(maxX, e.offsetLeft + e.offsetWidth);
-            minY = Math.min(minY, e.offsetTop); maxY = Math.max(maxY, e.offsetTop + e.offsetHeight);
+        for (const k of cartoesAtuais) {
+            minX = Math.min(minX, k.x); maxX = Math.max(maxX, k.x + LARGURA_CARTAO);
+            minY = Math.min(minY, k.y); maxY = Math.max(maxY, k.y + k.h);
         }
         const caixa = palco.getBoundingClientRect(), w = caixa.width || 1600, h = caixa.height || 900, margem = 40;
         const k = Math.min(1.15, (w - margem * 2) / (maxX - minX), (h - margem * 2 - 60) / (maxY - minY));
         vista = { k, x: w / 2 - (minX + maxX) / 2 * k, y: (h - 50) / 2 - (minY + maxY) / 2 * k };
         aplicaVista();
     }
+    const vistaValida = (v) => !!v && Number.isFinite(v.k) && v.k > 0 && Number.isFinite(v.x) && Number.isFinite(v.y);
     palco.addEventListener('wheel', (ev) => {
-        if (ev.target.closest('.tk-caixa')) return;
+        if (ev.target.closest('.tk-caixa') || !vistaValida(vista)) return;
         ev.preventDefault();
         const fator = ev.deltaY > 0 ? 1 / 1.12 : 1.12, caixa = palco.getBoundingClientRect();
         const px = ev.clientX - caixa.left, py = ev.clientY - caixa.top;
         vista = { k: vista.k * fator, x: px - (px - vista.x) * fator, y: py - (py - vista.y) * fator };
         aplicaVista();
     }, { passive: false });
-    let arrasto = null, arrastoCartao = null;
+    let arrasto = null, arrastoCartao = null, ultimoClique = { id: null, hora: 0 }, cliqueTimer = null;
     palco.addEventListener('pointerdown', (ev) => {
-        if (ev.button !== 0 || ev.target.closest('.tk-caixa, .tk-legenda')) return;
+        if (ev.button !== 0 || ev.target.closest('.tk-caixa, .tk-legenda') || !vistaValida(vista)) return;
         const cartao = ev.target.closest('.tk-cartao'), chip = ev.target.closest('.tk-chip-centro');
         if (cartao || chip) {
             const k = cartao ? cartoesAtuais.find(x => x.el === cartao) : null;
@@ -476,7 +517,7 @@
             const a = arrastoCartao;
             // LIMIAR DE 4 PX: ABAIXO DISSO E CLIQUE (ABRE A GAVETA), NAO ARRASTE
             if (!a.moveu && Math.hypot(ev.clientX - a.x, ev.clientY - a.y) < 4) return;
-            if (!a.moveu) { a.moveu = true; palco.classList.add('arrastando-cartao'); gPulsos.textContent = ''; (a.k ? a.k.el : $('tkChip')).classList.add('arrastando'); }
+            if (!a.moveu) { a.moveu = true; palco.classList.add('arrastando-cartao'); limpaPulsos(); (a.k ? a.k.el : $('tkChip')).classList.add('arrastando'); }
             const nx = Math.round(a.x0 + (ev.clientX - a.x) / vista.k), ny = Math.round(a.y0 + (ev.clientY - a.y) / vista.k);
             if (a.k) { a.k.x = nx; a.k.y = ny; a.k.fixo = true; a.k.contorno = null; a.k.el.style.left = nx + 'px'; a.k.el.style.top = ny + 'px'; }
             else { fixas.chip = { x: nx, y: ny }; posicionaChip(); }
@@ -493,6 +534,20 @@
         const cartao = ev.target.closest('.tk-cartao'), novo = cartao ? cartao.dataset.conversa : null;
         if (novo !== foco) { foco = novo; aplicaFoco(); }
     });
+    function abreConversa(c) {
+        if (!c || typeof abreSessao !== 'function') return;
+        fecha();
+        abreSessao(c.projeto + '/' + c.id);
+    }
+    // CLIQUE SIMPLES ABRE A GAVETA (DEPOIS DE UMA PAUSA CURTA); DUPLO CLIQUE ABRE A CONVERSA SEM A GAVETA PISCAR
+    function cliqueNoCartao(k) {
+        const agora = performance.now(), duplo = ultimoClique.id === k.c.id && agora - ultimoClique.hora < DUPLO_CLIQUE_MS;
+        ultimoClique = { id: k.c.id, hora: agora };
+        clearTimeout(cliqueTimer);
+        if (duplo) { ultimoClique = { id: null, hora: 0 }; abreConversa(k.c); return; }
+        const id = k.c.id;
+        cliqueTimer = setTimeout(() => { selecionada = selecionada === id ? null : id; desenha(); $('tkGaveta').hidden = !selecionada; }, DUPLO_CLIQUE_MS);
+    }
     const soltaArrasto = (ev) => {
         if (arrastoCartao) {
             const a = arrastoCartao;
@@ -504,9 +559,7 @@
                 gravaPosicoes();
                 desenha();
             } else if (a.k && ev.type === 'pointerup') {
-                selecionada = selecionada === a.k.c.id ? null : a.k.c.id;
-                desenha();
-                $('tkGaveta').hidden = !selecionada;
+                cliqueNoCartao(a.k);
             }
             return;
         }
@@ -516,8 +569,14 @@
     palco.addEventListener('pointerup', soltaArrasto);
     palco.addEventListener('pointercancel', soltaArrasto);
     palco.addEventListener('pointerleave', () => { if (foco) { foco = null; aplicaFoco(); } });
-    // A AREA DA VISAO MUDA COM A LISTA (CTRL+B) E COM A JANELA: REENCAIXA
-    new ResizeObserver(() => { if (!janela.hidden && vista && dados) ajusta(); }).observe(palco);
+    // A AREA DA VISAO MUDA COM A LISTA (CTRL+B) E COM A JANELA: REENCAIXA (SO ENTRE DOIS TAMANHOS REAIS, NAO AO ABRIR)
+    let tamanhoPalco = null;
+    new ResizeObserver(([entrada]) => {
+        const { width, height } = entrada.contentRect;
+        const antes = tamanhoPalco;
+        tamanhoPalco = width && height ? { width, height } : null;
+        if (antes && tamanhoPalco && (antes.width !== width || antes.height !== height) && !janela.hidden && dados) ajusta();
+    }).observe(palco);
 
     function aplicaFoco() {
         janela.classList.toggle('focando', !!foco);
@@ -528,69 +587,83 @@
         for (const e of caixaCartoes.children) e.classList.toggle('nao-achado', !!busca && !(e.dataset.busca || '').includes(busca));
     }
 
-    // GAVETA: A CONVERSA ESCOLHIDA POR INTEIRO (TAREFAS, SUBAGENTES E AS TAREFAS DELES)
+    // GAVETA: A CONVERSA ESCOLHIDA POR INTEIRO; SO REESCREVE SE O CONTEUDO MUDOU, PRESERVANDO ROLAGEM E FOCO
+    let htmlGaveta = '';
     function desenhaGaveta() {
         const c = dados && dados.conversas.find(x => x.id === selecionada);
         const gaveta = $('tkGaveta');
-        if (!c) { gaveta.hidden = true; return; }
+        if (!c) { gaveta.hidden = true; htmlGaveta = ''; return; }
         const p = progressoConversa(c), feitas = c.tarefas.filter(t => t.status === 'completed').length;
         const subs = (lista) => lista.map(s => `<div class="tk-sub ${escapa(s.status)}">${chipAgente(s)}<span title="${escapa(s.descricao)}">${escapa(s.descricao)}</span><small>${escapa(s.status)}</small></div>${s.tarefas.length ? `<ol class="passos">${s.tarefas.map(itemPasso).join('')}</ol>` : ''}`).join('');
-        gaveta.innerHTML = `<div class="cabeca-mapa"><h2>${escapa(c.titulo)}</h2><button class="fechar-mapa" data-tk-fecha-gaveta aria-label="Fechar">×</button></div>
+        const novo = `<div class="cabeca-mapa"><h2>${escapa(c.titulo)}</h2><button class="fechar-mapa" data-tk-fecha-gaveta aria-label="Fechar">×</button></div>
             <div class="nota">${chipModelo(c.modelo)}<span>${escapa(c.nomeProjeto)}</span><span>·</span><span class="tk-sit-gaveta" style="color:${c.esperando ? 'var(--atencao)' : c.vivo ? 'var(--voce)' : 'var(--grafite)'}">${situacao(c)}</span></div>
+            ${htmlAgora(c)}
             <div class="acoes"><button class="botao principal" data-tk-abrir>Abrir conversa</button></div>
             <div class="cabeca-plano"><span>Tarefas</span><span>${feitas} de ${c.tarefas.length} · ${Math.round(p * 100)}%</span></div>
             <div class="barra"><div style="width:${Math.round(p * 100)}%"></div></div>
             ${c.tarefas.map(t => `<ol class="passos">${itemPasso(t)}</ol>${subs(t.subagentes)}`).join('') || '<p class="nota">Sem lista de tarefas.</p>'}
             ${c.subagentesSoltos.length ? '<h4>Subagentes da conversa</h4>' + subs(c.subagentesSoltos) : ''}`;
+        if (novo !== htmlGaveta) {
+            const rolagem = gaveta.scrollTop, focado = document.activeElement && gaveta.contains(document.activeElement) ? [...gaveta.querySelectorAll('button')].indexOf(document.activeElement) : -1;
+            gaveta.innerHTML = novo;
+            htmlGaveta = novo;
+            gaveta.scrollTop = rolagem;
+            if (focado >= 0) { const b = gaveta.querySelectorAll('button')[focado]; if (b) b.focus(); }
+        }
         gaveta.hidden = false;
     }
     $('tkGaveta').addEventListener('click', (ev) => {
         if (ev.target.closest('[data-tk-fecha-gaveta]')) { selecionada = null; $('tkGaveta').hidden = true; desenha(); return; }
-        if (ev.target.closest('[data-tk-abrir]')) {
-            const c = dados.conversas.find(x => x.id === selecionada);
-            if (c && typeof abreSessao === 'function') { fecha(); abreSessao(c.projeto + '/' + c.id); }
-        }
+        if (ev.target.closest('[data-tk-abrir]')) abreConversa(dados.conversas.find(x => x.id === selecionada));
     });
 
-    // SINAIS: UM TRACO CURTO CORRENDO PELA TRILHA (SO STROKE-DASHOFFSET, SEM FILTER)
+    // SINAIS: PULSO DE LUZ EM CAMADAS DO MESMO TRACEJADO COM A CABECA ALINHADA (HALO, CAUDA, NUCLEO), SEM FILTER
     // A TRILHA VAI DO PINO AO CARTAO: "IN" E "BACK" CORREM CONTRA O PATH, "OUT" E "SPAWN" A FAVOR
-    // PULSO DE LUZ: CAMADAS DO MESMO TRACEJADO COM A CABECA ALINHADA (HALO, CAUDA, NUCLEO BRANCO), SEM FILTER
     const CAMADAS_PULSO = [
         { largura: 9, comprimento: 26, opacidade: .14 },
         { largura: 2.2, comprimento: 78, opacidade: .22 },
         { largura: 2.6, comprimento: 30, opacidade: .6 },
         { largura: 2, comprimento: 9, opacidade: 1, nucleo: true },
     ];
+    const agenda = (fn, ms) => { const id = setTimeout(() => { temporizadores.delete(id); fn(); }, ms); temporizadores.add(id); return id; };
+    const quadro = (fn) => { const id = requestAnimationFrame((t) => { quadros.delete(id); fn(t); }); quadros.add(id); return id; };
+    function limpaPulsos() {
+        temporizadores.forEach(clearTimeout); temporizadores = new Set();
+        quadros.forEach(cancelAnimationFrame); quadros = new Set();
+        gPulsos.textContent = '';
+        emVoo.clear();
+    }
     // AGENTE CORRE NA MESMA TRILHA NA COR DO MODELO DELE: PULSOS DE AGENTES DIFERENTES SE CRUZAM
-    function pulsa(f, dir, agente) {
-        if (!f || !f.el || document.visibilityState !== 'visible') return;
+    function pulsa(k, dir, agente) {
+        if (!k || !k.d || janela.hidden || document.visibilityState !== 'visible') return;
         const paraChip = dir === 'in' || dir === 'back';
         const cor = agente ? tomModelo(agente.modelo) : dir === 'in' ? 'var(--voce)' : 'var(--tinta)';
-        const fonte = f.conversa + ':' + (agente ? agente.id : 'conversa');
-        if (semMovimento()) { f.el.classList.add('acesa'); setTimeout(() => f.el.classList.remove('acesa'), 300); return; }
-        if (gPulsos.querySelectorAll(`.tk-nucleo[data-chave="${CSS.escape(fonte)}"]`).length >= MAX_PULSOS_TRILHA) return;
-        const len = f.len || (f.len = f.el.getTotalLength());
-        const esmaece = foco && f.conversa !== foco ? ' esmaece' : '';
+        const fonte = k.c.id + ':' + (agente ? agente.id : 'conversa');
+        if (semMovimento()) { k.trilha.classList.add('acesa'); agenda(() => k.trilha.classList.remove('acesa'), 300); return; }
+        if ((emVoo.get(fonte) || 0) >= MAX_PULSOS_TRILHA) return;
+        emVoo.set(fonte, (emVoo.get(fonte) || 0) + 1);
+        const len = k.len || (k.len = k.trilha.getTotalLength()), trilha = k.trilha, d = k.d;
+        const esmaece = foco && k.c.id !== foco ? ' esmaece' : '';
         const camadas = CAMADAS_PULSO.map(c => ({ ...c, el: el('path', {
-            d: f.d, class: 'tk-pulso' + (c.nucleo ? ' tk-nucleo' : '') + esmaece, 'data-chave': fonte, 'data-conversa': f.conversa,
-            stroke: c.nucleo ? `color-mix(in srgb, ${cor} 35%, #fff)` : cor, 'stroke-width': c.largura, 'stroke-dasharray': `${c.comprimento} ${len * 2}`, opacity: 0,
+            d, class: 'tk-pulso' + esmaece, 'data-conversa': k.c.id,
+            stroke: c.nucleo ? `color-mix(in srgb, ${cor} 35%, var(--tk-nucleo))` : cor, 'stroke-width': c.largura, 'stroke-dasharray': `${c.comprimento} ${len * 2}`, opacity: 0,
         }, gPulsos) }));
-        const inicio = performance.now(), duracao = DURACAO_PULSO;
+        const inicio = performance.now();
         const suave = (x) => -(Math.cos(Math.PI * x) - 1) / 2;
-        const quadro = (agora) => {
-            const k = Math.min(1, (agora - inicio) / duracao);
-            // A TRILHA VAI DO PINO AO CARTAO: "IN" E "BACK" CORREM CONTRA O PATH, "OUT" E "SPAWN" A FAVOR
-            const cabeca = paraChip ? len * (1 - suave(k)) : len * suave(k);
-            const brilho = Math.min(1, k / .12, (1 - k) / .18);
+        const passo = (agora) => {
+            const t = Math.min(1, (agora - inicio) / DURACAO_PULSO);
+            const cabeca = paraChip ? len * (1 - suave(t)) : len * suave(t);
+            const brilho = Math.min(1, t / .12, (1 - t) / .18);
             for (const c of camadas) {
                 c.el.style.strokeDashoffset = paraChip ? -cabeca : c.comprimento - cabeca;
                 c.el.style.opacity = c.opacidade * brilho;
             }
-            if (k < 1) return requestAnimationFrame(quadro);
+            if (t < 1) return quadro(passo);
             camadas.forEach(c => c.el.remove());
-            clarao(f.el.getPointAtLength(paraChip ? 0 : len), cor, esmaece);
+            emVoo.set(fonte, Math.max(0, (emVoo.get(fonte) || 1) - 1));
+            if (trilha.isConnected) clarao(trilha.getPointAtLength(paraChip ? 0 : len), cor, esmaece);
         };
-        requestAnimationFrame(quadro);
+        quadro(passo);
     }
     // CLARAO CURTO ONDE O PULSO CHEGA (PINO DO CHIP OU BORDA DO CARTAO)
     function clarao(p, cor, esmaece) {
@@ -598,50 +671,54 @@
         c.style.transformOrigin = `${p.x}px ${p.y}px`;
         c.animate([{ transform: 'scale(.6)', opacity: .9 }, { transform: 'scale(2.6)', opacity: 0 }], { duration: 280, easing: 'ease-out' }).onfinish = () => c.remove();
     }
-    function piscaAgente(c, s) {
-        const cartao = caixaCartoes.querySelector(`[data-conversa="${CSS.escape(c.id)}"]`);
-        const chip = cartao && [...cartao.querySelectorAll('.tk-agente')].find(e => e.title.startsWith(s.descricao || s.tipo));
+    function piscaAgente(s) {
+        const chip = caixaCartoes.querySelector(`.tk-agente[data-agente="${CSS.escape(s.id)}"]`);
         if (!chip) return;
         chip.classList.add('pisca');
-        setTimeout(() => chip.classList.remove('pisca'), 350);
+        agenda(() => chip.classList.remove('pisca'), 350);
     }
-    // TOCA SO O QUE CHEGOU DEPOIS DO ULTIMO POLL, NA ORDEM E COM O ESPACAMENTO REAL (COMPRIMIDO EM ATE 2 S)
-    function agendaPulsos(primeiraVez) {
-        if (!sinaisLigados()) return;
+    // TOCA SO O QUE CHEGOU DEPOIS DO ULTIMO POLL (POR seq), NA ORDEM E COM O ESPACAMENTO REAL (COMPRIMIDO EM ATE 2 S).
+    // CHAVE NOVA (CONVERSA OU AGENTE QUE APARECEU AGORA) ANCORA EM agora-3s, COMO NO PRIMEIRO POLL
+    function agendaPulsos() {
+        if (!sinaisLigados() || janela.hidden) return;
         const agora = Date.parse(dados.agora) || Date.now();
-        const fila = [];
+        const fila = [], vistos = new Set();
         const novos = (chave, lista) => {
-            const ultimo = tocados.get(chave) || (primeiraVez ? agora - 3000 : 0);
-            const n = lista.filter(p => Date.parse(p.hora) > ultimo);
-            if (lista.length) tocados.set(chave, Math.max(ultimo, ...lista.map(p => Date.parse(p.hora))));
+            vistos.add(chave);
+            const ultimo = tocados.has(chave) ? tocados.get(chave) : agora - JANELA_PRIMEIRO_POLL_MS;
+            const n = lista.filter(p => Date.parse(p.hora) > ultimo && (!p.seq || p.seq > ultimoSeq));
+            tocados.set(chave, Math.max(ultimo, ...lista.map(p => Date.parse(p.hora))));
             return n;
         };
         for (const c of dados.conversas) {
-            novos(c.id, c.pulsos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => pulsa(trilhas.get(c.id), p.dir) }));
+            novos(c.id, c.pulsos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => pulsa(cartoesPorId.get(c.id), p.dir) }));
             for (const s of todosSubs(c)) {
                 const marcos = [];
                 if (s.inicio) marcos.push({ hora: s.inicio, dir: 'spawn' });
                 if (s.fim) marcos.push({ hora: s.fim, dir: 'back' });
-                novos(s.id + ':marcos', marcos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => pulsa(trilhas.get(c.id), p.dir, s) }));
-                novos(s.id, s.pulsos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => { pulsa(trilhas.get(c.id), p.dir, s); piscaAgente(c, s); } }));
+                novos(s.id + ':marcos', marcos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => pulsa(cartoesPorId.get(c.id), p.dir, s) }));
+                novos(s.id, s.pulsos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => { pulsa(cartoesPorId.get(c.id), p.dir, s); piscaAgente(s); } }));
             }
         }
+        for (const chave of [...tocados.keys()]) if (!vistos.has(chave)) tocados.delete(chave);
+        ultimoSeq = Math.max(ultimoSeq, dados.seq || 0, ...dados.conversas.flatMap(c => [...c.pulsos, ...todosSubs(c).flatMap(s => s.pulsos)]).map(p => p.seq || 0));
         if (!fila.length) return;
         fila.sort((a, b) => a.hora - b.hora);
         const inicio = fila[0].hora, total = fila[fila.length - 1].hora - inicio, escala = total > LOTE_MAX_MS ? LOTE_MAX_MS / total : 1;
-        fila.forEach(item => setTimeout(item.acao, (item.hora - inicio) * escala));
+        fila.forEach(item => agenda(item.acao, (item.hora - inicio) * escala));
     }
 
-    // FEED "AGORA": DIFERENCA ENTRE DOIS POLLS
+    // FEED "AGORA": DIFERENCA ENTRE DOIS POLLS (TAREFAS COMPARADAS PELO TEXTO, NAO PELA POSICAO)
     function registraFeed() {
         if (anterior) {
             const antes = new Map(anterior.conversas.map(c => [c.id, c]));
             for (const c of dados.conversas) {
                 const v = antes.get(c.id);
                 if (!v) continue;
-                c.tarefas.forEach((t, j) => { if (t.status === 'completed' && v.tarefas[j] && v.tarefas[j].status !== 'completed') feed.unshift({ cor: 'var(--ok)', texto: `${cortaTexto(c.titulo, 22)} concluiu: ${t.texto}`, hora: Date.now() }); });
+                const statusAntes = new Map(v.tarefas.map(t => [t.texto, t.status]));
+                c.tarefas.forEach(t => { if (t.status === 'completed' && statusAntes.has(t.texto) && statusAntes.get(t.texto) !== 'completed') feed.unshift({ cor: 'var(--ok)', texto: `${cortaTexto(c.titulo, 22)} concluiu: ${t.texto}`, hora: Date.now() }); });
                 const idsAntes = new Set(todosSubs(v).map(s => s.id));
-                todosSubs(c).filter(s => !idsAntes.has(s.id)).forEach(s => feed.unshift({ cor: 'var(--agente)', texto: `${s.tipo} abriu em ${cortaTexto(c.titulo, 28)}`, hora: Date.now() }));
+                todosSubs(c).filter(s => !idsAntes.has(s.id)).forEach(s => feed.unshift({ cor: tomModelo(s.modelo), texto: `${s.tipo} abriu em ${cortaTexto(c.titulo, 28)}`, hora: Date.now() }));
                 if (c.esperando && !v.esperando) feed.unshift({ cor: 'var(--atencao)', texto: `${cortaTexto(c.titulo, 30)} espera você`, hora: Date.now() });
                 if (absorvida(c) && !absorvida(v)) feed.unshift({ cor: 'var(--grafite)', texto: `${cortaTexto(c.titulo, 30)} foi absorvida`, hora: Date.now() });
             }
@@ -652,25 +729,34 @@
         $('tkFeed').innerHTML = '<h4>Agora</h4>' + (feed.length ? feed.map(f => `<div><i style="background:${f.cor}"></i><span>${escapa(f.texto)}</span><small>${quando(f.hora)}</small></div>`).join('') : '<p>Nada ainda.</p>');
     }
 
-    // POLLING SO COM A VISAO ABERTA E A JANELA VISIVEL
+    // POLLING SO COM A VISAO ABERTA E A JANELA VISIVEL; UMA REQUISICAO POR VEZ E RESPOSTA DESCARTADA SE A VISAO FECHOU
     async function busca304() {
-        if (janela.hidden || document.visibilityState !== 'visible') return;
+        if (janela.hidden || document.visibilityState !== 'visible' || buscando) return;
+        buscando = true;
         try {
-            const r = await fetch('/api/tasks?desde=' + encodeURIComponent(hash), { cache: 'no-store' });
-            if (r.status === 304 || !r.ok) return;
-            const primeiraVez = !dados;
-            dados = await r.json();
+            const r = await fetch('/api/tasks?desde=' + encodeURIComponent(hash) + '&seq=' + ultimoSeq, { cache: 'no-store' });
+            if (janela.hidden) return;
+            if (r.status === 304 || !r.ok) { if (!vista) ajusta(); desenhaSeMudou(); return; }
+            const novo = await r.json();
+            if (janela.hidden) return;
+            dados = novo;
             hash = dados.hash;
             registraFeed();
+            // POLL NO MEIO DE UM ARRASTE: O CARTAO NAO PODE VOLTAR; REDESENHA AO SOLTAR
+            if (arrastoCartao) return;
             desenha();
-            agendaPulsos(primeiraVez);
+            agendaPulsos();
         } catch (e) { /* SERVIDOR REINICIANDO: TENTA NO PROXIMO CICLO */ }
+        finally { buscando = false; }
     }
     const botoesTasks = () => [document.getElementById('btnModoTasks'), document.querySelector('.trilho-lista [data-trilho="btnModoTasks"]')].filter(Boolean);
     function abre() {
+        if (!janela.hidden) return;
         janela.hidden = false;
-        vista = null;
         botoesTasks().forEach(b => b.setAttribute('aria-pressed', 'true'));
+        if (!vistaValida(vista)) vista = vistaValida(prefs.vista) ? prefs.vista : null;
+        // DADOS JA EM MEMORIA (REABERTURA): DESENHA NA HORA, O POLL SO CONFIRMA (304) OU ATUALIZA
+        if (dados) { desenha(); if (vista) aplicaVista(); }
         busca304();
         clearInterval(timer);
         timer = setInterval(busca304, INTERVALO_POLL);
@@ -679,42 +765,47 @@
         janela.hidden = true;
         clearInterval(timer);
         timer = null;
-        gPulsos.textContent = '';
+        clearTimeout(cliqueTimer);
+        limpaPulsos();
         botoesTasks().forEach(b => b.setAttribute('aria-pressed', 'false'));
     }
     const alterna = () => janela.hidden ? abre() : fecha();
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') gPulsos.textContent = ''; });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') limpaPulsos(); });
 
     $('tkFiltros').addEventListener('click', (ev) => {
         const b = ev.target.closest('button');
         if (!b) return;
-        filtro = b.dataset.f;
+        prefs.filtro = b.dataset.f;
+        gravaPrefs();
         vista = null;
         desenha();
     });
     $('tkModelos').addEventListener('click', (ev) => {
         const b = ev.target.closest('button');
         if (!b) return;
-        filtroModelo = filtroModelo === b.dataset.modelo ? null : b.dataset.modelo;
+        prefs.filtroModelo = prefs.filtroModelo === b.dataset.modelo ? null : b.dataset.modelo;
+        gravaPrefs();
         vista = null;
         desenha();
     });
     $('tkBusca').addEventListener('input', (ev) => { busca = ev.target.value.trim().toLowerCase(); aplicaBusca(); });
     $('tkBusca').addEventListener('keydown', (ev) => {
-        if (ev.key !== 'Enter' || !busca) return;
-        const e = [...caixaCartoes.children].find(x => (x.dataset.busca || '').includes(busca));
-        if (!e) return;
+        if (ev.key !== 'Enter' || !busca || !vistaValida(vista)) return;
+        const k = cartoesAtuais.find(x => (x.el.dataset.busca || '').includes(busca));
+        if (!k) return;
         const caixa = palco.getBoundingClientRect();
-        vista = { ...vista, x: caixa.width / 2 - (e.offsetLeft + e.offsetWidth / 2) * vista.k, y: caixa.height / 2 - (e.offsetTop + e.offsetHeight / 2) * vista.k };
+        vista = { ...vista, x: caixa.width / 2 - (k.x + LARGURA_CARTAO / 2) * vista.k, y: caixa.height / 2 - (k.y + k.h / 2) * vista.k };
         aplicaVista();
     });
-    $('tkSinais').addEventListener('click', () => { localStorage.setItem('tasksSinais', sinaisLigados() ? '0' : '1'); if (!sinaisLigados()) gPulsos.textContent = ''; atualizaContadores(); });
-    $('tkAbsorvidas').addEventListener('click', () => { mostraAbsorvidas = !mostraAbsorvidas; vista = null; desenha(); });
+    $('tkSinais').addEventListener('click', () => { prefs.sinais = !sinaisLigados(); gravaPrefs(); localStorage.setItem('tasksSinais', prefs.sinais ? '1' : '0'); if (!prefs.sinais) limpaPulsos(); atualizaContadores(); });
+    $('tkAbsorvidas').addEventListener('click', () => { prefs.absorvidas = !prefs.absorvidas; gravaPrefs(); vista = null; desenha(); });
     $('tkAjusta').addEventListener('click', ajusta);
     $('tkOrganiza').addEventListener('click', () => { fixas = { cartoes: {}, chip: null }; gravaPosicoes(); vista = null; desenha(); });
     $('tkFecha').addEventListener('click', fecha);
+    // ESC SO QUANDO A TASKS E A JANELA DE CIMA (UMA CONFIRMACAO DO APP, Z-INDEX MAIOR, FICA POR CIMA DELA)
+    const temJanelaPorCima = () => [...document.querySelectorAll('.ajuda:not([hidden])')].some(e => (parseInt(getComputedStyle(e).zIndex, 10) || 0) >= 65);
     document.addEventListener('keydown', (ev) => {
-        if (janela.hidden) return;
+        if (janela.hidden || temJanelaPorCima()) return;
         if (ev.key === 'Escape') {
             ev.stopImmediatePropagation();
             if (!$('tkGaveta').hidden) { selecionada = null; $('tkGaveta').hidden = true; desenha(); return; }
@@ -737,9 +828,17 @@
         }
     }
 
-    // ABRIR UMA CONVERSA DA LISTA COM A TASKS ABERTA FECHA A TASKS (COMPORTAMENTO DE ABA)
+    // ABRIR UMA CONVERSA PELA LISTA LATERAL FECHA A TASKS (COMPORTAMENTO DE ABA); ABERTURAS AUTOMATICAS
+    // (NOTIFICACAO, PRIMEIRA SESSAO, ATALHO DE TECLADO) DEIXAM A VISAO COMO ESTA
+    let cliqueNaLista = 0;
+    const lista = document.getElementById('listaSessoes') || document.querySelector('.sessoes .lista');
+    if (lista) {
+        lista.addEventListener('pointerdown', () => { cliqueNaLista = Date.now(); }, true);
+        lista.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') cliqueNaLista = Date.now(); }, true);
+    }
     const abreSessaoOriginal = window.abreSessao;
-    if (typeof abreSessaoOriginal === 'function') window.abreSessao = function (...args) { if (!janela.hidden) fecha(); return abreSessaoOriginal.apply(this, args); };
+    if (typeof abreSessaoOriginal === 'function') window.abreSessao = function (...args) { if (!janela.hidden && Date.now() - cliqueNaLista < 1500) fecha(); return abreSessaoOriginal.apply(this, args); };
+
     window.abreTasks = abre;
     window.fechaTasks = fecha;
     window.tasksAlterna = alterna;
