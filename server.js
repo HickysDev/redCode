@@ -588,7 +588,10 @@ function processaRegistro(estado, r, origem) {
                 const planoAntes = { id: b.id, plano: JSON.parse(JSON.stringify(estado.plano)), tarefas: JSON.parse(JSON.stringify(estado.tarefas)), hora: estado.planoHora, ultimaTarefa: estado.ultimaTarefa };
                 if (atualizaPlano(estado, b.name, b.input || {})) {
                     registraPulso(estado, r.timestamp, 'out');
-                    if (b.name === 'TaskCreate') (estado.tarefasCriadas = estado.tarefasCriadas || {})[b.id] = String(estado.ultimaTarefa);
+                    if (b.name === 'TaskCreate') {
+                        (estado.tarefasCriadas = estado.tarefasCriadas || {})[b.id] = String(estado.ultimaTarefa);
+                        estado.tarefas[estado.ultimaTarefa].criada = r.timestamp;
+                    }
                     estado.planoAntes = planoAntes;
                     if (!r.isSidechain) estado.planoHora = r.timestamp;
                     continue;
@@ -901,7 +904,8 @@ function solicitacoes(s, estado) {
 }
 function montaTasks(itens) {
     const conversas = itens.map(({ s, estado }) => {
-        const tarefas = tarefasDoPlano(estado.plano).map(t => ({ ...t, subagentes: [] }));
+        const sol = solicitacoes(s, estado);
+        const tarefasTodas = tarefasDoPlano(estado.plano).map((t, i) => ({ ...t, subagentes: [], criada: estado.plano[i].criada }));
         const subagentesSoltos = [];
         for (const a of Object.values(estado.agentes)) {
             const sub = {
@@ -909,15 +913,22 @@ function montaTasks(itens) {
                 inicio: a.inicio || null, fim: a.fim || null, pulsos: pulsosRecentes(a.pulsos), tarefas: tarefasDoPlano(a.plano),
                 acaoAtual: a.status === 'rodando' ? a.acaoAtual || null : null,
             };
-            const pai = tarefas[indiceTarefaPai(estado, a)];
+            const pai = tarefasTodas[indiceTarefaPai(estado, a)];
             if (pai) pai.subagentes.push(sub);
             else subagentesSoltos.push(sub);
         }
+        // PLANO DO ULTIMO PEDIDO: TASKCREATE ACUMULA NA CONVERSA, ENTAO SAI O QUE FOI CRIADO E CONCLUIDO ANTES DELE
+        const inicioPedido = sol.pedidoAtual ? Date.parse(sol.pedidoAtual.hora) : 0;
+        const doPedido = (t) => !(t.criada && Date.parse(t.criada) < inicioPedido && t.status === 'completed');
+        let tarefas = tarefasTodas.filter(doPedido);
+        if (!tarefas.length) { sol.planoAtual = false; tarefas = tarefasTodas; }
+        else tarefasTodas.filter(t => !doPedido(t)).forEach(t => subagentesSoltos.push(...t.subagentes.filter(x => x.status === 'rodando')));
+        tarefas = tarefas.map(({ criada, ...t }) => t);
         return {
             id: s.id, projeto: s.projeto, nomeProjeto: s.nomeProjeto, titulo: s.titulo, modelo: s.modelo,
             vivo: s.ativa, esperando: !s.ativa && !!estado.pergunta, ultimo: s.atualizado,
             pergunta: estado.pergunta ? corta(estado.pergunta.texto, 140) : null, acaoAtual: s.acaoAtual || null,
-            ...solicitacoes(s, estado),
+            ...sol,
             pulsos: pulsosRecentes(estado.pulsos), tarefas, subagentesSoltos,
         };
     });
