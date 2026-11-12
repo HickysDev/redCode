@@ -28,7 +28,7 @@
     const chipModelo = (m, extra = '') => `<span class="tk-chip-modelo${extra}" style="--tom:${tomModelo(m)}" title="${escapa(m || 'modelo não informado')}">${glifoModelo(m)}${escapa(nomeModelo(m))}</span>`;
 
     const css = `
-#janelaTasks { position: fixed; inset: 0; z-index: 65; background: var(--papel); color: var(--tinta); overflow: hidden; font-family: var(--sans); display: flex; flex-direction: column; }
+#janelaTasks { position: fixed; top: 0; right: 0; bottom: 0; left: var(--larg-sessoes, 0px); z-index: 65; background: var(--papel); color: var(--tinta); overflow: hidden; font-family: var(--sans); display: flex; flex-direction: column; }
 #janelaTasks, .marca, .trilho-lista { ${Object.entries(IDENTIDADE_MODELO).map(([f, i]) => `--tom-${f}: color-mix(in srgb, ${i.matiz} 62%, var(--tinta));`).join(' ')} }
 #janelaTasks[hidden] { display: none; }
 .tk-topo { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--linha); background: var(--papel); }
@@ -57,12 +57,18 @@
 .tk-chip-centro b { font: 600 14px var(--sans); }
 .tk-chip-centro .tk-pct { font: 600 20px var(--sans); }
 .tk-chip-centro small { font: 11px/1.3 var(--mono); color: var(--grafite); padding: 0 8px; }
-.tk-cartao { position: absolute; width: ${LARGURA_CARTAO}px; border: 1px solid var(--linha); border-radius: 10px; background: var(--folha); box-shadow: var(--sombra); padding: 10px 14px 10px 16px; cursor: pointer; transition: opacity .2s, border-color .2s; }
+.tk-cartao { position: absolute; user-select: none; width: ${LARGURA_CARTAO}px; border: 1px solid var(--linha); border-radius: 10px; background: var(--folha); box-shadow: var(--sombra); padding: 10px 14px 10px 16px; cursor: pointer; transition: opacity .2s, border-color .2s; }
 .tk-cartao::before { content: ""; position: absolute; left: -1px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 2px 2px 0; background: var(--tom); }
 .tk-cartao:hover, .tk-cartao.sel { border-color: var(--grafite); }
 .tk-cartao.viva { border-color: color-mix(in srgb, var(--voce) 55%, var(--linha)); }
 .tk-cartao.esperando { border-color: color-mix(in srgb, var(--atencao) 55%, var(--linha)); }
 .tk-cartao.sel { outline: 2px solid var(--voce); outline-offset: 1px; }
+.tk-cartao.arrastando, .tk-chip-centro.arrastando { cursor: grabbing; box-shadow: var(--sombra), 0 0 0 2px color-mix(in srgb, var(--voce) 35%, transparent); transition: none; z-index: 2; }
+.tk-palco.arrastando-cartao .tk-trilha { transition: none; }
+.tk-chip-centro { cursor: grab; }
+.tk-agente { overflow: visible; }
+.tk-agente .pet-mini { zoom: .45; width: 40px; height: 36px; margin: -4px 0 -6px -3px; }
+@media (prefers-reduced-motion: reduce) { .tk-agente .pet-corpo, .tk-agente .pet-item, .tk-agente .pet-corpo::before, .tk-agente .pet-corpo::after { animation: none !important; } }
 .tk-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .tk-cab b { font: 600 13.5px/1.3 var(--sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .tk-cab .tk-pct { font: 600 12px var(--mono); color: var(--grafite); flex: none; }
@@ -143,6 +149,7 @@
   <input class="tk-busca" id="tkBusca" placeholder="Procurar tarefa ou conversa (Ctrl+K)" aria-label="Procurar">
   <button class="mini" id="tkSinais" aria-pressed="true" title="Mostrar ou esconder os sinais correndo nas trilhas">Sinais</button>
   <button class="mini" id="tkAbsorvidas" aria-pressed="false" title="Mostrar as conversas concluídas e paradas há mais de ${MINUTOS_ABSORVE} min">Absorvidas<span class="n" id="tkNAbsorvidas"></span></button>
+  <button class="mini" id="tkOrganiza" title="Voltar ao arranjo automático (esquece as posições arrastadas)">Organizar</button>
   <button class="mini" id="tkAjusta" title="Ajustar à tela">Ajustar</button>
   <button class="fechar-mapa" id="tkFecha" title="Fechar (Esc)" aria-label="Fechar">×</button>
 </div>
@@ -213,7 +220,9 @@
         return { inicio, fim: Math.min(n, fim) };
     }
     const itemPasso = (t) => `<li class="${escapa(t.status)}"><i class="marcador"></i><span>${escapa(t.texto)}</span></li>`;
-    const chipAgente = (s) => `<span class="tk-agente ${escapa(s.status)}" style="--tom:${tomModelo(s.modelo)}" title="${escapa(s.descricao || s.tipo)} · ${escapa(s.status)}${s.modelo ? ' · ' + escapa(nomeModelo(s.modelo)) : ''}">◆ ${escapa(cortaTexto(s.tipo, 24))}${s.modelo ? `<i>${glifoModelo(s.modelo, 11)}${escapa(IDENTIDADE_MODELO[familiaModelo(s.modelo)].nome)}</i>` : ''}</span>`;
+    // MASCOTE DO AGENTE: O MESMO petMini DO APP (COM A PERSONALIZACAO DO USUARIO); SEM ELE, VOLTA AO LOSANGO
+    const petDoAgente = (s) => typeof petMini === 'function' ? petMini(s.tipo, s.status === 'rodando') : '◆ ';
+    const chipAgente = (s) => `<span class="tk-agente ${escapa(s.status)}" style="--tom:${tomModelo(s.modelo)}" title="${escapa(s.descricao || s.tipo)} · ${escapa(s.status)}${s.modelo ? ' · ' + escapa(nomeModelo(s.modelo)) : ''}">${petDoAgente(s)}${escapa(cortaTexto(s.tipo, 24))}${s.modelo ? `<i>${glifoModelo(s.modelo, 11)}${escapa(IDENTIDADE_MODELO[familiaModelo(s.modelo)].nome)}</i>` : ''}</span>`;
     function htmlCartao(c) {
         const feitas = c.tarefas.filter(t => t.status === 'completed').length, p = progressoConversa(c);
         const { inicio, fim } = janelaTarefas(c.tarefas);
@@ -225,11 +234,20 @@
             ${subs.length ? `<div class="tk-agentes">${subs.map(chipAgente).join('')}</div>` : ''}`;
     }
 
-    // LAYOUT DETERMINISTICO: COLUNAS A DIREITA E A ESQUERDA DO CHIP, SEM SOBREPOSICAO
+    // POSICOES FIXADAS PELO USUARIO (NO ESPACO DO MUNDO) E O CENTRO DO CHIP
+    const CHAVE_POSICOES = 'tasksPosicoes';
+    let fixas = { cartoes: {}, chip: null };
+    try { fixas = { cartoes: {}, chip: null, ...JSON.parse(localStorage.getItem(CHAVE_POSICOES) || '{}') }; } catch (e) { /* sem armazenamento */ }
+    const centro = () => fixas.chip || { x: 0, y: 0 };
+    function gravaPosicoes() { try { localStorage.setItem(CHAVE_POSICOES, JSON.stringify(fixas)); } catch (e) { /* sem armazenamento */ } }
+
+    // LAYOUT DETERMINISTICO: COLUNAS A DIREITA E A ESQUERDA DO CHIP, SEM SOBREPOSICAO; CARTAO FIXADO FICA ONDE O USUARIO DEIXOU
     function posiciona(cartoes) {
+        const o = centro();
+        const automaticos = cartoes.filter(k => !k.fixo);
         const xColuna = (i) => CHIP / 2 + CANAL + i * (LARGURA_CARTAO + CANAL);
         for (const lado of [1, -1]) {
-            const lista = cartoes.filter((k, i) => (i % 2 === 0) === (lado === 1));
+            const lista = automaticos.filter((k, i) => (i % 2 === 0) === (lado === 1));
             const nColunas = Math.ceil(lista.length / MAX_POR_COLUNA), tam = Math.ceil(lista.length / Math.max(nColunas, 1));
             const alturas = [];
             for (let j = 0; j < nColunas; j++) {
@@ -237,24 +255,74 @@
                 const total = itens.reduce((s, k) => s + k.h, 0) + FOLGA_Y * (itens.length - 1);
                 let y = -total / 2;
                 for (const k of itens) {
-                    Object.assign(k, { lado, coluna: j, y, cy: y + k.h / 2, x: lado > 0 ? xColuna(j) : -xColuna(j) - LARGURA_CARTAO });
-                    k.bordaX = lado > 0 ? k.x : k.x + LARGURA_CARTAO;
+                    Object.assign(k, { lado, coluna: j, y: o.y + y, x: o.x + (lado > 0 ? xColuna(j) : -xColuna(j) - LARGURA_CARTAO) });
                     y += k.h + FOLGA_Y;
                 }
                 alturas.push(total);
             }
-            const doLado = lista.slice().sort((a, b) => a.cy - b.cy), n = doLado.length;
+            // COLUNA EXTERNA CONTORNA A INTERNA: LANE ACIMA OU ABAIXO DO BLOCO E DEPOIS DESCE ATE O CARTAO
+            lista.filter(k => k.coluna > 0).sort((a, b) => Math.abs(a.y + a.h / 2 - o.y) - Math.abs(b.y + b.h / 2 - o.y)).forEach((k, i) => {
+                const sinal = k.y + k.h / 2 < o.y ? -1 : 1;
+                k.contorno = { xv: o.x + lado * (CHIP / 2 + 12 + i * 8), yl: o.y + sinal * (Math.max(...alturas.slice(0, k.coluna)) / 2 + 26 + i * 10), xh: o.x + lado * (xColuna(k.coluna) - CANAL + 30 + i * 10) };
+            });
+        }
+        empurraColisoes(cartoes);
+    }
+    // CARTAO AUTOMATICO QUE CAIU EM CIMA DE UM FIXADO (OU DO CHIP) DESCE ATE ACHAR LUGAR
+    function empurraColisoes(cartoes) {
+        const o = centro();
+        const colide = (a, b) => a.x < b.x + b.w + FOLGA_Y && b.x < a.x + a.w + FOLGA_Y && a.y < b.y + b.h + FOLGA_Y && b.y < a.y + a.h + FOLGA_Y;
+        const postos = [{ x: o.x - CHIP / 2, y: o.y - CHIP / 2, w: CHIP, h: CHIP }, ...cartoes.filter(k => k.fixo).map(k => ({ x: k.x, y: k.y, w: LARGURA_CARTAO, h: k.h }))];
+        for (const k of cartoes.filter(k => !k.fixo).sort((a, b) => a.lado - b.lado || a.coluna - b.coluna || a.y - b.y)) {
+            const r = { x: k.x, y: k.y, w: LARGURA_CARTAO, h: k.h };
+            for (let volta = 0; volta < 50; volta++) {
+                const batida = postos.find(p => colide(r, p));
+                if (!batida) break;
+                r.y = batida.y + batida.h + FOLGA_Y;
+                k.contorno = null;
+            }
+            k.y = r.y;
+            postos.push(r);
+        }
+    }
+    // LADO DO CHIP POR ONDE A TRILHA SAI, CONFORME ONDE O CARTAO ESTA
+    function ladoDoCartao(k) {
+        const o = centro();
+        if (k.x > o.x + CHIP / 2 + 20) return 'dir';
+        if (k.x + LARGURA_CARTAO < o.x - CHIP / 2 - 20) return 'esq';
+        return k.y + k.h / 2 < o.y ? 'cima' : 'baixo';
+    }
+    // ROTEIA TODAS AS TRILHAS: PINOS DISTRIBUIDOS POR LADO; CARTAO MAIS PERTO DO CENTRO SOBE MAIS LONGE NO CANAL (TRILHAS ANINHADAS)
+    function roteia(cartoes) {
+        const o = centro();
+        const grupos = { dir: [], esq: [], cima: [], baixo: [] };
+        for (const k of cartoes) { k.cx = k.x + LARGURA_CARTAO / 2; k.cy = k.y + k.h / 2; grupos[ladoDoCartao(k)].push(k); }
+        for (const [lado, lista] of Object.entries(grupos)) {
+            const horizontal = lado === 'dir' || lado === 'esq', sinal = lado === 'dir' || lado === 'baixo' ? 1 : -1;
+            const ordenada = lista.slice().sort((a, b) => horizontal ? a.cy - b.cy : a.cx - b.cx), n = ordenada.length;
             const passo = Math.min(20, (CHIP - 44) / Math.max(n - 1, 1));
-            doLado.forEach((k, i) => { k.pinoY = (i - (n - 1) / 2) * passo; k.pinoX = lado * CHIP / 2; });
-            // CARTAO MAIS PERTO DO CENTRO SOBE MAIS LONGE NO CANAL: AS TRILHAS FICAM ANINHADAS SEM SE CRUZAR
-            const internas = lista.filter(k => k.coluna === 0).sort((a, b) => Math.abs(b.cy) - Math.abs(a.cy));
-            const passoX = Math.min(14, (CANAL - 70) / Math.max(internas.length - 1, 1));
-            internas.forEach((k, i) => { k.pontos = [[k.pinoX, k.pinoY], [lado * (CHIP / 2 + 44 + i * passoX), k.pinoY], [lado * (CHIP / 2 + 44 + i * passoX), k.cy], [k.bordaX, k.cy]]; });
-            const externas = lista.filter(k => k.coluna > 0).sort((a, b) => Math.abs(a.cy) - Math.abs(b.cy));
-            externas.forEach((k, i) => {
-                const sinal = k.cy < 0 ? -1 : 1, xv = lado * (CHIP / 2 + 12 + i * 8);
-                const yl = sinal * (Math.max(...alturas.slice(0, k.coluna)) / 2 + 26 + i * 10), xh = lado * (xColuna(k.coluna) - CANAL + 30 + i * 10);
-                k.pontos = [[k.pinoX, k.pinoY], [xv, k.pinoY], [xv, yl], [xh, yl], [xh, k.cy], [k.bordaX, k.cy]];
+            ordenada.forEach((k, i) => {
+                const t = (i - (n - 1) / 2) * passo;
+                k.pinoX = horizontal ? o.x + sinal * CHIP / 2 : o.x + t;
+                k.pinoY = horizontal ? o.y + t : o.y + sinal * CHIP / 2;
+            });
+            const distancia = (k) => Math.abs(horizontal ? k.cy - o.y : k.cx - o.x);
+            const diretas = lista.filter(k => !k.contorno).sort((a, b) => distancia(b) - distancia(a));
+            const passoX = Math.min(14, (CANAL - 70) / Math.max(diretas.length - 1, 1));
+            diretas.forEach((k, i) => {
+                if (horizontal) {
+                    const borda = sinal > 0 ? k.x : k.x + LARGURA_CARTAO;
+                    const xm = sinal > 0 ? Math.min(o.x + CHIP / 2 + 44 + i * passoX, borda - 12) : Math.max(o.x - CHIP / 2 - 44 - i * passoX, borda + 12);
+                    k.pontos = [[k.pinoX, k.pinoY], [xm, k.pinoY], [xm, k.cy], [borda, k.cy]];
+                } else {
+                    const borda = sinal > 0 ? k.y : k.y + k.h;
+                    const ym = sinal > 0 ? Math.min(o.y + CHIP / 2 + 44 + i * passoX, borda - 12) : Math.max(o.y - CHIP / 2 - 44 - i * passoX, borda + 12);
+                    k.pontos = [[k.pinoX, k.pinoY], [k.pinoX, ym], [k.cx, ym], [k.cx, borda]];
+                }
+            });
+            lista.filter(k => k.contorno).forEach(k => {
+                const { xv, yl, xh } = k.contorno, borda = k.lado > 0 ? k.x : k.x + LARGURA_CARTAO;
+                k.pontos = [[k.pinoX, k.pinoY], [xv, k.pinoY], [xv, yl], [xh, yl], [xh, k.cy], [borda, k.cy]];
             });
         }
     }
@@ -273,6 +341,7 @@
         return d + ` L${fim[0]},${fim[1]}`;
     }
 
+    let cartoesAtuais = [];
     function desenha() {
         const visiveis = dados.conversas.filter(c => passaFiltro(c) && (mostraAbsorvidas || !absorvida(c))).sort((a, b) => a.id.localeCompare(b.id));
         caixaCartoes.textContent = '';
@@ -284,9 +353,12 @@
             e.dataset.busca = [c.titulo, c.nomeProjeto, nomeModelo(c.modelo), ...c.tarefas.map(t => t.texto), ...todosSubs(c).flatMap(s => [s.tipo, s.descricao, ...s.tarefas.map(t => t.texto)])].join(' ').toLowerCase();
             e.innerHTML = htmlCartao(c);
             caixaCartoes.appendChild(e);
-            return { c, el: e, h: e.offsetHeight };
+            const fixa = fixas.cartoes[c.id];
+            return { c, el: e, h: e.offsetHeight, fixo: !!fixa, x: fixa ? fixa.x : 0, y: fixa ? fixa.y : 0 };
         });
         posiciona(cartoes);
+        cartoesAtuais = cartoes;
+        posicionaChip();
         gPinos.textContent = ''; gTrilhas.textContent = '';
         desenhaPinos();
         trilhas = new Map();
@@ -294,10 +366,11 @@
             k.el.style.left = k.x + 'px';
             k.el.style.top = k.y + 'px';
             const tom = tomModelo(k.c.modelo);
-            const p = el('path', { d: caminhoChanfrado(k.pontos), class: 'tk-trilha', 'data-conversa': k.c.id, style: `--trilha: color-mix(in srgb, ${tom} 45%, var(--linha))`, 'stroke-dasharray': k.c.vivo || k.c.esperando ? null : '4 5' }, gTrilhas);
-            el('circle', { cx: k.pinoX, cy: k.pinoY, r: 2.6, class: 'tk-pino-ativo', style: `--trilha: color-mix(in srgb, ${tom} 70%, var(--linha))` }, gTrilhas);
-            trilhas.set(k.c.id, { el: p, d: p.getAttribute('d'), conversa: k.c.id });
+            k.trilha = el('path', { class: 'tk-trilha', 'data-conversa': k.c.id, style: `--trilha: color-mix(in srgb, ${tom} 45%, var(--linha))`, 'stroke-dasharray': k.c.vivo || k.c.esperando ? null : '4 5' }, gTrilhas);
+            k.pino = el('circle', { r: 2.6, class: 'tk-pino-ativo', style: `--trilha: color-mix(in srgb, ${tom} 70%, var(--linha))` }, gTrilhas);
+            trilhas.set(k.c.id, { el: k.trilha, d: '', conversa: k.c.id });
         }
+        atualizaTrilhas();
         atualizaCentro(visiveis);
         atualizaContadores();
         desenhaLegenda(visiveis);
@@ -306,6 +379,24 @@
         $('tkVazio').hidden = visiveis.length > 0;
         if (!vista) ajusta();
         if (selecionada) desenhaGaveta();
+    }
+    function posicionaChip() {
+        const o = centro();
+        $('tkChip').style.left = (o.x - CHIP / 2) + 'px';
+        $('tkChip').style.top = (o.y - CHIP / 2) + 'px';
+        gPinos.setAttribute('transform', `translate(${o.x} ${o.y})`);
+    }
+    // RECALCULA TODAS AS TRILHAS (TAMBEM A CADA QUADRO DO ARRASTE DE UM CARTAO OU DO CHIP)
+    function atualizaTrilhas() {
+        roteia(cartoesAtuais);
+        for (const k of cartoesAtuais) {
+            const d = caminhoChanfrado(k.pontos);
+            k.trilha.setAttribute('d', d);
+            k.pino.setAttribute('cx', k.pinoX);
+            k.pino.setAttribute('cy', k.pinoY);
+            const f = trilhas.get(k.c.id);
+            f.d = d; f.len = 0;
+        }
     }
     function desenhaPinos() {
         const meio = CHIP / 2, n = 7, passo = (CHIP - 44) / (n - 1), comp = 9;
@@ -348,7 +439,8 @@
     function aplicaVista() { mundo.style.transform = `translate(${vista.x}px, ${vista.y}px) scale(${vista.k})`; }
     function ajusta() {
         const cartoes = [...caixaCartoes.children];
-        let minX = -CHIP / 2 - 12, maxX = CHIP / 2 + 12, minY = -CHIP / 2 - 12, maxY = CHIP / 2 + 12;
+        const o = centro();
+        let minX = o.x - CHIP / 2 - 12, maxX = o.x + CHIP / 2 + 12, minY = o.y - CHIP / 2 - 12, maxY = o.y + CHIP / 2 + 12;
         for (const e of cartoes) {
             minX = Math.min(minX, e.offsetLeft); maxX = Math.max(maxX, e.offsetLeft + e.offsetWidth);
             minY = Math.min(minY, e.offsetTop); maxY = Math.max(maxY, e.offsetTop + e.offsetHeight);
@@ -366,13 +458,31 @@
         vista = { k: vista.k * fator, x: px - (px - vista.x) * fator, y: py - (py - vista.y) * fator };
         aplicaVista();
     }, { passive: false });
-    let arrasto = null;
+    let arrasto = null, arrastoCartao = null;
     palco.addEventListener('pointerdown', (ev) => {
-        if (ev.button !== 0 || ev.target.closest('.tk-cartao, .tk-caixa, .tk-legenda, .tk-chip-centro')) return;
-        arrasto = { x: ev.clientX, y: ev.clientY, vx: vista.x, vy: vista.y, moveu: false };
+        if (ev.button !== 0 || ev.target.closest('.tk-caixa, .tk-legenda')) return;
+        const cartao = ev.target.closest('.tk-cartao'), chip = ev.target.closest('.tk-chip-centro');
+        if (cartao || chip) {
+            const k = cartao ? cartoesAtuais.find(x => x.el === cartao) : null;
+            if (cartao && !k) return;
+            arrastoCartao = { k, x: ev.clientX, y: ev.clientY, x0: k ? k.x : centro().x, y0: k ? k.y : centro().y, moveu: false };
+        } else {
+            arrasto = { x: ev.clientX, y: ev.clientY, vx: vista.x, vy: vista.y, moveu: false };
+        }
         palco.setPointerCapture(ev.pointerId);
     });
     palco.addEventListener('pointermove', (ev) => {
+        if (arrastoCartao) {
+            const a = arrastoCartao;
+            // LIMIAR DE 4 PX: ABAIXO DISSO E CLIQUE (ABRE A GAVETA), NAO ARRASTE
+            if (!a.moveu && Math.hypot(ev.clientX - a.x, ev.clientY - a.y) < 4) return;
+            if (!a.moveu) { a.moveu = true; palco.classList.add('arrastando-cartao'); gPulsos.textContent = ''; (a.k ? a.k.el : $('tkChip')).classList.add('arrastando'); }
+            const nx = Math.round(a.x0 + (ev.clientX - a.x) / vista.k), ny = Math.round(a.y0 + (ev.clientY - a.y) / vista.k);
+            if (a.k) { a.k.x = nx; a.k.y = ny; a.k.fixo = true; a.k.contorno = null; a.k.el.style.left = nx + 'px'; a.k.el.style.top = ny + 'px'; }
+            else { fixas.chip = { x: nx, y: ny }; posicionaChip(); }
+            atualizaTrilhas();
+            return;
+        }
         if (arrasto) {
             const dx = ev.clientX - arrasto.x, dy = ev.clientY - arrasto.y;
             if (Math.hypot(dx, dy) > 3) { arrasto.moveu = true; palco.classList.add('arrastando'); }
@@ -384,19 +494,30 @@
         if (novo !== foco) { foco = novo; aplicaFoco(); }
     });
     const soltaArrasto = (ev) => {
-        if (arrasto && !arrasto.moveu && ev.type === 'pointerup' && !ev.target.closest('.tk-cartao')) { selecionada = null; $('tkGaveta').hidden = true; desenha(); }
+        if (arrastoCartao) {
+            const a = arrastoCartao;
+            arrastoCartao = null;
+            palco.classList.remove('arrastando-cartao');
+            (a.k ? a.k.el : $('tkChip')).classList.remove('arrastando');
+            if (a.moveu) {
+                if (a.k) fixas.cartoes[a.k.c.id] = { x: a.k.x, y: a.k.y };
+                gravaPosicoes();
+                desenha();
+            } else if (a.k && ev.type === 'pointerup') {
+                selecionada = selecionada === a.k.c.id ? null : a.k.c.id;
+                desenha();
+                $('tkGaveta').hidden = !selecionada;
+            }
+            return;
+        }
+        if (arrasto && !arrasto.moveu && ev.type === 'pointerup') { selecionada = null; $('tkGaveta').hidden = true; desenha(); }
         arrasto = null; palco.classList.remove('arrastando');
     };
     palco.addEventListener('pointerup', soltaArrasto);
     palco.addEventListener('pointercancel', soltaArrasto);
     palco.addEventListener('pointerleave', () => { if (foco) { foco = null; aplicaFoco(); } });
-    caixaCartoes.addEventListener('click', (ev) => {
-        const cartao = ev.target.closest('.tk-cartao');
-        if (!cartao || !dados) return;
-        selecionada = selecionada === cartao.dataset.conversa ? null : cartao.dataset.conversa;
-        desenha();
-        $('tkGaveta').hidden = !selecionada;
-    });
+    // A AREA DA VISAO MUDA COM A LISTA (CTRL+B) E COM A JANELA: REENCAIXA
+    new ResizeObserver(() => { if (!janela.hidden && vista && dados) ajusta(); }).observe(palco);
 
     function aplicaFoco() {
         janela.classList.toggle('focando', !!foco);
@@ -590,6 +711,7 @@
     $('tkSinais').addEventListener('click', () => { localStorage.setItem('tasksSinais', sinaisLigados() ? '0' : '1'); if (!sinaisLigados()) gPulsos.textContent = ''; atualizaContadores(); });
     $('tkAbsorvidas').addEventListener('click', () => { mostraAbsorvidas = !mostraAbsorvidas; vista = null; desenha(); });
     $('tkAjusta').addEventListener('click', ajusta);
+    $('tkOrganiza').addEventListener('click', () => { fixas = { cartoes: {}, chip: null }; gravaPosicoes(); vista = null; desenha(); });
     $('tkFecha').addEventListener('click', fecha);
     document.addEventListener('keydown', (ev) => {
         if (janela.hidden) return;
@@ -615,6 +737,9 @@
         }
     }
 
+    // ABRIR UMA CONVERSA DA LISTA COM A TASKS ABERTA FECHA A TASKS (COMPORTAMENTO DE ABA)
+    const abreSessaoOriginal = window.abreSessao;
+    if (typeof abreSessaoOriginal === 'function') window.abreSessao = function (...args) { if (!janela.hidden) fecha(); return abreSessaoOriginal.apply(this, args); };
     window.abreTasks = abre;
     window.fechaTasks = fecha;
     window.tasksAlterna = alterna;
