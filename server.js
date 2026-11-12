@@ -438,7 +438,7 @@ function processaRegistro(estado, r, origem) {
         if (!r.isSidechain && /^\s*<task-notification>/.test(textoBruto)) {
             const campo = (nome) => ((textoBruto.match(new RegExp(`<${nome}>([\\s\\S]*?)</${nome}>`)) || [])[1] || '').trim();
             const situacao = campo('status');
-            if (campo('task-id')) estado.tarefasNotificadas[campo('task-id')] = situacao;
+            if (campo('task-id')) { estado.tarefasNotificadas[campo('task-id')] = situacao; (estado.horaNotificacao = estado.horaNotificacao || {})[campo('task-id')] = r.timestamp; }
             estado.turnoEncerrado = false;
             adicionaEvento(estado, {
                 tipo: 'notificacao', hora: r.timestamp, situacao,
@@ -726,6 +726,11 @@ function leSubagentes(pastaSessao, estadoPai) {
         else if (meta.finished === true || (agente.status === 'rodando' && parado)) {
             agente.status = agente.status === 'erro' ? 'erro' : 'concluido';
         }
+        // Retomado por SendMessage: atividade no transcript depois da última notificação e arquivo mexido há pouco
+        // = rodando de novo (vale mais que o aviso antigo, o meta.finished e o status do tool_result)
+        const horaAviso = estadoPai.horaNotificacao && estadoPai.horaNotificacao[idAgente];
+        const retomado = sub.ultimo && (!horaAviso || Date.parse(sub.ultimo) > Date.parse(horaAviso)) && Date.now() - mtime < SEGUNDOS_ATIVA * 1000;
+        if (retomado) { agente.status = 'rodando'; agente.fim = null; }
         // Fim = última atividade registrada do agente (vale também para os de segundo plano)
         if (agente.status !== 'rodando' && sub.ultimo) agente.fim = sub.ultimo;
         agente.inicio = agente.inicio || sub.inicio;
