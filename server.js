@@ -951,7 +951,7 @@ function solicitacoes(s, estado) {
     return { pedidoAtual: atual ? { texto: corta(atual.texto, 200), hora: atual.hora } : null, complementos, fila, planoAtual, planoHora: estado.planoHora || null };
 }
 function montaTasks(itens) {
-    const conversas = itens.map(({ s, estado }) => {
+    const conversas = itens.map(({ s, estado, fundo = [] }) => {
         const sol = solicitacoes(s, estado);
         const tarefasTodas = tarefasDoPlano(estado.plano).map((t, i) => ({ ...t, subagentes: [], criada: estado.plano[i].criada }));
         const subagentesSoltos = [];
@@ -975,7 +975,8 @@ function montaTasks(itens) {
         tarefas = tarefas.map(({ criada, ...t }) => t);
         return {
             id: s.id, projeto: s.projeto, nomeProjeto: s.nomeProjeto, titulo: s.titulo, modelo: s.modelo,
-            vivo: s.ativa, esperando: !s.ativa && !!estado.pergunta, ultimo: s.atualizado,
+            // Em segundo plano conta como trabalhando (cartão, chip e filtro Trabalhando)
+            vivo: s.ativa || fundo.length > 0, esperando: !s.ativa && !!estado.pergunta, ultimo: s.atualizado, segundoPlano: fundo,
             pergunta: estado.pergunta ? corta(estado.pergunta.texto, 140) : null, acaoAtual: s.acaoAtual || null,
             ...sol,
             pulsos: pulsosRecentes(estado.pulsos), tarefas, subagentesSoltos,
@@ -987,18 +988,25 @@ function listaTasks() {
     const limite = Date.now() - HORAS_TASKS * 3600 * 1000;
     const itens = [];
     const sessoes = sessoesParaTasks(), arquivadas = sessoesTasks.arquivadas;
+    // Trabalho em segundo plano: tarefa do processo do painel (comando em segundo plano) ou processo solto acompanhado
+    const vivasPainel = chat.estado().filter(c => c.vivo && c.sessionId && (c.tarefasBg || []).length);
+    const fundoDe = (s) => [
+        ...((vivasPainel.find(c => c.sessionId === s.id) || {}).tarefasBg || []).map(t => corta(t.descricao || 'tarefa', 80)),
+        ...(s.acompanhando || []).map(a => a.nome),
+    ];
     for (const s of sessoes) {
-        // SO CONVERSA PROCESSANDO OU COM PERGUNTA SEM RESPOSTA: TURNO ENCERRADO NAO PEDE NADA AO USUARIO
-        if (s.atualizado < limite || arquivadas.has(s.projeto + '/' + s.id) || !(s.ativa || s.pergunta)) continue;
+        // SO CONVERSA PROCESSANDO (TAMBEM EM SEGUNDO PLANO) OU COM PERGUNTA SEM RESPOSTA: TURNO ENCERRADO NAO PEDE NADA AO USUARIO
+        const fundo = fundoDe(s);
+        if (s.atualizado < limite || arquivadas.has(s.projeto + '/' + s.id) || !(s.ativa || s.pergunta || fundo.length)) continue;
         const achado = arquivoDaSessao(s.projeto, s.id);
         const item = achado && cache.get(achado.arquivo);
         if (!item) continue;
         const estado = item.estado;
-        if (!estado.plano.length && !Object.keys(estado.agentes).length) continue;
-        itens.push({ s, estado });
+        // Sem plano nem agente o cartão ainda mostra o pedido e o que ela está fazendo (antes a conversa sumia da visão)
+        itens.push({ s, estado, fundo });
     }
-    const versao = itens.map(({ s, estado }) => [
-        s.id, s.atualizado, s.ativa, s.esperando, s.titulo, s.modelo, estado.pergunta && estado.pergunta.texto, s.acaoAtual && s.acaoAtual.texto,
+    const versao = itens.map(({ s, estado, fundo }) => [
+        s.id, s.atualizado, s.ativa, s.esperando, fundo.join(';'), s.titulo, s.modelo, estado.pergunta && estado.pergunta.texto, s.acaoAtual && s.acaoAtual.texto,
         JSON.stringify(solicitacoes(s, estado)),
         estado.plano.map(t => t.status + t.texto).join(','),
         Object.values(estado.agentes).map(a => [a.id, a.status, a.modelo, a.fim, (a.plano || []).map(t => t.status + t.texto).join(';'), a.acaoAtual && a.acaoAtual.tipo + ':' + a.acaoAtual.texto].join('|')).join(','),

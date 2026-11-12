@@ -287,7 +287,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     const passaFiltro = (c) => (prefs.filtro === 'todas' || (prefs.filtro === 'ativas' && c.vivo) || (prefs.filtro === 'esperando' && c.esperando) || (prefs.filtro === 'agentes' && agentesAtivos(c).length > 0))
         && (!prefs.filtroModelo || familiaModelo(c.modelo) === prefs.filtroModelo || todosSubs(c).some(s => familiaModelo(s.modelo) === prefs.filtroModelo));
     const visiveisAgora = () => dados.conversas.filter(c => passaFiltro(c) && (prefs.absorvidas || !absorvida(c))).sort((a, b) => a.id.localeCompare(b.id));
-    const situacao = (c) => c.esperando ? 'pergunta pra você' : c.vivo ? 'trabalhando' : 'parada';
+    const situacao = (c) => c.esperando ? 'pergunta pra você' : c.vivo ? ((c.segundoPlano || []).length && !c.acaoAtual ? 'em segundo plano' : 'trabalhando') : 'parada';
     const classeSituacao = (c) => c.esperando ? 'esperando' : c.vivo ? 'viva' : 'parada';
 
     // CARTAO DA CONVERSA: MESMO DNA DO CARTAO "PLANO" (BARRA + PASSOS + MARCADORES)
@@ -309,6 +309,9 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     function htmlAgora(c) {
         if (c.esperando && c.pergunta) return `<div class="tk-agora pergunta" title="${escapa(c.pergunta)}"><b>?</b><span>${escapa(c.pergunta)}</span></div>`;
         if (c.vivo && c.acaoAtual && c.acaoAtual.texto) return `<div class="tk-agora acao" title="${escapa(c.acaoAtual.texto)}"><b>${escapa(VERBO_ACAO[c.acaoAtual.tipo] || c.acaoAtual.tipo)}</b><span>${escapa(c.acaoAtual.texto)}</span></div>`;
+        // TURNO ENCERRADO COM COMANDO OU PROCESSO AINDA RODANDO EM SEGUNDO PLANO
+        const fundo = c.segundoPlano || [];
+        if (fundo.length) { const texto = fundo.length > 1 ? `${fundo.length} tarefas: ${fundo.join(' · ')}` : fundo[0]; return `<div class="tk-agora acao" title="${escapa(fundo.join('\n'))}"><b>Em segundo plano:</b><span>${escapa(texto)}</span></div>`; }
         return '';
     }
     // SOLICITACOES: O PEDIDO QUE ABRIU O TURNO, OS COMPLEMENTOS ENTREGUES NO MEIO E O QUE AINDA ESTA NA FILA
