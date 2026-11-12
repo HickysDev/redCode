@@ -340,7 +340,7 @@
         const familias = [...new Set(visiveis.flatMap(c => [familiaModelo(c.modelo), ...todosSubs(c).map(s => familiaModelo(s.modelo))]))].sort();
         const traco = (cor) => `<svg width="26" height="8" aria-hidden="true"><line x1="2" y1="4" x2="24" y2="4" stroke="var(--linha)" stroke-width="1.5"/><line x1="6" y1="4" x2="16" y2="4" stroke="${cor}" stroke-width="2.5" stroke-linecap="round"/></svg>`;
         $('tkLegenda').innerHTML = `<ol class="passos"><li class="completed"><i class="marcador"></i>feita</li><li class="in_progress"><i class="marcador"></i>em andamento</li><li class="pending"><i class="marcador"></i>a fazer</li></ol>
-            <i class="sep"></i><span>${traco('var(--voce)')}entrada</span><span>${traco('var(--tinta)')}saída</span><span>${traco('var(--agente)')}agente</span>
+            <i class="sep"></i><span>${traco('var(--voce)')}entrada</span><span>${traco('var(--tinta)')}saída</span><span>${traco('var(--agente)')}agente (cor do modelo)</span>
             ${familias.length ? '<i class="sep"></i>' + familias.map(f => `<span style="--tom:var(--tom-${f});color:var(--tom)">${glifoModelo(f, 13)}${IDENTIDADE_MODELO[f].nome}</span>`).join('') : ''}`;
     }
 
@@ -440,16 +440,18 @@
         { largura: 2.6, comprimento: 30, opacidade: .6 },
         { largura: 2, comprimento: 9, opacidade: 1, nucleo: true },
     ];
-    function pulsa(f, dir) {
+    // AGENTE CORRE NA MESMA TRILHA NA COR DO MODELO DELE: PULSOS DE AGENTES DIFERENTES SE CRUZAM
+    function pulsa(f, dir, agente) {
         if (!f || !f.el || document.visibilityState !== 'visible') return;
         const paraChip = dir === 'in' || dir === 'back';
-        const cor = dir === 'in' ? 'var(--voce)' : dir === 'out' ? 'var(--tinta)' : 'var(--agente)';
+        const cor = agente ? tomModelo(agente.modelo) : dir === 'in' ? 'var(--voce)' : 'var(--tinta)';
+        const fonte = f.conversa + ':' + (agente ? agente.id : 'conversa');
         if (semMovimento()) { f.el.classList.add('acesa'); setTimeout(() => f.el.classList.remove('acesa'), 300); return; }
-        if (gPulsos.querySelectorAll(`.tk-nucleo[data-chave="${CSS.escape(f.conversa)}"]`).length >= MAX_PULSOS_TRILHA) return;
+        if (gPulsos.querySelectorAll(`.tk-nucleo[data-chave="${CSS.escape(fonte)}"]`).length >= MAX_PULSOS_TRILHA) return;
         const len = f.len || (f.len = f.el.getTotalLength());
         const esmaece = foco && f.conversa !== foco ? ' esmaece' : '';
         const camadas = CAMADAS_PULSO.map(c => ({ ...c, el: el('path', {
-            d: f.d, class: 'tk-pulso' + (c.nucleo ? ' tk-nucleo' : '') + esmaece, 'data-chave': f.conversa, 'data-conversa': f.conversa,
+            d: f.d, class: 'tk-pulso' + (c.nucleo ? ' tk-nucleo' : '') + esmaece, 'data-chave': fonte, 'data-conversa': f.conversa,
             stroke: c.nucleo ? `color-mix(in srgb, ${cor} 35%, #fff)` : cor, 'stroke-width': c.largura, 'stroke-dasharray': `${c.comprimento} ${len * 2}`, opacity: 0,
         }, gPulsos) }));
         const inicio = performance.now(), duracao = DURACAO_PULSO;
@@ -499,8 +501,8 @@
                 const marcos = [];
                 if (s.inicio) marcos.push({ hora: s.inicio, dir: 'spawn' });
                 if (s.fim) marcos.push({ hora: s.fim, dir: 'back' });
-                novos(s.id + ':marcos', marcos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => pulsa(trilhas.get(c.id), p.dir) }));
-                novos(s.id, s.pulsos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => piscaAgente(c, s) }));
+                novos(s.id + ':marcos', marcos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => pulsa(trilhas.get(c.id), p.dir, s) }));
+                novos(s.id, s.pulsos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => { pulsa(trilhas.get(c.id), p.dir, s); piscaAgente(c, s); } }));
             }
         }
         if (!fila.length) return;
