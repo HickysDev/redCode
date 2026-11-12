@@ -52,6 +52,7 @@
 .tk-pino { stroke: var(--linha); stroke-width: 1.5; stroke-linecap: round; }
 .tk-pino-ativo { fill: var(--trilha, var(--linha)); }
 .tk-pulso { fill: none; stroke-linecap: round; pointer-events: none; }
+.tk-direcao { pointer-events: none; }
 .tk-chip-centro { position: absolute; left: ${-CHIP / 2}px; top: ${-CHIP / 2}px; width: ${CHIP}px; height: ${CHIP}px; border: 1px solid var(--linha); border-radius: 12px; background: var(--folha); box-shadow: var(--sombra); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; }
 .tk-chip-centro svg { width: 34px; height: 34px; color: var(--voce); margin-bottom: 4px; }
 .tk-chip-centro b { font: 600 14px var(--sans); }
@@ -437,12 +438,46 @@
         if (!f || !f.el || document.visibilityState !== 'visible') return;
         const paraChip = dir === 'in' || dir === 'back';
         const cor = dir === 'in' ? 'var(--voce)' : dir === 'out' ? 'var(--tinta)' : 'var(--agente)';
-        if (semMovimento()) { f.el.classList.add('acesa'); setTimeout(() => f.el.classList.remove('acesa'), 300); return; }
-        if (gPulsos.querySelectorAll(`[data-chave="${CSS.escape(f.conversa)}"]`).length >= MAX_PULSOS_TRILHA) return;
+        if (semMovimento()) { f.el.classList.add('acesa'); setTimeout(() => f.el.classList.remove('acesa'), 300); etiquetaDirecao(f, dir, cor); return; }
+        if (gPulsos.querySelectorAll(`.tk-cauda[data-chave="${CSS.escape(f.conversa)}"]`).length >= MAX_PULSOS_TRILHA) return;
         const len = f.len || (f.len = f.el.getTotalLength());
-        const de = paraChip ? -len : PULSO, ate = paraChip ? PULSO : -len;
-        const p = el('path', { d: f.d, class: 'tk-pulso' + (foco && f.conversa !== foco ? ' esmaece' : ''), stroke: cor, 'stroke-width': 3, 'stroke-dasharray': `${PULSO} ${len + PULSO}`, 'data-chave': f.conversa, 'data-conversa': f.conversa }, gPulsos);
-        p.animate([{ strokeDashoffset: de, opacity: .9 }, { strokeDashoffset: ate, opacity: .9 }], { duration: DURACAO_PULSO, easing: 'cubic-bezier(.4,0,.6,1)' }).onfinish = () => p.remove();
+        const esmaece = foco && f.conversa !== foco ? ' esmaece' : '';
+        const cauda = el('path', { d: f.d, class: 'tk-pulso tk-cauda' + esmaece, stroke: cor, 'stroke-width': 2, opacity: .35, 'stroke-dasharray': `${PULSO * 2.4} ${len * 2}`, 'data-chave': f.conversa, 'data-conversa': f.conversa }, gPulsos);
+        const corpo = el('path', { d: f.d, class: 'tk-pulso' + esmaece, stroke: cor, 'stroke-width': 3.2, 'stroke-dasharray': `${PULSO} ${len * 2}`, 'data-conversa': f.conversa }, gPulsos);
+        const seta = el('path', { d: 'M-4,-4.5 L3,0 L-4,4.5', class: 'tk-pulso tk-seta' + esmaece, stroke: cor, 'stroke-width': 2.2, 'stroke-linejoin': 'round', 'data-conversa': f.conversa }, gPulsos);
+        etiquetaDirecao(f, dir, cor);
+        const inicio = performance.now(), duracao = DURACAO_PULSO * (dir === 'spawn' || dir === 'back' ? .8 : 1.15);
+        const suave = (x) => x < .5 ? 2 * x * x : 1 - 2 * (1 - x) * (1 - x);
+        const quadro = (agora) => {
+            const k = Math.min(1, (agora - inicio) / duracao), s = suave(k);
+            // A TRILHA VAI DO PINO AO CARTAO: "IN" E "BACK" CORREM CONTRA O PATH, "OUT" E "SPAWN" A FAVOR
+            const ponta = paraChip ? len * (1 - s) : len * s;
+            const atras = paraChip ? Math.min(len, ponta + 2) : Math.max(0, ponta - 2);
+            corpo.style.strokeDashoffset = paraChip ? -ponta : PULSO - ponta;
+            cauda.style.strokeDashoffset = paraChip ? -ponta : PULSO * 2.4 - ponta;
+            const a = f.el.getPointAtLength(ponta), b = f.el.getPointAtLength(atras);
+            const ang = Math.atan2(a.y - b.y, a.x - b.x) * 180 / Math.PI;
+            seta.setAttribute('transform', `translate(${a.x} ${a.y}) rotate(${ang})`);
+            seta.style.opacity = k < .08 ? k / .08 : k > .92 ? (1 - k) / .08 : 1;
+            if (k < 1) requestAnimationFrame(quadro); else { corpo.remove(); cauda.remove(); seta.remove(); }
+        };
+        requestAnimationFrame(quadro);
+    }
+    // ROTULO NA PONTA DO CARTAO: DIZ SE O ULTIMO SINAL FOI ENTRADA OU SAIDA, E SOME SOZINHO
+    function etiquetaDirecao(f, dir, cor) {
+        const len = f.len || (f.len = f.el.getTotalLength());
+        const texto = { in: 'entrada', out: 'saída', spawn: 'agente abriu', back: 'agente voltou' }[dir];
+        const largura = Math.max(46, texto.length * 6.4 + 12);
+        const p = f.el.getPointAtLength(Math.max(0, len - largura / 2 - 10));
+        const antigo = gPulsos.querySelector(`.tk-direcao[data-chave="${CSS.escape(f.chave || f.conversa)}"]`);
+        if (antigo) antigo.remove();
+        const g = el('g', { class: 'tk-direcao', 'data-chave': f.chave || f.conversa, 'data-conversa': f.conversa, transform: `translate(${p.x} ${p.y - 12})` }, gPulsos);
+        const r = el('rect', { x: -30, y: -9, width: 60, height: 16, rx: 8, fill: 'var(--folha)', stroke: cor, 'stroke-width': 1 }, g);
+        const tx = el('text', { x: 0, y: 3, 'text-anchor': 'middle', 'font-size': 9.5, fill: cor, style: 'font-family: var(--mono)' }, g);
+        tx.textContent = texto;
+        r.setAttribute('width', largura);
+        r.setAttribute('x', -largura / 2);
+        g.animate([{ opacity: 0 }, { opacity: 1, offset: .1 }, { opacity: 1, offset: .75 }, { opacity: 0 }], { duration: 2200 }).onfinish = () => g.remove();
     }
     function piscaAgente(c, s) {
         const cartao = caixaCartoes.querySelector(`[data-conversa="${CSS.escape(c.id)}"]`);
