@@ -56,7 +56,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 .tk-trilha.acesa { stroke: var(--voce); }
 .tk-pino-ativo { fill: var(--trilha, var(--linha)); }
 .tk-pulso { fill: none; stroke-linecap: round; pointer-events: none; }
-.tk-chip-centro { position: absolute; margin: 0; box-sizing: border-box; width: ${CHIP}px; height: ${CHIP}px; border: 1px solid var(--linha); border-radius: 14px; background: linear-gradient(160deg, color-mix(in srgb, var(--realce) 70%, var(--folha)), var(--folha) 60%); box-shadow: var(--sombra), inset 0 1px 0 color-mix(in srgb, var(--tinta) 6%, transparent); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding-bottom: 14px; cursor: grab; user-select: none; transition: opacity .3s; }
+.tk-chip-centro { position: absolute; margin: 0; box-sizing: border-box; width: ${CHIP}px; height: ${CHIP}px; border: 1px solid var(--linha); border-radius: 14px; background: linear-gradient(160deg, color-mix(in srgb, var(--realce) 70%, var(--folha)), var(--folha) 60%); box-shadow: var(--sombra), inset 0 1px 0 color-mix(in srgb, var(--tinta) 6%, transparent); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding-bottom: 14px; cursor: default; user-select: none; transition: opacity .3s; }
 .tk-die { position: absolute; inset: 12px; border-radius: 9px; border: 1px solid color-mix(in srgb, var(--linha) 85%, transparent); background-image: repeating-linear-gradient(0deg, color-mix(in srgb, var(--tinta) 4%, transparent) 0 1px, transparent 1px 8px), repeating-linear-gradient(90deg, color-mix(in srgb, var(--tinta) 4%, transparent) 0 1px, transparent 1px 8px); -webkit-mask: radial-gradient(circle at 50% 46%, transparent 40px, #000 72px); mask: radial-gradient(circle at 50% 46%, transparent 40px, #000 72px); pointer-events: none; }
 .tk-pino1 { position: absolute; top: 17px; left: 17px; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid var(--grafite); box-sizing: border-box; opacity: .8; }
 .tk-serigrafia { position: absolute; top: 15px; right: 17px; font: 500 8.5px var(--mono); letter-spacing: .2em; color: var(--grafite); opacity: .75; }
@@ -212,6 +212,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
   <button class="mini" id="tkSinais" aria-pressed="true" title="Mostrar ou esconder os sinais correndo nas trilhas">Sinais</button>
   <button class="mini" id="tkAbsorvidas" hidden aria-pressed="false" title="Mostrar as conversas concluídas e paradas há mais de ${MINUTOS_ABSORVE} min">Absorvidas<span class="n" id="tkNAbsorvidas"></span></button>
   <button class="mini" id="tkOrganiza" title="Voltar ao arranjo automático (esquece as posições arrastadas)">Organizar</button>
+  <button class="mini" id="tkCentraliza" title="Recentralizar no chip (mantém o zoom)">Recentralizar</button>
   <button class="mini" id="tkAjusta" title="Ajustar à tela">Ajustar</button>
   <button class="fechar-mapa" id="tkFecha" title="Fechar (Esc)" aria-label="Fechar">×</button>
 </div>
@@ -345,7 +346,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 
     // POSICOES FIXADAS PELO USUARIO (NO ESPACO DO MUNDO) E O CENTRO DO CHIP
     let fixas = { cartoes: {}, agentes: {}, chip: null, ...lePref(CHAVE_POSICOES, {}) };
-    const centro = () => fixas.chip || { x: 0, y: 0 };
+    const centro = () => ({ x: 0, y: 0 });
     const gravaPosicoes = () => gravaPref(CHAVE_POSICOES, fixas);
 
     // FOOTPRINT DO CARTAO COM OS SUB-CARTOES PENDURADOS DO LADO DE FORA (LONGE DO CHIP)
@@ -495,7 +496,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         const visiveis = visiveisAgora();
         chaveVisiveis = visiveis.map(c => c.id).join(',');
         const vivos = new Set(visiveis.map(c => c.id));
-        for (const [id, k] of cartoesPorId) if (!vivos.has(id)) { k.el.remove(); k.trilha.remove(); k.pino.remove(); k.subs.forEach(u => { u.el.remove(); u.trilha.remove(); }); cartoesPorId.delete(id); }
+        for (const [id, k] of cartoesPorId) if (!vivos.has(id)) { k.el.remove(); k.trilha.remove(); k.pino.remove(); k.subs.forEach(u => { u.el.remove(); u.trilha.remove(); if (subsPorId.get(u.s.id) === u) subsPorId.delete(u.s.id); }); cartoesPorId.delete(id); }
         const cartoes = visiveis.map(c => {
             let k = cartoesPorId.get(c.id);
             const corpo = htmlCartao(c), classe = `tk-cartao ${classeSituacao(c)}${selecionada === c.id ? ' sel' : ''}`;
@@ -710,15 +711,15 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     let arrasto = null, arrastoCartao = null, ultimoClique = { id: null, hora: 0 }, cliqueTimer = null;
     palco.addEventListener('pointerdown', (ev) => {
         if (ev.button !== 0 || ev.target.closest('.tk-caixa, .tk-legenda') || !vistaValida(vista)) return;
-        const cartao = ev.target.closest('.tk-cartao'), chip = ev.target.closest('.tk-chip-centro'), subEl = ev.target.closest('.tk-subcartao');
+        const cartao = ev.target.closest('.tk-cartao'), subEl = ev.target.closest('.tk-subcartao');
         if (subEl) {
             const u = subsPorId.get(subEl.dataset.agente);
             if (!u || u.saindo) return;
             arrastoCartao = { u, k: u.k, x: ev.clientX, y: ev.clientY, x0: u.dx, y0: u.dy, moveu: false };
-        } else if (cartao || chip) {
-            const k = cartao ? cartoesAtuais.find(x => x.el === cartao) : null;
-            if (cartao && !k) return;
-            arrastoCartao = { k, x: ev.clientX, y: ev.clientY, x0: k ? k.x : centro().x, y0: k ? k.y : centro().y, moveu: false };
+        } else if (cartao) {
+            const k = cartoesAtuais.find(x => x.el === cartao);
+            if (!k) return;
+            arrastoCartao = { k, x: ev.clientX, y: ev.clientY, x0: k.x, y0: k.y, moveu: false };
         } else {
             arrasto = { x: ev.clientX, y: ev.clientY, vx: vista.x, vy: vista.y, moveu: false };
         }
@@ -732,8 +733,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
             if (!a.moveu) { a.moveu = true; palco.classList.add('arrastando-cartao'); limpaPulsos(); (a.u ? a.u.el : a.k ? a.k.el : $('tkChip')).classList.add('arrastando'); }
             const nx = Math.round(a.x0 + (ev.clientX - a.x) / vista.k), ny = Math.round(a.y0 + (ev.clientY - a.y) / vista.k);
             if (a.u) { fixas.agentes[a.u.s.id] = { dx: nx, dy: ny }; posicionaSubs(a.k); }
-            else if (a.k) { a.k.x = nx; a.k.y = ny; a.k.fixo = true; a.k.contorno = null; a.k.el.style.left = nx + 'px'; a.k.el.style.top = ny + 'px'; posicionaSubs(a.k); }
-            else { fixas.chip = { x: nx, y: ny }; posicionaChip(); }
+            else { a.k.x = nx; a.k.y = ny; a.k.fixo = true; a.k.contorno = null; a.k.el.style.left = nx + 'px'; a.k.el.style.top = ny + 'px'; posicionaSubs(a.k); }
             atualizaTrilhas();
             return;
         }
@@ -1026,6 +1026,12 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     $('tkSinais').addEventListener('click', () => { prefs.sinais = !sinaisLigados(); gravaPrefs(); localStorage.setItem('tasksSinais', prefs.sinais ? '1' : '0'); if (!prefs.sinais) limpaPulsos(); atualizaContadores(); });
     $('tkAbsorvidas').addEventListener('click', () => { prefs.absorvidas = !prefs.absorvidas; gravaPrefs(); vista = null; desenha(); });
     $('tkAjusta').addEventListener('click', ajusta);
+    $('tkCentraliza').addEventListener('click', () => {
+        if (!vistaValida(vista)) return ajusta();
+        const caixa = palco.getBoundingClientRect(), o = centro();
+        vista = { k: vista.k, x: caixa.width / 2 - o.x * vista.k, y: (caixa.height - 50) / 2 - o.y * vista.k };
+        aplicaVista();
+    });
     $('tkOrganiza').addEventListener('click', () => { fixas = { cartoes: {}, agentes: {}, chip: null }; gravaPosicoes(); vista = null; desenha(); });
     $('tkFecha').addEventListener('click', fecha);
     // ESC SO QUANDO A TASKS E A JANELA DE CIMA (UMA CONFIRMACAO DO APP, Z-INDEX MAIOR, FICA POR CIMA DELA)
