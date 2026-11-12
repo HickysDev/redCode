@@ -820,6 +820,8 @@ function listaSessoes() {
                 custoHoje: stat.mtimeMs >= new Date(diaLocal() + 'T00:00:00').getTime() ? custoHojeSessao(path.join(caminhoPasta, nome.replace('.jsonl', '')), estado) : 0,
                 ativa: situacao.ativa, esperando: situacao.esperando, agentesRodando: situacao.agentesRodando,
                 pergunta: !!estado.pergunta, fimTurno: estado.fimTurno,
+                // Selo do botão Tasks na lista (conta sem chamar /api/tasks)
+                tarefasAndamento: estado.plano.filter(i => i.status === 'in_progress').length,
                 // O que ela está fazendo agora (ferramenta ainda sem resposta), para a lista lateral
                 acaoAtual: situacao.ativa ? (() => {
                     const e = [...estado.eventos].reverse().find(x => x.id && !x.fim);
@@ -860,7 +862,7 @@ function listaTasks() {
         const subagentesSoltos = [];
         for (const a of agentes) {
             const sub = {
-                id: a.id, tipo: a.tipoAgente || 'agente', descricao: corta(a.descricao, 80), status: a.status,
+                id: a.id, tipo: a.tipoAgente || 'agente', descricao: corta(a.descricao, 80), status: a.status, modelo: a.modelo || null,
                 inicio: a.inicio || null, fim: a.fim || null, pulsos: pulsosRecentes(a.pulsos), tarefas: tarefasDoPlano(a.plano),
             };
             if (tarefas[a.tarefaPai]) tarefas[a.tarefaPai].subagentes.push(sub);

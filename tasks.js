@@ -1,101 +1,162 @@
-// Visão Tasks: constelação das listas de tarefas de todas as conversas, com o Claude no centro.
-// Os pulsos nas linhas são o fluxo real lido do transcript (atraso de 1 a 3 s): "in" vai ao Claude, "out" volta dele.
+// Visão Tasks: placa de circuito. O Claude é o chip no centro; cada conversa é um cartão (o mesmo "Plano" da conversa)
+// ligado ao chip por uma trilha. Os pulsos são o fluxo real lido do transcript: "in" corre para o chip, "out" sai dele.
 (() => {
     'use strict';
     const NS = 'http://www.w3.org/2000/svg';
     const INTERVALO_POLL = 2000;
-    const MINUTOS_ABSORVE = 10;
-    const PULSO = 18, DURACAO_PULSO = 750, MAX_PULSOS_LINHA = 3, LOTE_MAX_MS = 2000;
+    const MINUTOS_ABSORVE = 10, HORAS_SELO = 24;
+    const PULSO = 22, DURACAO_PULSO = 700, MAX_PULSOS_TRILHA = 3, LOTE_MAX_MS = 2000;
+    const LARGURA_CARTAO = 300, CHIP = 164, CANAL = 140, FOLGA_Y = 18, MAX_POR_COLUNA = 4, LINHAS_CARTAO = 4, CHANFRO = 10;
     const semMovimento = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
     const sinaisLigados = () => localStorage.getItem('tasksSinais') !== '0';
 
+    // Identidade visual por família de modelo: matiz próprio misturado com a tinta do tema (funciona no claro e no escuro)
+    const IDENTIDADE_MODELO = {
+        fable: { nome: 'Fable', matiz: '#a78bfa', glifo: '<path d="M8 2.2l1.5 4.3L13.8 8l-4.3 1.5L8 13.8l-1.5-4.3L2.2 8l4.3-1.5z"/>' },
+        opus: { nome: 'Opus', matiz: '#2fb8a6', glifo: '<circle cx="8" cy="8" r="5"/><circle cx="8" cy="8" r="1.7" fill="currentColor" stroke="none"/>' },
+        sonnet: { nome: 'Sonnet', matiz: '#ec6fae', glifo: '<path d="M3 10.5c1.6-5 8.4-5 10 0"/><path d="M3 13h10"/>' },
+        haiku: { nome: 'Haiku', matiz: '#9ccc3c', glifo: '<path d="M4 11l4-6.5 4 6.5"/><path d="M5.3 13.3h5.4"/>' },
+        outro: { nome: 'Claude', matiz: '#9a9a9a', glifo: '<circle cx="8" cy="8" r="4.5"/>' },
+    };
+    const familiaModelo = (m) => (String(m || '').toLowerCase().match(/fable|opus|sonnet|haiku/) || ['outro'])[0];
+    const nomeModelo = (m) => {
+        const partes = String(m || '').replace(/^claude-/, '').replace(/-\d{8}$/, '').match(/^([a-z]+)-(\d+)(?:-(\d+))?/);
+        return partes ? `${partes[1][0].toUpperCase() + partes[1].slice(1)} ${partes[2]}${partes[3] ? '.' + partes[3] : ''}` : IDENTIDADE_MODELO[familiaModelo(m)].nome;
+    };
+    const tomModelo = (m) => `var(--tom-${familiaModelo(m)})`;
+    const glifoModelo = (m, t = 12) => `<svg width="${t}" height="${t}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IDENTIDADE_MODELO[familiaModelo(m)].glifo}</svg>`;
+    const chipModelo = (m, extra = '') => `<span class="tk-chip-modelo${extra}" style="--tom:${tomModelo(m)}" title="${escapa(m || 'modelo não informado')}">${glifoModelo(m)}${escapa(nomeModelo(m))}</span>`;
+
     const css = `
-#janelaTasks { position: fixed; inset: 0; z-index: 65; background: radial-gradient(ellipse 60% 55% at 50% 52%, color-mix(in srgb, var(--voce) 14%, var(--papel)) 0%, var(--papel) 70%); color: var(--tinta); overflow: hidden; font-family: var(--sans); }
+#janelaTasks { position: fixed; inset: 0; z-index: 65; background: var(--papel); color: var(--tinta); overflow: hidden; font-family: var(--sans); display: flex; flex-direction: column; }
+#janelaTasks, .marca, .trilho-lista { ${Object.entries(IDENTIDADE_MODELO).map(([f, i]) => `--tom-${f}: color-mix(in srgb, ${i.matiz} 62%, var(--tinta));`).join(' ')} }
 #janelaTasks[hidden] { display: none; }
-#janelaTasks::after { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(color-mix(in srgb, var(--tinta) 7%, transparent) 1px, transparent 1px); background-size: 26px 26px; mask-image: radial-gradient(ellipse at 50% 52%, transparent 10%, #000 70%); }
-#tasksSvg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; cursor: grab; }
-#tasksSvg.arrastando { cursor: grabbing; }
-.tk-topo { position: absolute; z-index: 6; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 12px; padding: 14px 20px; }
-.tk-topo h2 { font-size: 19px; font-weight: 700; display: flex; align-items: center; gap: 9px; margin: 0; }
-.tk-topo h2 i { width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--voce); box-shadow: 0 0 12px var(--voce); }
-.tk-seg { display: flex; background: color-mix(in srgb, var(--tinta) 5%, transparent); border: 1px solid var(--linha); border-radius: 10px; padding: 3px; margin-left: 14px; }
-.tk-seg button { font-size: 12.5px; padding: 5px 11px; border-radius: 7px; color: var(--grafite); display: flex; gap: 6px; align-items: center; }
-.tk-seg button.sel { background: color-mix(in srgb, var(--tinta) 9%, transparent); color: var(--tinta); }
-.tk-seg small { font-size: 10.5px; padding: 0 6px; border-radius: 6px; background: color-mix(in srgb, var(--tinta) 8%, transparent); }
-.tk-busca { margin-left: auto; width: 250px; font: inherit; font-size: 12.5px; color: var(--tinta); border: 1px solid var(--linha); background: color-mix(in srgb, var(--tinta) 4%, transparent); border-radius: 10px; padding: 7px 12px; }
-.tk-ic { min-width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--linha); background: color-mix(in srgb, var(--tinta) 4%, transparent); display: grid; place-items: center; color: var(--grafite); font-size: 13px; padding: 0 9px; }
-.tk-ic:hover, .tk-ic.sel { color: var(--voce); border-color: var(--voce); }
-.tk-bh { position: absolute; z-index: 1; left: 0; top: 0; width: 0; height: 0; pointer-events: none; transform-origin: 0 0; }
-.tk-bh > div { position: absolute; transform: translate(-50%, -50%); border-radius: 50%; }
-.tk-halo { width: 520px; height: 520px; background: radial-gradient(circle, #ff9d4a33 0%, #e8483d22 30%, transparent 62%); filter: blur(18px); }
-.tk-bh > .tk-disco { width: 440px; height: 440px; background: conic-gradient(from 200deg, #ffb070, #fff1d6 12%, #ff8a3d 22%, #c2410c 35%, #7f1d1d 52%, #e8483d 64%, #ff8a3d 82%, #ffb070); -webkit-mask: radial-gradient(circle, transparent 31%, #000 33%, #000 46%, transparent 70%); transform: translate(-50%, -50%) rotateX(76deg) rotateZ(0deg); filter: blur(1.5px) saturate(1.2); opacity: .95; animation: tk-gira 24s linear infinite; }
-.tk-bh > .tk-disco.frente { clip-path: inset(50% 0 0 0); z-index: 3; animation: none; transform: translate(-50%, -50%) rotateX(76deg); }
-.tk-bh > .tk-lente { z-index: 2; width: 150px; height: 150px; background: conic-gradient(from 90deg, #fff1d6, #ff8a3d 25%, #e8483d 50%, #ff8a3d 75%, #fff1d6); -webkit-mask: radial-gradient(circle, transparent 60%, #000 63%, #000 70%, transparent 78%); filter: blur(2.5px); opacity: .9; }
-.tk-bh > .tk-horizonte { z-index: 2; width: 104px; height: 104px; background: radial-gradient(circle, #000 62%, #050308 80%, #1a0f05 100%); box-shadow: 0 0 0 1.5px #ffe2b866, 0 0 24px 6px #ff8a3d55, inset 0 0 18px #000; }
-.tk-bh > .tk-centro { z-index: 4; border-radius: 0; transform: translate(-50%, 100px); text-align: center; white-space: nowrap; }
-.tk-centro b { display: block; font-size: 30px; font-weight: 700; background: linear-gradient(90deg, #ffd29a, #e8483d); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.tk-centro span { font-size: 12px; color: var(--grafite); }
-@keyframes tk-gira { to { transform: translate(-50%, -50%) rotateX(76deg) rotateZ(360deg); } }
-@keyframes tk-roda { to { transform: rotate(360deg); } }
-.tk-roda { transform-box: fill-box; transform-origin: center; animation: tk-roda 3.5s linear infinite; }
-#tasksSvg text { font-family: var(--sans); fill: var(--tinta); pointer-events: none; }
-#tasksSvg .tk-no { cursor: pointer; transition: opacity .2s; }
-#tasksSvg .tk-fio { transition: opacity .2s; }
-#janelaTasks.focando .tk-esmaece { opacity: .3; }
-#janelaTasks.buscando .tk-nao-achado { opacity: .2; }
-.tk-gaveta { position: absolute; z-index: 6; top: 64px; right: 20px; width: 340px; max-height: calc(100% - 210px); overflow: auto; background: color-mix(in srgb, var(--folha) 88%, transparent); border: 1px solid var(--linha); border-radius: 16px; padding: 16px; backdrop-filter: blur(18px); box-shadow: 0 20px 60px #0007; }
+.tk-topo { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--linha); background: var(--papel); }
+.tk-topo .tk-titulo { display: flex; align-items: center; gap: 8px; color: var(--voce); font: 600 18px/1.1 var(--estreita); margin-right: 6px; }
+.tk-topo .tk-titulo svg { width: 20px; height: 20px; }
+.tk-topo .filtros { flex-wrap: nowrap; }
+.tk-topo .tk-modelos { display: flex; gap: 4px; margin-left: 6px; padding-left: 10px; border-left: 1px solid var(--linha); }
+.tk-chip-modelo { display: inline-flex; align-items: center; gap: 4px; font: 500 11px var(--sans); line-height: 16px; padding: 0 7px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--tom) 55%, transparent); color: var(--tom); background: color-mix(in srgb, var(--tom) 7%, transparent); white-space: nowrap; }
+.tk-chip-modelo.n { opacity: .9; }
+.tk-chip-modelo.n .n { font: 11px var(--mono); opacity: .75; }
+.tk-chip-modelo[aria-pressed="true"] { background: var(--tom); color: var(--papel); }
+.tk-busca { margin-left: auto; width: 240px; height: 30px; padding: 0 11px; border: 1px solid var(--linha); border-radius: 8px; background: var(--folha); color: var(--tinta); font: 13px var(--sans); }
+.tk-busca:focus-visible { outline: none; border-color: var(--voce); box-shadow: 0 0 0 2px color-mix(in srgb, var(--voce) 22%, transparent); }
+.tk-topo .fechar-mapa { margin-left: 4px; }
+.tk-palco { flex: 1; position: relative; overflow: hidden; cursor: grab; background-image: radial-gradient(var(--linha) 1px, transparent 1px); background-size: 28px 28px; background-position: 14px 14px; }
+.tk-palco.arrastando { cursor: grabbing; }
+.tk-mundo { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.tk-svg { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.tk-trilha { fill: none; stroke: var(--trilha, var(--linha)); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; transition: opacity .2s, stroke .2s; }
+.tk-trilha.acesa { stroke: var(--voce); }
+.tk-pino { stroke: var(--linha); stroke-width: 1.5; stroke-linecap: round; }
+.tk-pino-ativo { fill: var(--trilha, var(--linha)); }
+.tk-pulso { fill: none; stroke-linecap: round; pointer-events: none; }
+.tk-chip-centro { position: absolute; left: ${-CHIP / 2}px; top: ${-CHIP / 2}px; width: ${CHIP}px; height: ${CHIP}px; border: 1px solid var(--linha); border-radius: 12px; background: var(--folha); box-shadow: var(--sombra); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; }
+.tk-chip-centro svg { width: 34px; height: 34px; color: var(--voce); margin-bottom: 4px; }
+.tk-chip-centro b { font: 600 14px var(--sans); }
+.tk-chip-centro .tk-pct { font: 600 20px var(--sans); }
+.tk-chip-centro small { font: 11px/1.3 var(--mono); color: var(--grafite); padding: 0 8px; }
+.tk-cartao { position: absolute; width: ${LARGURA_CARTAO}px; border: 1px solid var(--linha); border-radius: 10px; background: var(--folha); box-shadow: var(--sombra); padding: 10px 14px 10px 16px; cursor: pointer; transition: opacity .2s, border-color .2s; }
+.tk-cartao::before { content: ""; position: absolute; left: -1px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 2px 2px 0; background: var(--tom); }
+.tk-cartao:hover, .tk-cartao.sel { border-color: var(--grafite); }
+.tk-cartao.viva { border-color: color-mix(in srgb, var(--voce) 55%, var(--linha)); }
+.tk-cartao.esperando { border-color: color-mix(in srgb, var(--atencao) 55%, var(--linha)); }
+.tk-cartao.sel { outline: 2px solid var(--voce); outline-offset: 1px; }
+.tk-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.tk-cab b { font: 600 13.5px/1.3 var(--sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tk-cab .tk-pct { font: 600 12px var(--mono); color: var(--grafite); flex: none; }
+.tk-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font: 11px var(--mono); color: var(--grafite); margin: 4px 0 7px; }
+.tk-meta .tk-sit::before { content: "●"; margin-right: 4px; font-size: 9px; }
+.tk-cartao.viva .tk-sit { color: var(--voce); }
+.tk-cartao.esperando .tk-sit { color: var(--atencao); }
+.tk-cartao .barra { margin-bottom: 7px; }
+.tk-cartao .passos li, .tk-gaveta .passos li { grid-template-columns: 22px 1fr; align-items: center; padding: 2px 0; text-decoration: none; font-size: 12.5px; line-height: 1.3; }
+.tk-cartao .passos li::before, .tk-gaveta .passos li::before { content: none; }
+.tk-cartao .passos li span, .tk-gaveta .passos li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-cartao .passos li.completed span { color: var(--tinta); opacity: .7; }
+.tk-cartao .passos li.pending span { color: var(--grafite); }
+.tk-cartao .passos li.mais, .tk-gaveta .passos li.mais { font: 11px var(--mono); color: var(--grafite); }
+.tk-cartao .passos li.mais::before { content: "+" attr(data-n); color: var(--grafite); font: 11px var(--mono); text-align: center; }
+.tk-agentes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+.tk-agente { display: inline-flex; align-items: center; gap: 4px; font: 500 11px var(--sans); line-height: 16px; padding: 0 7px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--agente) 55%, transparent); color: var(--agente); background: color-mix(in srgb, var(--agente) 7%, transparent); max-width: 100%; white-space: nowrap; }
+.tk-agente i { font-style: normal; color: var(--tom); display: inline-flex; align-items: center; gap: 2px; }
+.tk-agente.rodando { border-color: var(--agente); }
+.tk-agente.rodando::after { content: "●"; font-size: 8px; animation: pisca-passo 1s ease-in-out infinite; }
+.tk-agente.erro, .tk-agente.interrompido { color: var(--erro); border-color: color-mix(in srgb, var(--erro) 55%, transparent); }
+.tk-agente.concluido { opacity: .75; }
+.tk-agente.pisca { background: color-mix(in srgb, var(--agente) 35%, transparent); }
+#janelaTasks.focando .tk-cartao.esmaece, #janelaTasks.focando .tk-trilha.esmaece, #janelaTasks.focando .tk-pulso.esmaece { opacity: .3; }
+#janelaTasks.buscando .tk-cartao.nao-achado { opacity: .25; }
+.tk-caixa { position: absolute; z-index: 3; background: var(--realce); border: 1px solid var(--linha); border-radius: 12px; box-shadow: var(--sombra); box-sizing: border-box; }
+.tk-gaveta { right: 16px; top: 14px; width: 380px; max-height: calc(100% - 180px); overflow: auto; padding: 16px 20px; }
 .tk-gaveta[hidden] { display: none; }
-.tk-gaveta .cab { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
-.tk-gaveta h3 { font-size: 15px; margin: 0; }
-.tk-gaveta .sub { font-size: 12px; color: var(--grafite); margin-top: 2px; }
+.tk-gaveta h2 { font: 600 17px/1.25 var(--estreita); margin: 0; }
+.tk-gaveta .nota { margin: 4px 0 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .tk-gaveta .acoes { display: flex; gap: 8px; margin-bottom: 12px; }
-.tk-gaveta .acoes button { font-size: 12px; padding: 6px 11px; border-radius: 8px; border: 1px solid var(--linha); color: var(--tinta); }
-.tk-gaveta .acoes button.pri { background: var(--voce); border-color: var(--voce); color: #fff; }
-.tk-gaveta h4 { font-size: 10.5px; letter-spacing: .8px; color: var(--grafite); margin: 6px 0; font-weight: 600; }
-.tk-lin { display: flex; align-items: center; gap: 9px; font-size: 13px; padding: 6px 4px; border-radius: 7px; }
-.tk-lin.c { color: var(--grafite); }
-.tk-lin.a { background: color-mix(in srgb, var(--tinta) 6%, transparent); font-weight: 600; }
-.tk-lin.filho { padding-left: 26px; font-size: 12px; color: var(--agente); }
-.tk-lin small { margin-left: auto; font-size: 11.5px; color: var(--grafite); font-variant-numeric: tabular-nums; }
-.tk-leg { position: absolute; z-index: 5; left: 20px; bottom: 18px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; font-size: 12px; color: var(--grafite); background: color-mix(in srgb, var(--folha) 85%, transparent); border: 1px solid var(--linha); border-radius: 12px; padding: 9px 14px; backdrop-filter: blur(12px); }
-.tk-leg span { display: flex; align-items: center; gap: 7px; }
-.tk-feed { position: absolute; z-index: 5; right: 20px; bottom: 18px; width: 340px; background: color-mix(in srgb, var(--folha) 85%, transparent); border: 1px solid var(--linha); border-radius: 12px; padding: 10px 14px; backdrop-filter: blur(12px); font-size: 12px; color: var(--grafite); }
-.tk-feed h4 { font-size: 10.5px; letter-spacing: 1px; margin: 0 0 6px; font-weight: 600; }
-.tk-feed div { display: flex; gap: 8px; align-items: center; margin: 4px 0; color: var(--tinta); }
-.tk-feed div i { width: 6px; height: 6px; border-radius: 50%; flex: none; }
-.tk-feed div small { margin-left: auto; color: var(--grafite); }
-.tk-vazio { position: absolute; z-index: 5; left: 50%; top: 70%; transform: translateX(-50%); color: var(--grafite); font-size: 13px; }
-@media (prefers-reduced-motion: reduce) { .tk-disco, .tk-roda { animation: none; } }
+.tk-gaveta h4 { font: 600 11px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--grafite); margin: 12px 0 6px; }
+.tk-gaveta .passos li.in_progress { background: color-mix(in srgb, var(--tinta) 5%, transparent); border-radius: 5px; }
+.tk-gaveta .passos li span { white-space: normal; }
+.tk-sub { display: flex; align-items: center; gap: 8px; padding: 3px 0 3px 22px; font-size: 12.5px; color: var(--grafite); }
+.tk-sub span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-sub .tk-agente { flex: none; }
+.tk-sub small { margin-left: auto; font: 11px var(--mono); flex: none; }
+.tk-sub.erro small, .tk-sub.interrompido small { color: var(--erro); }
+.tk-sub + .passos { margin-left: 22px; }
+.tk-feed { right: 16px; bottom: 14px; width: 320px; padding: 10px 14px; font-size: 12.5px; }
+.tk-feed h4 { font: 600 11px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--grafite); margin: 0 0 6px; }
+.tk-feed p { margin: 0; color: var(--grafite); }
+.tk-feed div { display: flex; gap: 8px; align-items: center; margin: 3px 0; min-width: 0; }
+.tk-feed div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-feed div i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.tk-feed div small { margin-left: auto; font: 11px var(--mono); color: var(--grafite); flex: none; }
+.tk-legenda { position: absolute; z-index: 3; left: 16px; bottom: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font: 11.5px var(--sans); color: var(--grafite); background: color-mix(in srgb, var(--papel) 85%, transparent); padding: 6px 10px; border-radius: 8px; }
+.tk-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.tk-legenda .passos { display: contents; }
+.tk-legenda .passos li { display: inline-flex; gap: 6px; padding: 0; align-items: center; font-weight: 400; color: var(--grafite); }
+.tk-legenda .passos li::before { content: none; }
+.tk-legenda .marcador { width: 13px; height: 13px; }
+.tk-legenda .sep { width: 1px; height: 14px; background: var(--linha); }
+.tk-vazio { position: absolute; z-index: 3; left: 50%; top: 50%; transform: translate(-50%, -50%); color: var(--grafite); font-size: 13.5px; text-align: center; }
+#btnModoTasks { position: relative; }
+#btnModoTasks .ponto-tasks { position: absolute; top: 3px; left: 5px; }
+.tk-topo .mini .n { font: 11px var(--mono); opacity: .75; margin-left: 4px; }
+.selo-tasks { font: 600 10.5px/15px var(--mono); min-width: 15px; padding: 0 5px; border-radius: 8px; background: color-mix(in srgb, var(--tinta) 10%, transparent); color: var(--tinta); text-align: center; }
+.trilho-lista .selo-tasks { position: absolute; top: 1px; right: 1px; background: var(--voce); color: #fff; font-size: 9.5px; line-height: 14px; min-width: 14px; padding: 0 4px; }
+.trilho-lista [data-trilho="btnModoTasks"] { position: relative; }
+.ponto-tasks { width: 6px; height: 6px; border-radius: 50%; background: var(--voce); animation: pisca-passo 1s ease-in-out infinite; }
+.trilho-lista .ponto-tasks { position: absolute; left: 5px; top: 5px; }
+@media (prefers-reduced-motion: reduce) { .ponto-tasks, .tk-agente.rodando::after { animation: none; } }
 `;
 
+    const marcaSvg = (t) => `<svg width="${t}" height="${t}" viewBox="-1.15 -1.15 2.3 2.3" aria-hidden="true"><g stroke="currentColor" stroke-width="0.22" stroke-linecap="round"><line x1="0" y1="0" x2="0.990" y2="0.139"/><line x1="0" y1="0" x2="0.595" y2="0.535"/><line x1="0" y1="0" x2="0.227" y2="0.912"/><line x1="0" y1="0" x2="-0.103" y2="0.733"/><line x1="0" y1="0" x2="-0.602" y2="0.669"/><line x1="0" y1="0" x2="-0.796" y2="0.198"/><line x1="0" y1="0" x2="-0.990" y2="-0.139"/><line x1="0" y1="0" x2="-0.572" y2="-0.515"/><line x1="0" y1="0" x2="-0.223" y2="-0.893"/><line x1="0" y1="0" x2="0.100" y2="-0.713"/><line x1="0" y1="0" x2="0.589" y2="-0.654"/><line x1="0" y1="0" x2="0.815" y2="-0.203"/></g><circle r="0.15" fill="currentColor"/></svg>`;
     const html = `
-<div class="tk-bh" id="tkBh"><div class="tk-halo"></div><div class="tk-disco"></div><div class="tk-lente"></div><div class="tk-horizonte"></div><div class="tk-disco frente"></div><div class="tk-centro"><b id="tkPct">0%</b><span id="tkResumo"></span></div></div>
-<svg id="tasksSvg" xmlns="${NS}"><g id="tkFios"></g><g id="tkPulsos"></g><g id="tkNos"></g></svg>
 <div class="tk-topo">
-  <h2><i></i>Tasks</h2>
-  <div class="tk-seg" id="tkFiltros">
-    <button data-f="todas" class="sel">Todas <small>0</small></button>
-    <button data-f="ativas">Ativas <small>0</small></button>
-    <button data-f="esperando">Esperando você <small>0</small></button>
-    <button data-f="agentes">Com agentes <small>0</small></button>
+  <span class="tk-titulo">${marcaSvg(20)}Tasks</span>
+  <div class="filtros" id="tkFiltros" role="group" aria-label="Quais conversas mostrar">
+    <button class="filtro" data-f="todas" aria-pressed="true">Todas<span class="n">0</span></button>
+    <button class="filtro" data-f="ativas" aria-pressed="false">Ativas<span class="n">0</span></button>
+    <button class="filtro" data-f="esperando" aria-pressed="false">Esperando você<span class="n">0</span></button>
+    <button class="filtro" data-f="agentes" aria-pressed="false">Com agentes<span class="n">0</span></button>
   </div>
-  <input class="tk-busca" id="tkBusca" placeholder="Buscar tarefa ou conversa (Ctrl+K)">
-  <button class="tk-ic" id="tkSinais" title="Ligar ou desligar os sinais nas linhas">⚡ sinais</button>
-  <button class="tk-ic" id="tkAbsorvidas" title="Mostrar conversas concluídas que caíram no centro">absorvidas</button>
-  <button class="tk-ic" id="tkAjusta" title="Ajustar à tela">⤢</button>
-  <button class="tk-ic" id="tkFecha" title="Fechar (Esc)">×</button>
+  <div class="tk-modelos" id="tkModelos" role="group" aria-label="Filtrar por modelo"></div>
+  <input class="tk-busca" id="tkBusca" placeholder="Procurar tarefa ou conversa (Ctrl+K)" aria-label="Procurar">
+  <button class="mini" id="tkSinais" aria-pressed="true" title="Mostrar ou esconder os sinais correndo nas trilhas">Sinais</button>
+  <button class="mini" id="tkAbsorvidas" aria-pressed="false" title="Mostrar as conversas concluídas e paradas há mais de ${MINUTOS_ABSORVE} min">Absorvidas<span class="n" id="tkNAbsorvidas"></span></button>
+  <button class="mini" id="tkAjusta" title="Ajustar à tela">Ajustar</button>
+  <button class="fechar-mapa" id="tkFecha" title="Fechar (Esc)" aria-label="Fechar">×</button>
 </div>
-<div class="tk-gaveta" id="tkGaveta" hidden></div>
-<div class="tk-feed" id="tkFeed"><h4>AGORA</h4><p style="margin:0">Nada ainda.</p></div>
-<div class="tk-leg">
-  <span><svg width="16" height="16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-opacity=".6"/></svg>não iniciada</span>
-  <span><svg width="16" height="16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="var(--voce)" stroke-width="1.8" stroke-dasharray="17 40" transform="rotate(-90 8 8)"/></svg>parcial</span>
-  <span><svg width="16" height="16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="var(--voce)" stroke-width="1.8"/><circle cx="8" cy="8" r="2.3" fill="var(--voce)"/></svg>concluída</span>
-  <span><svg width="16" height="16"><rect x="4" y="4" width="8" height="8" rx="2" transform="rotate(45 8 8)" fill="none" stroke="var(--agente)" stroke-width="1.4"/></svg>subagente</span>
-  <span><svg width="26" height="10"><line x1="2" y1="5" x2="24" y2="5" stroke="var(--voce)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="7 30"/></svg>entrada (vai ao Claude)</span>
-  <span><svg width="26" height="10"><line x1="24" y1="5" x2="2" y2="5" stroke="#ffe2b8" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="7 30"/></svg>saída (volta do Claude)</span>
-</div>
-<div class="tk-vazio" id="tkVazio" hidden>Nenhuma conversa com lista de tarefas nas últimas 24 h.</div>`;
+<div class="tk-palco" id="tkPalco">
+  <div class="tk-mundo" id="tkMundo">
+    <svg class="tk-svg" xmlns="${NS}"><g id="tkPinos"></g><g id="tkTrilhas"></g><g id="tkPulsos"></g></svg>
+    <div class="tk-chip-centro" id="tkChip">${marcaSvg(34)}<b>Claude</b><span class="tk-pct" id="tkPct">0%</span><small id="tkResumo"></small></div>
+    <div id="tkCartoes"></div>
+  </div>
+  <div class="tk-caixa tk-gaveta" id="tkGaveta" hidden></div>
+  <div class="tk-caixa tk-feed" id="tkFeed"><h4>Agora</h4><p>Nada ainda.</p></div>
+  <div class="tk-legenda" id="tkLegenda"></div>
+  <div class="tk-vazio" id="tkVazio" hidden>Nenhuma conversa com lista de tarefas nas últimas 24 h.</div>
+</div>`;
 
     const estilo = document.createElement('style');
     estilo.textContent = css;
@@ -109,20 +170,20 @@
     document.body.appendChild(janela);
 
     const $ = (id) => document.getElementById(id);
-    const svg = $('tasksSvg'), gFios = $('tkFios'), gPulsos = $('tkPulsos'), gNos = $('tkNos');
-    const escapa = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const palco = $('tkPalco'), mundo = $('tkMundo'), gPinos = $('tkPinos'), gTrilhas = $('tkTrilhas'), gPulsos = $('tkPulsos'), caixaCartoes = $('tkCartoes');
+    function escapa(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
     const el = (tag, atributos, pai) => {
         const e = document.createElementNS(NS, tag);
         for (const k in atributos) if (atributos[k] !== undefined && atributos[k] !== null) e.setAttribute(k, atributos[k]);
         if (pai) pai.appendChild(e);
         return e;
     };
-    const texto = (pai, x, y, conteudo, atributos) => { const t = el('text', { x, y, ...atributos }, pai); t.textContent = conteudo; return t; };
-    const varCss = (nome) => getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
-    const rad = (g) => g * Math.PI / 180;
+    const varCss = (nome) => getComputedStyle(janela).getPropertyValue(nome).trim();
+    const cortaTexto = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 
-    let dados = null, hash = '', timer = null, filtro = 'todas', busca = '', foco = null, selecionada = null, mostraAbsorvidas = false;
-    let viewBox = null, layoutBase = null;
+    let dados = null, hash = '', timer = null, filtro = 'todas', filtroModelo = null, busca = '', foco = null, selecionada = null, mostraAbsorvidas = false;
+    let vista = null;
+    let trilhas = new Map();
     const tocados = new Map();
     const feed = [];
     let anterior = null;
@@ -132,129 +193,130 @@
         if (t.status === 'completed') return 1;
         const filhos = (t.subagentes || []).flatMap(s => s.tarefas);
         if (filhos.length) return filhos.reduce((s, f) => s + progressoTarefa(f), 0) / filhos.length;
-        if (t.status === 'pending') return 0;
-        return 0.5;
+        return t.status === 'pending' ? 0 : 0.5;
     };
-    const progressoConversa = (c) => c.tarefas.length ? c.tarefas.reduce((s, t) => s + progressoTarefa(t), 0) / c.tarefas.length : (todosSubs(c).every(s => s.status !== 'rodando') ? 1 : 0.5);
     const todosSubs = (c) => [...c.tarefas.flatMap(t => t.subagentes), ...c.subagentesSoltos];
+    const progressoConversa = (c) => c.tarefas.length ? c.tarefas.reduce((s, t) => s + progressoTarefa(t), 0) / c.tarefas.length : (todosSubs(c).every(s => s.status !== 'rodando') ? 1 : 0.5);
     const absorvida = (c) => !c.vivo && progressoConversa(c) >= 1 && Date.now() - c.ultimo > MINUTOS_ABSORVE * 60000;
-    const passaFiltro = (c) => filtro === 'todas' || (filtro === 'ativas' && c.vivo) || (filtro === 'esperando' && c.esperando) || (filtro === 'agentes' && todosSubs(c).length > 0);
+    const passaFiltro = (c) => (filtro === 'todas' || (filtro === 'ativas' && c.vivo) || (filtro === 'esperando' && c.esperando) || (filtro === 'agentes' && todosSubs(c).length > 0))
+        && (!filtroModelo || familiaModelo(c.modelo) === filtroModelo || todosSubs(c).some(s => familiaModelo(s.modelo) === filtroModelo));
+    const situacao = (c) => c.esperando ? 'esperando você' : c.vivo ? 'trabalhando' : 'parada';
+    const classeSituacao = (c) => c.esperando ? 'esperando' : c.vivo ? 'viva' : 'parada';
 
-    function corDaConversa(id) {
-        const paleta = [varCss('--voce') || '#e8483d', '#38bdf8', '#2dd4bf', varCss('--atencao') || '#f0b264', '#a882ff', '#f472b6', varCss('--ok') || '#9fc5a9', '#fb923c'];
-        let h = 0;
-        for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-        return paleta[h % paleta.length];
+    // CARTAO DA CONVERSA: MESMO DNA DO CARTAO "PLANO" (BARRA + PASSOS + MARCADORES)
+    function janelaTarefas(tarefas) {
+        const n = tarefas.length, atual = Math.max(0, tarefas.findIndex(t => t.status === 'in_progress'));
+        let inicio = Math.max(0, Math.min(atual - 1, n - LINHAS_CARTAO)), fim = Math.min(n, inicio + LINHAS_CARTAO);
+        if (inicio > 0) { inicio += 1; }
+        if (fim < n) { fim -= 1; }
+        if (inicio > 0 && fim <= inicio) fim = inicio + 1;
+        return { inicio, fim: Math.min(n, fim) };
+    }
+    const itemPasso = (t) => `<li class="${escapa(t.status)}"><i class="marcador"></i><span>${escapa(t.texto)}</span></li>`;
+    const chipAgente = (s) => `<span class="tk-agente ${escapa(s.status)}" style="--tom:${tomModelo(s.modelo)}" title="${escapa(s.descricao || s.tipo)} · ${escapa(s.status)}${s.modelo ? ' · ' + escapa(nomeModelo(s.modelo)) : ''}">◆ ${escapa(cortaTexto(s.tipo, 24))}${s.modelo ? `<i>${glifoModelo(s.modelo, 11)}${escapa(IDENTIDADE_MODELO[familiaModelo(s.modelo)].nome)}</i>` : ''}</span>`;
+    function htmlCartao(c) {
+        const feitas = c.tarefas.filter(t => t.status === 'completed').length, p = progressoConversa(c);
+        const { inicio, fim } = janelaTarefas(c.tarefas);
+        const passos = c.tarefas.length ? `<ol class="passos">${inicio > 0 ? `<li class="mais" data-n="${inicio}">${inicio === 1 ? 'anterior' : 'anteriores'}</li>` : ''}${c.tarefas.slice(inicio, fim).map(itemPasso).join('')}${fim < c.tarefas.length ? `<li class="mais" data-n="${c.tarefas.length - fim}">${c.tarefas.length - fim === 1 ? 'restante' : 'restantes'}</li>` : ''}</ol>` : '<p class="tk-meta" style="margin:0">Sem lista de tarefas</p>';
+        const subs = todosSubs(c);
+        return `<div class="tk-cab"><b title="${escapa(c.titulo)}">${escapa(c.titulo)}</b><span class="tk-pct">${Math.round(p * 100)}%</span></div>
+            <div class="tk-meta">${chipModelo(c.modelo)}<span class="tk-sit">${situacao(c)}</span><span>· ${feitas} de ${c.tarefas.length}</span></div>
+            <div class="barra"><div style="width:${Math.round(p * 100)}%"></div></div>${passos}
+            ${subs.length ? `<div class="tk-agentes">${subs.map(chipAgente).join('')}</div>` : ''}`;
     }
 
-    function anel(pai, x, y, r, p, cor, o = {}) {
-        const g = el('g', {}, pai);
-        const sw = o.sw || 2;
-        if (o.aura) el('circle', { cx: x, cy: y, r: r + 8, fill: cor, opacity: .14 }, g);
-        el('circle', { cx: x, cy: y, r, fill: o.fundo || varCss('--folha'), stroke: varCss('--tinta'), 'stroke-opacity': p === 0 ? .5 : .12, 'stroke-width': p === 0 ? 1.2 : sw, 'stroke-dasharray': o.tracejado ? '2 3' : null }, g);
-        if (p > 0 && p < 1) {
-            const c = 2 * Math.PI * r;
-            const arco = el('circle', { cx: x, cy: y, r, fill: 'none', stroke: cor, 'stroke-width': sw, 'stroke-linecap': 'round', 'stroke-dasharray': `${c * p} ${c}`, transform: `rotate(-90 ${x} ${y})` }, g);
-            if (o.gira) { const gg = el('g', { class: 'tk-roda' }, g); gg.appendChild(arco); }
-        }
-        if (p >= 1) {
-            el('circle', { cx: x, cy: y, r, fill: 'none', stroke: cor, 'stroke-width': sw }, g);
-            el('circle', { cx: x, cy: y, r: Math.max(1.6, r * .42), fill: cor }, g);
-        }
-        return g;
-    }
-
-    // LAYOUT DETERMINISTICO: CONVERSAS NUMA ELIPSE, TAREFAS EM ARCO VIRADO PARA FORA
-    function monta() {
-        const visiveis = dados.conversas.filter(c => passaFiltro(c) && (mostraAbsorvidas || !absorvida(c))).sort((a, b) => a.id.localeCompare(b.id));
-        const n = visiveis.length;
-        const rx = 300 + Math.min(n, 10) * 28, ry = 210 + Math.min(n, 10) * 20;
-        const fios = [], nos = [];
-        visiveis.forEach((c, i) => {
-            const a = rad(-120 + 360 * i / Math.max(n, 1));
-            const x = rx * Math.cos(a), y = ry * Math.sin(a);
-            const cor = corDaConversa(c.id);
-            const mx = x / 2 + 60 * Math.cos(a + 1.4), my = y / 2 + 60 * Math.sin(a + 1.4);
-            fios.push({ chave: c.id, conversa: c.id, d: `M${x},${y} Q${mx},${my} 0,0`, cor, curva: true, vivo: c.vivo });
-            nos.push({ tipo: 'conversa', c, x, y, cor, a });
-            const m = c.tarefas.length, raio = 92 + Math.max(0, m - 10) * 6, span = rad(m > 1 ? 250 : 0);
-            c.tarefas.forEach((t, j) => {
-                const b = a - span / 2 + (m > 1 ? span * j / (m - 1) : 0), r = raio + (j % 2) * 22;
-                const tx = x + r * Math.cos(b), ty = y + r * Math.sin(b);
-                fios.push({ chave: `${c.id}:t${j}`, conversa: c.id, d: `M${x},${y} L${tx},${ty}`, cor, fraco: true });
-                nos.push({ tipo: 'tarefa', c, t, j, x: tx, y: ty, cor, b });
-                t.subagentes.forEach((s, k) => montaSub(c, s, tx, ty, b + rad((k - (t.subagentes.length - 1) / 2) * 38), fios, nos));
+    // LAYOUT DETERMINISTICO: COLUNAS A DIREITA E A ESQUERDA DO CHIP, SEM SOBREPOSICAO
+    function posiciona(cartoes) {
+        const xColuna = (i) => CHIP / 2 + CANAL + i * (LARGURA_CARTAO + CANAL);
+        for (const lado of [1, -1]) {
+            const lista = cartoes.filter((k, i) => (i % 2 === 0) === (lado === 1));
+            const nColunas = Math.ceil(lista.length / MAX_POR_COLUNA), tam = Math.ceil(lista.length / Math.max(nColunas, 1));
+            const alturas = [];
+            for (let j = 0; j < nColunas; j++) {
+                const itens = lista.slice(j * tam, (j + 1) * tam);
+                const total = itens.reduce((s, k) => s + k.h, 0) + FOLGA_Y * (itens.length - 1);
+                let y = -total / 2;
+                for (const k of itens) {
+                    Object.assign(k, { lado, coluna: j, y, cy: y + k.h / 2, x: lado > 0 ? xColuna(j) : -xColuna(j) - LARGURA_CARTAO });
+                    k.bordaX = lado > 0 ? k.x : k.x + LARGURA_CARTAO;
+                    y += k.h + FOLGA_Y;
+                }
+                alturas.push(total);
+            }
+            const doLado = lista.slice().sort((a, b) => a.cy - b.cy), n = doLado.length;
+            const passo = Math.min(20, (CHIP - 44) / Math.max(n - 1, 1));
+            doLado.forEach((k, i) => { k.pinoY = (i - (n - 1) / 2) * passo; k.pinoX = lado * CHIP / 2; });
+            // CARTAO MAIS PERTO DO CENTRO SOBE MAIS LONGE NO CANAL: AS TRILHAS FICAM ANINHADAS SEM SE CRUZAR
+            const internas = lista.filter(k => k.coluna === 0).sort((a, b) => Math.abs(b.cy) - Math.abs(a.cy));
+            const passoX = Math.min(14, (CANAL - 70) / Math.max(internas.length - 1, 1));
+            internas.forEach((k, i) => { k.pontos = [[k.pinoX, k.pinoY], [lado * (CHIP / 2 + 44 + i * passoX), k.pinoY], [lado * (CHIP / 2 + 44 + i * passoX), k.cy], [k.bordaX, k.cy]]; });
+            const externas = lista.filter(k => k.coluna > 0).sort((a, b) => Math.abs(a.cy) - Math.abs(b.cy));
+            externas.forEach((k, i) => {
+                const sinal = k.cy < 0 ? -1 : 1, xv = lado * (CHIP / 2 + 12 + i * 8);
+                const yl = sinal * (Math.max(...alturas.slice(0, k.coluna)) / 2 + 26 + i * 10), xh = lado * (xColuna(k.coluna) - CANAL + 30 + i * 10);
+                k.pontos = [[k.pinoX, k.pinoY], [xv, k.pinoY], [xv, yl], [xh, yl], [xh, k.cy], [k.bordaX, k.cy]];
             });
-            c.subagentesSoltos.forEach((s, k) => montaSub(c, s, x, y, a + rad(180 + (k - (c.subagentesSoltos.length - 1) / 2) * 24), fios, nos, 120));
-        });
-        return { visiveis, fios, nos, rx, ry };
+        }
     }
-    function montaSub(c, s, px, py, ang, fios, nos, dist = 62) {
-        const sx = px + dist * Math.cos(ang), sy = py + dist * Math.sin(ang);
-        fios.push({ chave: s.id, conversa: c.id, agente: s, d: `M${px},${py} L${sx},${sy}`, cor: varCss('--agente') || '#a3bba9', tracejado: true, sx, sy });
-        nos.push({ tipo: 'agente', c, s, x: sx, y: sy, ang });
+    // TRILHA DE PLACA: SEGMENTOS ORTOGONAIS COM OS CANTOS CHANFRADOS A 45 GRAUS
+    function caminhoChanfrado(pontos) {
+        const pts = pontos.filter((p, i) => !i || p[0] !== pontos[i - 1][0] || p[1] !== pontos[i - 1][1]);
+        if (pts.length < 2) return '';
+        let d = `M${pts[0][0]},${pts[0][1]}`;
+        for (let i = 1; i < pts.length - 1; i++) {
+            const [a, b, c] = [pts[i - 1], pts[i], pts[i + 1]];
+            const lenAB = Math.hypot(b[0] - a[0], b[1] - a[1]), lenBC = Math.hypot(c[0] - b[0], c[1] - b[1]);
+            const r = Math.min(CHANFRO, lenAB / 2, lenBC / 2);
+            d += ` L${b[0] + (a[0] - b[0]) / lenAB * r},${b[1] + (a[1] - b[1]) / lenAB * r} L${b[0] + (c[0] - b[0]) / lenBC * r},${b[1] + (c[1] - b[1]) / lenBC * r}`;
+        }
+        const fim = pts[pts.length - 1];
+        return d + ` L${fim[0]},${fim[1]}`;
     }
 
     function desenha() {
-        const { visiveis, fios, nos, rx, ry } = monta();
-        layoutBase = { rx, ry };
-        if (!viewBox) ajusta();
-        gFios.textContent = ''; gNos.textContent = '';
-        const corAgente = varCss('--agente') || '#a3bba9', corErro = varCss('--erro') || '#ff8f80', tinta = varCss('--tinta');
-        for (const f of fios) {
-            const p = el('path', { d: f.d, fill: 'none', stroke: f.fraco ? tinta : f.cor, 'stroke-width': f.curva ? 1.1 : 1, opacity: f.fraco ? .1 : f.tracejado ? .55 : .3, 'stroke-dasharray': f.tracejado ? '2 3' : (f.curva && !f.vivo ? '3 5' : null), class: 'tk-fio', 'data-conversa': f.conversa }, gFios);
-            f.el = p;
-        }
-        fiosAtuais = new Map(fios.map(f => [f.chave, f]));
-        for (const no of nos) {
-            const g = el('g', { class: 'tk-no', 'data-conversa': no.c.id }, gNos);
-            if (no.tipo === 'conversa') {
-                const p = progressoConversa(no.c);
-                anel(g, no.x, no.y, 21, p, no.cor, { sw: 3, aura: no.c.vivo });
-                if (selecionada === no.c.id) el('circle', { cx: no.x, cy: no.y, r: 28, fill: 'none', stroke: varCss('--voce'), 'stroke-width': 1.5 }, g);
-                texto(g, no.x, no.y + 4, Math.round(p * 100) + '%', { 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700 });
-                texto(g, no.x, no.y + 41, cortaTexto(no.c.titulo, 34), { 'text-anchor': 'middle', 'font-size': 13.5, 'font-weight': 600 });
-                const feitas = no.c.tarefas.filter(t => t.status === 'completed').length;
-                texto(g, no.x, no.y + 56, `${no.c.esperando ? 'esperando você' : no.c.vivo ? 'trabalhando' : 'parada'} · ${feitas}/${no.c.tarefas.length}`, { 'text-anchor': 'middle', 'font-size': 11, style: `fill:${no.c.vivo ? no.cor : varCss('--grafite')}` });
-                g.dataset.busca = (no.c.titulo + ' ' + no.c.nomeProjeto).toLowerCase();
-                g.dataset.abre = no.c.id;
-            } else if (no.tipo === 'tarefa') {
-                const t = no.t, p = progressoTarefa(t), ativa = t.status === 'in_progress';
-                anel(g, no.x, no.y, ativa ? 9 : 7, p, no.cor, { sw: ativa ? 2.4 : 1.8, aura: ativa, gira: ativa && !t.subagentes.length });
-                const dx = Math.cos(no.b), dy = Math.sin(no.b), off = (ativa ? 9 : 7) + 9;
-                const anc = dx > .35 ? 'start' : dx < -.35 ? 'end' : 'middle';
-                const mostra = ativa || t.status !== 'completed' || selecionada === no.c.id || foco === no.c.id;
-                if (mostra) texto(g, no.x + dx * off, no.y + dy * off + 4 + (anc === 'middle' ? dy * 6 : 0), cortaTexto(t.texto, 38) + (p > 0 && p < 1 ? `  ${Math.round(p * 100)}%` : ''), { 'text-anchor': anc, 'font-size': 11.5, 'font-weight': ativa ? 600 : 400, opacity: t.status === 'completed' ? .55 : 1 });
-                g.dataset.busca = t.texto.toLowerCase();
-                g.dataset.abre = no.c.id;
-            } else {
-                const s = no.s, rodando = s.status === 'rodando';
-                const cor = s.status === 'erro' || s.status === 'interrompido' ? corErro : corAgente;
-                const losango = el('rect', { x: no.x - 5.5, y: no.y - 5.5, width: 11, height: 11, rx: 2.5, transform: `rotate(45 ${no.x} ${no.y})`, fill: varCss('--folha'), stroke: cor, 'stroke-width': rodando ? 1.8 : 1.3 }, g);
-                if (s.status === 'concluido') losango.setAttribute('fill', cor);
-                const ca = Math.cos(no.ang), sa = Math.sin(no.ang);
-                texto(g, no.x + ca * 12, no.y + sa * 12 + (sa > 0 ? 12 : -4), cortaTexto(s.tipo, 22), { 'text-anchor': ca > .3 ? 'start' : ca < -.3 ? 'end' : 'middle', 'font-size': 10.5, style: `fill:${cor}` });
-                s.tarefas.forEach((f, k) => {
-                    const c = no.ang + rad((k - (s.tarefas.length - 1) / 2) * 34), fx = no.x + 32 * Math.cos(c), fy = no.y + 32 * Math.sin(c);
-                    el('line', { x1: no.x, y1: no.y, x2: fx, y2: fy, stroke: cor, opacity: .3 }, g);
-                    anel(g, fx, fy, 4.5, progressoTarefa(f), cor, { sw: 1.5 });
-                });
-                g.dataset.busca = (s.tipo + ' ' + s.descricao).toLowerCase();
-                g.dataset.abre = no.c.id;
-                fiosAtuais.get(s.id).losango = losango;
-            }
+        const visiveis = dados.conversas.filter(c => passaFiltro(c) && (mostraAbsorvidas || !absorvida(c))).sort((a, b) => a.id.localeCompare(b.id));
+        caixaCartoes.textContent = '';
+        const cartoes = visiveis.map(c => {
+            const e = document.createElement('article');
+            e.className = `tk-cartao ${classeSituacao(c)}${selecionada === c.id ? ' sel' : ''}`;
+            e.dataset.conversa = c.id;
+            e.style.setProperty('--tom', tomModelo(c.modelo));
+            e.dataset.busca = [c.titulo, c.nomeProjeto, nomeModelo(c.modelo), ...c.tarefas.map(t => t.texto), ...todosSubs(c).flatMap(s => [s.tipo, s.descricao, ...s.tarefas.map(t => t.texto)])].join(' ').toLowerCase();
+            e.innerHTML = htmlCartao(c);
+            caixaCartoes.appendChild(e);
+            return { c, el: e, h: e.offsetHeight };
+        });
+        posiciona(cartoes);
+        gPinos.textContent = ''; gTrilhas.textContent = '';
+        desenhaPinos();
+        trilhas = new Map();
+        for (const k of cartoes) {
+            k.el.style.left = k.x + 'px';
+            k.el.style.top = k.y + 'px';
+            const tom = tomModelo(k.c.modelo);
+            const p = el('path', { d: caminhoChanfrado(k.pontos), class: 'tk-trilha', 'data-conversa': k.c.id, style: `--trilha: color-mix(in srgb, ${tom} 45%, var(--linha))`, 'stroke-dasharray': k.c.vivo || k.c.esperando ? null : '4 5' }, gTrilhas);
+            el('circle', { cx: k.pinoX, cy: k.pinoY, r: 2.6, class: 'tk-pino-ativo', style: `--trilha: color-mix(in srgb, ${tom} 70%, var(--linha))` }, gTrilhas);
+            trilhas.set(k.c.id, { el: p, d: p.getAttribute('d'), conversa: k.c.id });
         }
         atualizaCentro(visiveis);
         atualizaContadores();
+        desenhaLegenda(visiveis);
         aplicaFoco();
         aplicaBusca();
-        posicionaBuracoNegro();
         $('tkVazio').hidden = visiveis.length > 0;
+        if (!vista) ajusta();
         if (selecionada) desenhaGaveta();
     }
-    let fiosAtuais = new Map();
-    const cortaTexto = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
-
+    function desenhaPinos() {
+        const meio = CHIP / 2, n = 7, passo = (CHIP - 44) / (n - 1), comp = 9;
+        for (let i = 0; i < n; i++) {
+            const t = (i - (n - 1) / 2) * passo;
+            el('line', { x1: -meio, y1: t, x2: -meio - comp, y2: t, class: 'tk-pino' }, gPinos);
+            el('line', { x1: meio, y1: t, x2: meio + comp, y2: t, class: 'tk-pino' }, gPinos);
+            el('line', { x1: t, y1: -meio, x2: t, y2: -meio - comp, class: 'tk-pino' }, gPinos);
+            el('line', { x1: t, y1: meio, x2: t, y2: meio + comp, class: 'tk-pino' }, gPinos);
+        }
+    }
     function atualizaCentro(visiveis) {
         const todas = visiveis.flatMap(c => c.tarefas);
         const pct = todas.length ? todas.reduce((s, t) => s + progressoTarefa(t), 0) / todas.length : 0;
@@ -264,102 +326,103 @@
     function atualizaContadores() {
         const base = dados.conversas.filter(c => mostraAbsorvidas || !absorvida(c));
         const conta = { todas: base.length, ativas: base.filter(c => c.vivo).length, esperando: base.filter(c => c.esperando).length, agentes: base.filter(c => todosSubs(c).length).length };
-        for (const b of $('tkFiltros').querySelectorAll('button')) { b.querySelector('small').textContent = conta[b.dataset.f]; b.classList.toggle('sel', b.dataset.f === filtro); }
-        $('tkSinais').classList.toggle('sel', sinaisLigados());
-        $('tkAbsorvidas').classList.toggle('sel', mostraAbsorvidas);
+        for (const b of $('tkFiltros').querySelectorAll('button')) { b.querySelector('.n').textContent = conta[b.dataset.f]; b.setAttribute('aria-pressed', String(b.dataset.f === filtro)); }
+        const familias = new Map();
+        for (const c of base) for (const f of new Set([familiaModelo(c.modelo), ...todosSubs(c).map(s => familiaModelo(s.modelo))])) familias.set(f, (familias.get(f) || 0) + 1);
+        if (filtroModelo && !familias.has(filtroModelo)) filtroModelo = null;
+        $('tkModelos').innerHTML = [...familias].sort().map(([f, n]) => `<button class="tk-chip-modelo n" data-modelo="${f}" aria-pressed="${filtroModelo === f}" style="--tom:var(--tom-${f})" title="Só conversas e agentes com ${IDENTIDADE_MODELO[f].nome}">${glifoModelo(f)}${IDENTIDADE_MODELO[f].nome}<span class="n">${n}</span></button>`).join('');
+        $('tkSinais').setAttribute('aria-pressed', String(sinaisLigados()));
+        $('tkAbsorvidas').setAttribute('aria-pressed', String(mostraAbsorvidas));
+        const absorvidas = dados.conversas.filter(absorvida).length;
+        $('tkNAbsorvidas').textContent = absorvidas || '';
+    }
+    function desenhaLegenda(visiveis) {
+        const familias = [...new Set(visiveis.flatMap(c => [familiaModelo(c.modelo), ...todosSubs(c).map(s => familiaModelo(s.modelo))]))].sort();
+        const traco = (cor) => `<svg width="26" height="8" aria-hidden="true"><line x1="2" y1="4" x2="24" y2="4" stroke="var(--linha)" stroke-width="1.5"/><line x1="6" y1="4" x2="16" y2="4" stroke="${cor}" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+        $('tkLegenda').innerHTML = `<ol class="passos"><li class="completed"><i class="marcador"></i>feita</li><li class="in_progress"><i class="marcador"></i>em andamento</li><li class="pending"><i class="marcador"></i>a fazer</li></ol>
+            <i class="sep"></i><span>${traco('var(--voce)')}entrada</span><span>${traco('var(--tinta)')}saída</span><span>${traco('var(--agente)')}agente</span>
+            ${familias.length ? '<i class="sep"></i>' + familias.map(f => `<span style="--tom:var(--tom-${f});color:var(--tom)">${glifoModelo(f, 13)}${IDENTIDADE_MODELO[f].nome}</span>`).join('') : ''}`;
     }
 
-    // ZOOM E PAN PELO VIEWBOX
+    // ZOOM E ARRASTE: UMA TRANSFORMACAO SO PARA AS TRILHAS (SVG) E OS CARTOES (HTML)
+    function aplicaVista() { mundo.style.transform = `translate(${vista.x}px, ${vista.y}px) scale(${vista.k})`; }
     function ajusta() {
-        const { rx, ry } = layoutBase || { rx: 400, ry: 300 };
-        const w = (rx + 260) * 2, h = (ry + 230) * 2;
-        const caixa = svg.getBoundingClientRect(), proporcao = (caixa.width || 1600) / (caixa.height || 1000);
-        const largura = Math.max(w, h * proporcao), altura = largura / proporcao;
-        viewBox = { x: -largura / 2, y: -altura / 2, w: largura, h: altura };
-        aplicaViewBox();
+        const cartoes = [...caixaCartoes.children];
+        let minX = -CHIP / 2 - 12, maxX = CHIP / 2 + 12, minY = -CHIP / 2 - 12, maxY = CHIP / 2 + 12;
+        for (const e of cartoes) {
+            minX = Math.min(minX, e.offsetLeft); maxX = Math.max(maxX, e.offsetLeft + e.offsetWidth);
+            minY = Math.min(minY, e.offsetTop); maxY = Math.max(maxY, e.offsetTop + e.offsetHeight);
+        }
+        const caixa = palco.getBoundingClientRect(), w = caixa.width || 1600, h = caixa.height || 900, margem = 40;
+        const k = Math.min(1.15, (w - margem * 2) / (maxX - minX), (h - margem * 2 - 60) / (maxY - minY));
+        vista = { k, x: w / 2 - (minX + maxX) / 2 * k, y: (h - 50) / 2 - (minY + maxY) / 2 * k };
+        aplicaVista();
     }
-    function aplicaViewBox() {
-        svg.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`);
-        posicionaBuracoNegro();
-    }
-    function posicionaBuracoNegro() {
-        const ctm = svg.getScreenCTM();
-        if (!ctm) return;
-        const caixa = janela.getBoundingClientRect();
-        const ponto = new DOMPoint(0, 0).matrixTransform(ctm);
-        $('tkBh').style.transform = `translate(${ponto.x - caixa.left}px, ${ponto.y - caixa.top}px) scale(${Math.min(ctm.a * 1.1, 1.6)})`;
-    }
-    svg.addEventListener('wheel', (ev) => {
+    palco.addEventListener('wheel', (ev) => {
+        if (ev.target.closest('.tk-caixa')) return;
         ev.preventDefault();
-        const fator = ev.deltaY > 0 ? 1.12 : 1 / 1.12;
-        const p = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(svg.getScreenCTM().inverse());
-        viewBox = { x: p.x - (p.x - viewBox.x) * fator, y: p.y - (p.y - viewBox.y) * fator, w: viewBox.w * fator, h: viewBox.h * fator };
-        aplicaViewBox();
+        const fator = ev.deltaY > 0 ? 1 / 1.12 : 1.12, caixa = palco.getBoundingClientRect();
+        const px = ev.clientX - caixa.left, py = ev.clientY - caixa.top;
+        vista = { k: vista.k * fator, x: px - (px - vista.x) * fator, y: py - (py - vista.y) * fator };
+        aplicaVista();
     }, { passive: false });
     let arrasto = null;
-    svg.addEventListener('pointerdown', (ev) => {
-        if (ev.target.closest('.tk-no')) return;
-        arrasto = { x: ev.clientX, y: ev.clientY, vb: { ...viewBox }, escala: viewBox.w / svg.getBoundingClientRect().width };
-        svg.setPointerCapture(ev.pointerId);
-        svg.classList.add('arrastando');
+    palco.addEventListener('pointerdown', (ev) => {
+        if (ev.button !== 0 || ev.target.closest('.tk-cartao, .tk-caixa, .tk-legenda, .tk-chip-centro')) return;
+        arrasto = { x: ev.clientX, y: ev.clientY, vx: vista.x, vy: vista.y, moveu: false };
+        palco.setPointerCapture(ev.pointerId);
     });
-    svg.addEventListener('pointermove', (ev) => {
+    palco.addEventListener('pointermove', (ev) => {
         if (arrasto) {
-            viewBox = { ...arrasto.vb, x: arrasto.vb.x - (ev.clientX - arrasto.x) * arrasto.escala, y: arrasto.vb.y - (ev.clientY - arrasto.y) * arrasto.escala };
-            aplicaViewBox();
+            const dx = ev.clientX - arrasto.x, dy = ev.clientY - arrasto.y;
+            if (Math.hypot(dx, dy) > 3) { arrasto.moveu = true; palco.classList.add('arrastando'); }
+            vista = { ...vista, x: arrasto.vx + dx, y: arrasto.vy + dy };
+            aplicaVista();
             return;
         }
-        const g = ev.target.closest('.tk-no');
-        const novo = g ? g.dataset.conversa : null;
+        const cartao = ev.target.closest('.tk-cartao'), novo = cartao ? cartao.dataset.conversa : null;
         if (novo !== foco) { foco = novo; aplicaFoco(); }
     });
-    const soltaArrasto = () => { arrasto = null; svg.classList.remove('arrastando'); };
-    svg.addEventListener('pointerup', soltaArrasto);
-    svg.addEventListener('pointercancel', soltaArrasto);
-    svg.addEventListener('pointerleave', () => { if (foco) { foco = null; aplicaFoco(); } });
-    svg.addEventListener('click', (ev) => {
-        if (!dados) return;
-        const g = ev.target.closest('.tk-no');
-        selecionada = g ? g.dataset.abre : null;
+    const soltaArrasto = (ev) => {
+        if (arrasto && !arrasto.moveu && ev.type === 'pointerup' && !ev.target.closest('.tk-cartao')) { selecionada = null; $('tkGaveta').hidden = true; desenha(); }
+        arrasto = null; palco.classList.remove('arrastando');
+    };
+    palco.addEventListener('pointerup', soltaArrasto);
+    palco.addEventListener('pointercancel', soltaArrasto);
+    palco.addEventListener('pointerleave', () => { if (foco) { foco = null; aplicaFoco(); } });
+    caixaCartoes.addEventListener('click', (ev) => {
+        const cartao = ev.target.closest('.tk-cartao');
+        if (!cartao || !dados) return;
+        selecionada = selecionada === cartao.dataset.conversa ? null : cartao.dataset.conversa;
         desenha();
         $('tkGaveta').hidden = !selecionada;
     });
 
     function aplicaFoco() {
         janela.classList.toggle('focando', !!foco);
-        for (const e of janela.querySelectorAll('#tasksSvg [data-conversa]')) e.classList.toggle('tk-esmaece', !!foco && e.dataset.conversa !== foco);
+        for (const e of palco.querySelectorAll('[data-conversa]')) e.classList.toggle('esmaece', !!foco && e.dataset.conversa !== foco);
     }
     function aplicaBusca() {
         janela.classList.toggle('buscando', !!busca);
-        for (const g of gNos.querySelectorAll('.tk-no')) g.classList.toggle('tk-nao-achado', !!busca && !(g.dataset.busca || '').includes(busca));
+        for (const e of caixaCartoes.children) e.classList.toggle('nao-achado', !!busca && !(e.dataset.busca || '').includes(busca));
     }
 
-    // GAVETA
+    // GAVETA: A CONVERSA ESCOLHIDA POR INTEIRO (TAREFAS, SUBAGENTES E AS TAREFAS DELES)
     function desenhaGaveta() {
         const c = dados && dados.conversas.find(x => x.id === selecionada);
         const gaveta = $('tkGaveta');
         if (!c) { gaveta.hidden = true; return; }
-        const p = progressoConversa(c), cor = corDaConversa(c.id);
-        const linha = (t, filho, prefixo = '') => {
-            const pt = progressoTarefa(t);
-            const classe = t.status === 'completed' ? 'c' : t.status === 'in_progress' ? 'a' : '';
-            return `<div class="tk-lin ${classe}${filho ? ' filho' : ''}">${miniAnel(pt, filho ? varCss('--agente') : cor)}${escapa(prefixo + t.texto)}<small>${Math.round(pt * 100)}%</small></div>`;
-        };
-        const subs = (lista) => lista.map(s => `<div class="tk-lin filho">◆ ${escapa(s.tipo)}: ${escapa(s.descricao)}<small>${escapa(s.status)}</small></div>` + s.tarefas.map(f => linha(f, true, '   ')).join('')).join('');
-        gaveta.innerHTML = `<div class="cab"><svg width="54" height="54" id="tkAnelGaveta"></svg><div><h3>${escapa(c.titulo)}</h3><div class="sub">${escapa(c.nomeProjeto)} · ${escapa(c.modelo || '')} · ${c.esperando ? 'esperando você' : c.vivo ? 'trabalhando' : 'parada'}</div></div></div>
-            <div class="acoes"><button class="pri" data-tk-abrir>Abrir conversa</button><button data-tk-fecha-gaveta>Fechar</button></div>
-            <h4>TAREFAS · ${c.tarefas.filter(t => t.status === 'completed').length} DE ${c.tarefas.length}</h4>
-            ${c.tarefas.map(t => linha(t) + subs(t.subagentes)).join('') || '<p class="sub">Sem lista de tarefas.</p>'}
-            ${c.subagentesSoltos.length ? '<h4 style="margin-top:12px">SUBAGENTES DA CONVERSA</h4>' + subs(c.subagentesSoltos) : ''}`;
-        const alvo = $('tkAnelGaveta');
-        anel(alvo, 27, 27, 21, p, cor, { sw: 3.5, aura: true });
-        texto(alvo, 27, 31, Math.round(p * 100) + '%', { 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700, style: `fill:${varCss('--tinta')};font-family:var(--sans)` });
+        const p = progressoConversa(c), feitas = c.tarefas.filter(t => t.status === 'completed').length;
+        const subs = (lista) => lista.map(s => `<div class="tk-sub ${escapa(s.status)}">${chipAgente(s)}<span title="${escapa(s.descricao)}">${escapa(s.descricao)}</span><small>${escapa(s.status)}</small></div>${s.tarefas.length ? `<ol class="passos">${s.tarefas.map(itemPasso).join('')}</ol>` : ''}`).join('');
+        gaveta.innerHTML = `<div class="cabeca-mapa"><h2>${escapa(c.titulo)}</h2><button class="fechar-mapa" data-tk-fecha-gaveta aria-label="Fechar">×</button></div>
+            <div class="nota">${chipModelo(c.modelo)}<span>${escapa(c.nomeProjeto)}</span><span>·</span><span class="tk-sit-gaveta" style="color:${c.esperando ? 'var(--atencao)' : c.vivo ? 'var(--voce)' : 'var(--grafite)'}">${situacao(c)}</span></div>
+            <div class="acoes"><button class="botao principal" data-tk-abrir>Abrir conversa</button></div>
+            <div class="cabeca-plano"><span>Tarefas</span><span>${feitas} de ${c.tarefas.length} · ${Math.round(p * 100)}%</span></div>
+            <div class="barra"><div style="width:${Math.round(p * 100)}%"></div></div>
+            ${c.tarefas.map(t => `<ol class="passos">${itemPasso(t)}</ol>${subs(t.subagentes)}`).join('') || '<p class="nota">Sem lista de tarefas.</p>'}
+            ${c.subagentesSoltos.length ? '<h4>Subagentes da conversa</h4>' + subs(c.subagentesSoltos) : ''}`;
         gaveta.hidden = false;
     }
-    const miniAnel = (p, cor) => {
-        const c = 2 * Math.PI * 6;
-        return `<svg width="16" height="16" style="flex:none"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-opacity="${p === 0 ? .5 : .15}" stroke-width="1.6"/>${p > 0 ? `<circle cx="8" cy="8" r="6" fill="none" stroke="${cor}" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="${c * Math.min(p, 1)} ${c}" transform="rotate(-90 8 8)"/>` : ''}${p >= 1 ? `<circle cx="8" cy="8" r="2.5" fill="${cor}"/>` : ''}</svg>`;
-    };
     $('tkGaveta').addEventListener('click', (ev) => {
         if (ev.target.closest('[data-tk-fecha-gaveta]')) { selecionada = null; $('tkGaveta').hidden = true; desenha(); return; }
         if (ev.target.closest('[data-tk-abrir]')) {
@@ -368,27 +431,25 @@
         }
     });
 
-    // SINAIS: CADA PULSO E UM TRACO DO TRACEJADO CORRENDO PELA LINHA (SO STROKE-DASHOFFSET, SEM FILTER)
+    // SINAIS: UM TRACO CURTO CORRENDO PELA TRILHA (SO STROKE-DASHOFFSET, SEM FILTER)
+    // A TRILHA VAI DO PINO AO CARTAO: "IN" E "BACK" CORREM CONTRA O PATH, "OUT" E "SPAWN" A FAVOR
     function pulsa(f, dir) {
         if (!f || !f.el || document.visibilityState !== 'visible') return;
-        const vindo = dir === 'in' || dir === 'spawn';
-        const cor = dir === 'out' ? '#ffe2b8' : f.cor;
-        if (gPulsos.querySelectorAll(`[data-chave="${CSS.escape(f.chave)}"]`).length >= MAX_PULSOS_LINHA * 2) return;
-        if (semMovimento()) { f.el.animate([{ opacity: 1 }, { opacity: f.el.getAttribute('opacity') }], 300); return; }
+        const paraChip = dir === 'in' || dir === 'back';
+        const cor = dir === 'in' ? 'var(--voce)' : dir === 'out' ? 'var(--tinta)' : 'var(--agente)';
+        if (semMovimento()) { f.el.classList.add('acesa'); setTimeout(() => f.el.classList.remove('acesa'), 300); return; }
+        if (gPulsos.querySelectorAll(`[data-chave="${CSS.escape(f.conversa)}"]`).length >= MAX_PULSOS_TRILHA) return;
         const len = f.len || (f.len = f.el.getTotalLength());
-        // A CURVA DA CONVERSA VAI DO NO PARA O CENTRO: "IN" ANDA NO SENTIDO DO PATH
-        const de = vindo ? PULSO : -len, ate = vindo ? -len : PULSO;
-        const esmaecido = !!foco && f.conversa !== foco;
-        [[8, .28], [2.6, 1]].forEach(([largura, op]) => {
-            const p = el('path', { d: f.d, fill: 'none', stroke: cor, 'stroke-width': largura, 'stroke-linecap': 'round', 'stroke-dasharray': `${PULSO} ${len + PULSO}`, opacity: esmaecido ? op * .3 : op, 'data-chave': f.chave }, gPulsos);
-            p.animate([{ strokeDashoffset: de }, { strokeDashoffset: ate }], { duration: DURACAO_PULSO * (f.agente ? .6 : 1), easing: 'cubic-bezier(.4,0,.6,1)' }).onfinish = () => p.remove();
-        });
+        const de = paraChip ? -len : PULSO, ate = paraChip ? PULSO : -len;
+        const p = el('path', { d: f.d, class: 'tk-pulso' + (foco && f.conversa !== foco ? ' esmaece' : ''), stroke: cor, 'stroke-width': 3, 'stroke-dasharray': `${PULSO} ${len + PULSO}`, 'data-chave': f.conversa, 'data-conversa': f.conversa }, gPulsos);
+        p.animate([{ strokeDashoffset: de, opacity: .9 }, { strokeDashoffset: ate, opacity: .9 }], { duration: DURACAO_PULSO, easing: 'cubic-bezier(.4,0,.6,1)' }).onfinish = () => p.remove();
     }
-    function piscaLosango(f) {
-        if (!f || !f.losango || semMovimento() || document.visibilityState !== 'visible') return;
-        const r = el('circle', { cx: f.sx, cy: f.sy, r: 6, fill: 'none', stroke: f.cor, 'stroke-width': 1.4 }, gPulsos);
-        r.style.transformOrigin = `${f.sx}px ${f.sy}px`;
-        r.animate([{ transform: 'scale(1)', opacity: .9 }, { transform: 'scale(2.4)', opacity: 0 }], 550).onfinish = () => r.remove();
+    function piscaAgente(c, s) {
+        const cartao = caixaCartoes.querySelector(`[data-conversa="${CSS.escape(c.id)}"]`);
+        const chip = cartao && [...cartao.querySelectorAll('.tk-agente')].find(e => e.title.startsWith(s.descricao || s.tipo));
+        if (!chip) return;
+        chip.classList.add('pisca');
+        setTimeout(() => chip.classList.remove('pisca'), 350);
     }
     // TOCA SO O QUE CHEGOU DEPOIS DO ULTIMO POLL, NA ORDEM E COM O ESPACAMENTO REAL (COMPRIMIDO EM ATE 2 S)
     function agendaPulsos(primeiraVez) {
@@ -402,13 +463,13 @@
             return n;
         };
         for (const c of dados.conversas) {
-            novos(c.id, c.pulsos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => pulsa(fiosAtuais.get(c.id), p.dir) }));
+            novos(c.id, c.pulsos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => pulsa(trilhas.get(c.id), p.dir) }));
             for (const s of todosSubs(c)) {
                 const marcos = [];
                 if (s.inicio) marcos.push({ hora: s.inicio, dir: 'spawn' });
                 if (s.fim) marcos.push({ hora: s.fim, dir: 'back' });
-                novos(s.id + ':marcos', marcos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => pulsa(fiosAtuais.get(s.id), p.dir) }));
-                novos(s.id, s.pulsos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => piscaLosango(fiosAtuais.get(s.id)) }));
+                novos(s.id + ':marcos', marcos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => pulsa(trilhas.get(c.id), p.dir) }));
+                novos(s.id, s.pulsos).forEach(p => fila.push({ hora: Date.parse(p.hora), acao: () => piscaAgente(c, s) }));
             }
         }
         if (!fila.length) return;
@@ -419,22 +480,22 @@
 
     // FEED "AGORA": DIFERENCA ENTRE DOIS POLLS
     function registraFeed() {
-        const mapa = (lista) => new Map(lista.map(c => [c.id, c]));
         if (anterior) {
-            const antes = mapa(anterior.conversas);
+            const antes = new Map(anterior.conversas.map(c => [c.id, c]));
             for (const c of dados.conversas) {
                 const v = antes.get(c.id);
                 if (!v) continue;
-                c.tarefas.forEach((t, j) => { if (t.status === 'completed' && v.tarefas[j] && v.tarefas[j].status !== 'completed') feed.unshift({ cor: varCss('--ok'), texto: `${cortaTexto(c.titulo, 22)} concluiu ${cortaTexto(t.texto, 30)}`, hora: Date.now() }); });
+                c.tarefas.forEach((t, j) => { if (t.status === 'completed' && v.tarefas[j] && v.tarefas[j].status !== 'completed') feed.unshift({ cor: 'var(--ok)', texto: `${cortaTexto(c.titulo, 22)} concluiu: ${t.texto}`, hora: Date.now() }); });
                 const idsAntes = new Set(todosSubs(v).map(s => s.id));
-                todosSubs(c).filter(s => !idsAntes.has(s.id)).forEach(s => feed.unshift({ cor: varCss('--agente'), texto: `${s.tipo} abriu em ${cortaTexto(c.titulo, 28)}`, hora: Date.now() }));
-                if (absorvida(c) && !absorvida(v)) feed.unshift({ cor: '#a882ff', texto: `${cortaTexto(c.titulo, 30)} foi absorvida`, hora: Date.now() });
+                todosSubs(c).filter(s => !idsAntes.has(s.id)).forEach(s => feed.unshift({ cor: 'var(--agente)', texto: `${s.tipo} abriu em ${cortaTexto(c.titulo, 28)}`, hora: Date.now() }));
+                if (c.esperando && !v.esperando) feed.unshift({ cor: 'var(--atencao)', texto: `${cortaTexto(c.titulo, 30)} espera você`, hora: Date.now() });
+                if (absorvida(c) && !absorvida(v)) feed.unshift({ cor: 'var(--grafite)', texto: `${cortaTexto(c.titulo, 30)} foi absorvida`, hora: Date.now() });
             }
         }
         feed.splice(5);
         anterior = dados;
-        const quando = (ms) => { const s = Math.round((Date.now() - ms) / 1000); return s < 60 ? s + 's' : Math.round(s / 60) + 'min'; };
-        $('tkFeed').innerHTML = '<h4>AGORA</h4>' + (feed.length ? feed.map(f => `<div><i style="background:${f.cor}"></i>${escapa(f.texto)}<small>${quando(f.hora)}</small></div>`).join('') : '<p style="margin:0">Nada ainda.</p>');
+        const quando = (ms) => { const s = Math.round((Date.now() - ms) / 1000); return s < 60 ? s + ' s' : Math.round(s / 60) + ' min'; };
+        $('tkFeed').innerHTML = '<h4>Agora</h4>' + (feed.length ? feed.map(f => `<div><i style="background:${f.cor}"></i><span>${escapa(f.texto)}</span><small>${quando(f.hora)}</small></div>`).join('') : '<p>Nada ainda.</p>');
     }
 
     // POLLING SO COM A VISAO ABERTA E A JANELA VISIVEL
@@ -451,9 +512,11 @@
             agendaPulsos(primeiraVez);
         } catch (e) { /* SERVIDOR REINICIANDO: TENTA NO PROXIMO CICLO */ }
     }
+    const botoesTasks = () => [document.getElementById('btnModoTasks'), document.querySelector('.trilho-lista [data-trilho="btnModoTasks"]')].filter(Boolean);
     function abre() {
         janela.hidden = false;
-        viewBox = null;
+        vista = null;
+        botoesTasks().forEach(b => b.setAttribute('aria-pressed', 'true'));
         busca304();
         clearInterval(timer);
         timer = setInterval(busca304, INTERVALO_POLL);
@@ -463,28 +526,36 @@
         clearInterval(timer);
         timer = null;
         gPulsos.textContent = '';
+        botoesTasks().forEach(b => b.setAttribute('aria-pressed', 'false'));
     }
+    const alterna = () => janela.hidden ? abre() : fecha();
     document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') gPulsos.textContent = ''; });
-    window.addEventListener('resize', () => { if (!janela.hidden) posicionaBuracoNegro(); });
 
     $('tkFiltros').addEventListener('click', (ev) => {
         const b = ev.target.closest('button');
         if (!b) return;
         filtro = b.dataset.f;
-        viewBox = null;
+        vista = null;
+        desenha();
+    });
+    $('tkModelos').addEventListener('click', (ev) => {
+        const b = ev.target.closest('button');
+        if (!b) return;
+        filtroModelo = filtroModelo === b.dataset.modelo ? null : b.dataset.modelo;
+        vista = null;
         desenha();
     });
     $('tkBusca').addEventListener('input', (ev) => { busca = ev.target.value.trim().toLowerCase(); aplicaBusca(); });
     $('tkBusca').addEventListener('keydown', (ev) => {
         if (ev.key !== 'Enter' || !busca) return;
-        const g = [...gNos.querySelectorAll('.tk-no')].find(x => (x.dataset.busca || '').includes(busca));
-        if (!g) return;
-        const b = g.getBBox();
-        viewBox = { ...viewBox, x: b.x + b.width / 2 - viewBox.w / 2, y: b.y + b.height / 2 - viewBox.h / 2 };
-        aplicaViewBox();
+        const e = [...caixaCartoes.children].find(x => (x.dataset.busca || '').includes(busca));
+        if (!e) return;
+        const caixa = palco.getBoundingClientRect();
+        vista = { ...vista, x: caixa.width / 2 - (e.offsetLeft + e.offsetWidth / 2) * vista.k, y: caixa.height / 2 - (e.offsetTop + e.offsetHeight / 2) * vista.k };
+        aplicaVista();
     });
     $('tkSinais').addEventListener('click', () => { localStorage.setItem('tasksSinais', sinaisLigados() ? '0' : '1'); if (!sinaisLigados()) gPulsos.textContent = ''; atualizaContadores(); });
-    $('tkAbsorvidas').addEventListener('click', () => { mostraAbsorvidas = !mostraAbsorvidas; viewBox = null; desenha(); });
+    $('tkAbsorvidas').addEventListener('click', () => { mostraAbsorvidas = !mostraAbsorvidas; vista = null; desenha(); });
     $('tkAjusta').addEventListener('click', ajusta);
     $('tkFecha').addEventListener('click', fecha);
     document.addEventListener('keydown', (ev) => {
@@ -499,7 +570,21 @@
         }
     }, true);
 
+    // SELO DO BOTAO TASKS NA LISTA: VEM DO /api/sessoes (A CADA 5 S), SEM CHAMAR /api/tasks COM A VISAO FECHADA
+    function atualizaSelo(sessoes) {
+        const limite = Date.now() - HORAS_SELO * 3600 * 1000, recentes = (sessoes || []).filter(s => s.atualizado >= limite);
+        const andamento = recentes.reduce((n, s) => n + (s.tarefasAndamento || 0), 0), trabalhando = recentes.some(s => s.ativa);
+        for (const b of botoesTasks()) {
+            const selo = b.querySelector('.selo-tasks'), ponto = b.querySelector('.ponto-tasks');
+            if (selo) { selo.textContent = andamento; selo.hidden = !andamento; }
+            if (ponto) ponto.hidden = !trabalhando;
+            b.title = `Tasks: o chip e as tarefas de todas as conversas (Ctrl + Shift + T)${andamento ? ` · ${andamento} em andamento` : ''}${trabalhando ? ' · alguma conversa trabalhando' : ''}`;
+        }
+    }
+
     window.abreTasks = abre;
-    const botao = document.getElementById('btnTasks');
-    if (botao) botao.addEventListener('click', abre);
+    window.fechaTasks = fecha;
+    window.tasksAlterna = alterna;
+    window.tasksAtualizaSelo = atualizaSelo;
+    botoesTasks().forEach(b => { if (b.id === 'btnModoTasks') b.addEventListener('click', alterna); });
 })();
