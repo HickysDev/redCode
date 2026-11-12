@@ -56,6 +56,7 @@ const PASTA_CLAUDE = perfis.pastaClaude();
 const RAIZ_PROJETOS = path.join(PASTA_CLAUDE, 'projects');
 const DIAS_LISTADOS = 7;
 const SEGUNDOS_ATIVA = 90;
+const LIMITE_PULSOS = 40;
 const LIMITE_EVENTOS = 400;
 const LIMITE_TEXTO = 700;
 const LIMITE_CONVERSA = 60000;
@@ -269,6 +270,20 @@ function resumoFerramenta(nome, entrada) {
     return { tipo: 'ferramenta', texto: curto + (principal ? ': ' + principal : '') };
 }
 
+// TaskCreate ganha id sequencial na hora; o resultado ("Task #N created") traz o id real que o TaskUpdate usa
+function acertaIdTarefa(estado, b) {
+    const provisorio = estado.tarefasCriadas && estado.tarefasCriadas[b.tool_use_id];
+    if (!provisorio) return;
+    delete estado.tarefasCriadas[b.tool_use_id];
+    const texto = Array.isArray(b.content) ? b.content.map(c => c.text || '').join('\n') : String(b.content || '');
+    const real = (texto.match(/Task #(\d+) created/) || [])[1];
+    if (b.is_error || !real || real === provisorio || !estado.tarefas[provisorio]) return;
+    const reordenadas = {};
+    for (const [id, t] of Object.entries(estado.tarefas)) reordenadas[id === provisorio ? real : id] = t;
+    estado.tarefas = reordenadas;
+    estado.ultimaTarefa = Math.max(estado.ultimaTarefa, Number(real));
+}
+
 // Atualiza a lista de progresso a partir das ferramentas de plano/tarefas
 function atualizaPlano(estado, nome, entrada) {
     if (nome === 'TodoWrite' && Array.isArray(entrada.todos)) {
@@ -300,13 +315,17 @@ function atualizaPlano(estado, nome, entrada) {
         return true;
     }
     if (nome === 'TaskCreate') {
-        const id = String(Object.keys(estado.tarefas).length + 1);
+        estado.ultimaTarefa = (estado.ultimaTarefa || 0) + 1;
+        const id = String(estado.ultimaTarefa);
         estado.tarefas[id] = { texto: entrada.subject || entrada.description, status: 'pending' };
         estado.plano = Object.values(estado.tarefas);
         return true;
     }
     if (nome === 'TaskUpdate' && estado.tarefas[entrada.taskId]) {
-        if (entrada.status) estado.tarefas[entrada.taskId].status = entrada.status;
+        const tarefa = estado.tarefas[entrada.taskId];
+        if (entrada.subject) tarefa.texto = entrada.subject;
+        if (entrada.status === 'deleted') delete estado.tarefas[entrada.taskId];
+        else if (entrada.status) tarefa.status = entrada.status;
         estado.plano = Object.values(estado.tarefas);
         return true;
     }
@@ -323,6 +342,14 @@ function somaTokens(estado, modelo, uso) {
     t.chamadas += 1;
 }
 
+// Fluxo com o Claude para os sinais da visão Tasks: "in" = ele recebe, "out" = ele produz
+function registraPulso(estado, hora, dir) {
+    if (!hora) return;
+    const pulsos = estado.pulsos || (estado.pulsos = []);
+    pulsos.push({ hora, dir });
+    if (pulsos.length > LIMITE_PULSOS) pulsos.splice(0, pulsos.length - LIMITE_PULSOS);
+}
+
 function adicionaEvento(estado, evento) {
     // Liga a mensagem original à reescrita do Haiku (a mais próxima no tempo, até 2 min)
     if (evento.tipo === 'pedido' && estado.reescritas) {
@@ -330,6 +357,9 @@ function adicionaEvento(estado, evento) {
         if (pendente) pendente.original = evento.texto;
         estado.ultimoPedido = evento;
     }
+    const dir = evento.tipo === 'pedido' || evento.tipo === 'retorno' ? 'in'
+        : ['notificacao', 'interrompido', 'compactacao', 'troca', 'capitulo', 'proximo', 'refinado'].includes(evento.tipo) ? '' : 'out';
+    if (dir) registraPulso(estado, evento.hora, dir);
     estado.eventos.push(evento);
     if (evento.id) estado.porId[evento.id] = evento;
     if (estado.eventos.length > LIMITE_EVENTOS * 1.5) {
@@ -454,7 +484,9 @@ function processaRegistro(estado, r, origem) {
                 }
             }
             if (b.type === 'tool_result') {
+                registraPulso(estado, r.timestamp, 'in');
                 if (estado.pergunta && estado.pergunta.id === b.tool_use_id) estado.pergunta = null;
+                acertaIdTarefa(estado, b);
                 if (b.is_error && estado.planoAntes && estado.planoAntes.id === b.tool_use_id) {
                     estado.plano = estado.planoAntes.plano;
                     estado.tarefas = estado.planoAntes.tarefas;
@@ -553,6 +585,8 @@ function processaRegistro(estado, r, origem) {
                 }
                 const planoAntes = { id: b.id, plano: JSON.parse(JSON.stringify(estado.plano)), tarefas: JSON.parse(JSON.stringify(estado.tarefas)), hora: estado.planoHora };
                 if (atualizaPlano(estado, b.name, b.input || {})) {
+                    registraPulso(estado, r.timestamp, 'out');
+                    if (b.name === 'TaskCreate') (estado.tarefasCriadas = estado.tarefasCriadas || {})[b.id] = String(estado.ultimaTarefa);
                     estado.planoAntes = planoAntes;
                     if (!r.isSidechain) estado.planoHora = r.timestamp;
                     continue;
@@ -575,6 +609,7 @@ function processaRegistro(estado, r, origem) {
                         id: b.id, tipoAgente: (b.input || {}).subagent_type || 'general-purpose',
                         descricao: (b.input || {}).description || '', briefing: corta((b.input || {}).prompt, 3000),
                         status: 'rodando', inicio: r.timestamp, modelo: '',
+                        tarefaPai: estado.plano.findIndex(i => i.status === 'in_progress'),
                     };
                 }
             }
@@ -669,6 +704,8 @@ function leSubagentes(pastaSessao, estadoPai) {
         agente.contexto = sub.ultimoContexto || 0;
         agente.ultimasAcoes = sub.eventos.filter(e => !['pedido', 'pensou'].includes(e.tipo)).slice(-8).map(e => ({ tipo: e.tipo, texto: e.texto }));
         agente.contagem = sub.contagem;
+        agente.plano = sub.plano;
+        agente.pulsos = sub.pulsos || [];
         const parado = Date.now() - mtime > 10 * 60 * 1000;
         // O aviso do sistema (<task-notification>) é a fonte mais confiável: diz se terminou ou parou
         const idAgente = nome.replace(/^agent-/, '').replace(/\.meta\.json$/, '');
@@ -795,6 +832,50 @@ function listaSessoes() {
     }
     }
     return sessoes.sort((a, b) => b.atualizado - a.atualizado);
+}
+
+// Visão Tasks: conversas das últimas 24 h com lista de tarefas ou subagente, montadas do cache já lido
+const HORAS_TASKS = 24;
+const SEGUNDOS_PULSOS = 30;
+const LIMITE_PULSOS_NO = 12;
+function pulsosRecentes(pulsos) {
+    const desde = Date.now() - SEGUNDOS_PULSOS * 1000;
+    return (pulsos || []).filter(p => Date.parse(p.hora) >= desde).slice(-LIMITE_PULSOS_NO);
+}
+function tarefasDoPlano(plano) {
+    return (plano || []).map(t => ({ texto: corta(t.texto, 120), status: t.status || 'pending' }));
+}
+function listaTasks() {
+    const limite = Date.now() - HORAS_TASKS * 3600 * 1000;
+    const conversas = [];
+    for (const s of listaSessoes()) {
+        if (s.atualizado < limite) continue;
+        const achado = arquivoDaSessao(s.projeto, s.id);
+        const item = achado && cache.get(achado.arquivo);
+        if (!item) continue;
+        const estado = item.estado;
+        const agentes = Object.values(estado.agentes);
+        if (!estado.plano.length && !agentes.length) continue;
+        const tarefas = tarefasDoPlano(estado.plano).map(t => ({ ...t, subagentes: [] }));
+        const subagentesSoltos = [];
+        for (const a of agentes) {
+            const sub = {
+                id: a.id, tipo: a.tipoAgente || 'agente', descricao: corta(a.descricao, 80), status: a.status,
+                inicio: a.inicio || null, fim: a.fim || null, pulsos: pulsosRecentes(a.pulsos), tarefas: tarefasDoPlano(a.plano),
+            };
+            if (tarefas[a.tarefaPai]) tarefas[a.tarefaPai].subagentes.push(sub);
+            else subagentesSoltos.push(sub);
+        }
+        conversas.push({
+            id: s.id, projeto: s.projeto, nomeProjeto: s.nomeProjeto, titulo: s.titulo, modelo: s.modelo,
+            vivo: s.ativa, esperando: s.esperando, ultimo: s.atualizado,
+            pulsos: pulsosRecentes(estado.pulsos), tarefas, subagentesSoltos,
+        });
+    }
+    const corpo = { conversas };
+    corpo.hash = crypto.createHash('md5').update(JSON.stringify(corpo)).digest('hex').slice(0, 16);
+    corpo.agora = new Date().toISOString();
+    return corpo;
 }
 
 // cwd que gera o nome da pasta onde está o .jsonl (é nele que o SDK procura ao retomar)
@@ -2608,6 +2689,11 @@ const servidor = http.createServer(async (req, res) => {
             return responde(res, 200, await plugins.estado());
         }
         if (url.pathname === '/api/sessoes') return responde(res, 200, listaSessoes());
+        if (url.pathname === '/api/tasks') {
+            const tasks = listaTasks();
+            if (url.searchParams.get('desde') === tasks.hash) { res.writeHead(304); return res.end(); }
+            return responde(res, 200, tasks);
+        }
         // Player do rodapé: o que está tocando no Windows, a capa e os botões (tocar/pausar, próxima)
         if (url.pathname === '/api/midia/capa' && req.method === 'GET') {
             const capa = midia.capaAtual();
@@ -2654,7 +2740,7 @@ const servidor = http.createServer(async (req, res) => {
             try { return responde(res, 200, { ok: true, caminho: await videoNavegador.instalaYtdlp() }); }
             catch (e) { return responde(res, 502, { erro: e.message }); }
         }
-        if (url.pathname === '/clipe.html' || url.pathname === '/clipe.js') {
+        if (url.pathname === '/clipe.html' || url.pathname === '/clipe.js' || url.pathname === '/tasks.js') {
             res.writeHead(200, { 'Content-Type': url.pathname.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
             return res.end(fs.readFileSync(path.join(__dirname, url.pathname.slice(1))));
         }
