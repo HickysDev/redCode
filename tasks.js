@@ -101,6 +101,20 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 .tk-agora.pergunta { font: 12px var(--sans); color: var(--atencao); }
 .tk-agora.pergunta b { font: 700 12px var(--sans); flex: none; }
 .tk-agora.acao b { font-weight: 600; color: var(--tinta); flex: none; }
+.tk-pedidos { margin: 0 0 8px; display: flex; flex-direction: column; gap: 5px; }
+.tk-rotulo { font: 600 10px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--grafite); display: flex; align-items: center; gap: 6px; }
+.tk-rotulo .n { font: 10px var(--mono); opacity: .8; text-transform: none; letter-spacing: 0; }
+.tk-pedido p { margin: 2px 0 0; font: 12.5px/1.35 var(--sans); color: var(--tinta); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tk-pedido .tk-compl { margin: 2px 0 0 10px; font: 11.5px/1.3 var(--sans); color: var(--grafite); -webkit-line-clamp: 1; }
+.tk-pedido .tk-compl::before { content: "+ "; color: var(--grafite); }
+.tk-fila p { margin: 2px 0 0 10px; font: 11.5px/1.3 var(--sans); color: var(--grafite); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 8px; border-left: 2px solid var(--linha); }
+.tk-fila p.mais { border: 0; font: 11px var(--mono); }
+.tk-cartao.viva .tk-pedido p:first-of-type { color: var(--tinta); }
+.tk-gaveta .tk-pedido p { -webkit-line-clamp: unset; display: block; white-space: pre-wrap; }
+.tk-gaveta .tk-fila p { white-space: pre-wrap; }
+.tk-gaveta details.tk-antigo { margin-top: 10px; }
+.tk-gaveta details.tk-antigo summary { cursor: pointer; font: 600 11px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--grafite); list-style: none; }
+.tk-gaveta details.tk-antigo summary::before { content: "▸ "; } .tk-gaveta details.tk-antigo[open] summary::before { content: "▾ "; }
 .tk-cartao .barra { margin-bottom: 7px; }
 .tk-cartao .passos li, .tk-gaveta .passos li { grid-template-columns: 22px 1fr; align-items: center; padding: 2px 0; text-decoration: none; font-size: 12.5px; line-height: 1.3; }
 .tk-cartao .passos li::before, .tk-gaveta .passos li::before { content: none; }
@@ -259,10 +273,12 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         if (filhos.length) return filhos.reduce((s, f) => s + progressoTarefa(f), 0) / filhos.length;
         return t.status === 'pending' ? 0 : 0.5;
     };
+    // PLANO ANTIGO (FEITO ANTES DO ULTIMO PEDIDO) NAO CONTA: NAO APARECE NO CARTAO NEM NO PROGRESSO
+    const tarefasAtuais = (c) => (c.planoAtual === false ? [] : c.tarefas);
     const todosSubs = (c) => [...c.tarefas.flatMap(t => t.subagentes), ...c.subagentesSoltos];
     const ativo = (s) => s.status === 'rodando';
     const agentesAtivos = (c) => todosSubs(c).filter(ativo);
-    const progressoConversa = (c) => c.tarefas.length ? c.tarefas.reduce((s, t) => s + progressoTarefa(t), 0) / c.tarefas.length : (todosSubs(c).every(s => s.status !== 'rodando') ? 1 : 0.5);
+    const progressoConversa = (c) => tarefasAtuais(c).length ? tarefasAtuais(c).reduce((s, t) => s + progressoTarefa(t), 0) / tarefasAtuais(c).length : (todosSubs(c).every(s => s.status !== 'rodando') ? 1 : 0.5);
     const absorvida = () => false;
     const passaFiltro = (c) => (prefs.filtro === 'todas' || (prefs.filtro === 'ativas' && c.vivo) || (prefs.filtro === 'esperando' && c.esperando) || (prefs.filtro === 'agentes' && agentesAtivos(c).length > 0))
         && (!prefs.filtroModelo || familiaModelo(c.modelo) === prefs.filtroModelo || todosSubs(c).some(s => familiaModelo(s.modelo) === prefs.filtroModelo));
@@ -290,13 +306,27 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         if (c.vivo && c.acaoAtual && c.acaoAtual.texto) return `<div class="tk-agora acao" title="${escapa(c.acaoAtual.texto)}"><b>${escapa(VERBO_ACAO[c.acaoAtual.tipo] || c.acaoAtual.tipo)}</b><span>${escapa(c.acaoAtual.texto)}</span></div>`;
         return '';
     }
+    // SOLICITACOES: O PEDIDO QUE ABRIU O TURNO, OS COMPLEMENTOS ENTREGUES NO MEIO E O QUE AINDA ESTA NA FILA
+    function htmlSolicitacoes(c, completo) {
+        const partes = [];
+        if (c.pedidoAtual && c.pedidoAtual.texto) {
+            const compl = c.complementos || [], mostra = completo ? compl : compl.slice(0, 2);
+            partes.push(`<div class="tk-pedido"><span class="tk-rotulo">${c.vivo ? 'Em andamento' : 'Último pedido'}</span><p title="${escapa(c.pedidoAtual.texto)}">${escapa(c.pedidoAtual.texto)}</p>${mostra.map(x => `<p class="tk-compl" title="${escapa(x.texto)}">${escapa(x.texto)}</p>`).join('')}${compl.length > mostra.length ? `<p class="tk-compl">${compl.length - mostra.length} complemento(s) a mais</p>` : ''}</div>`);
+        }
+        const fila = c.fila || [];
+        if (fila.length) {
+            const mostra = completo ? fila : fila.slice(0, 3);
+            partes.push(`<div class="tk-fila"><span class="tk-rotulo">Na fila<span class="n">(${fila.length})</span></span>${mostra.map(x => `<p title="${escapa(x.texto)}">${escapa(x.texto)}</p>`).join('')}${fila.length > mostra.length ? `<p class="mais">+${fila.length - mostra.length}</p>` : ''}</div>`);
+        }
+        return partes.length ? `<div class="tk-pedidos">${partes.join('')}</div>` : '';
+    }
     function htmlCartao(c) {
-        const feitas = c.tarefas.filter(t => t.status === 'completed').length, p = progressoConversa(c);
-        const { inicio, fim } = janelaTarefas(c.tarefas);
-        const passos = c.tarefas.length ? `<ol class="passos">${inicio > 0 ? `<li class="mais" data-n="${inicio}">${inicio === 1 ? 'anterior' : 'anteriores'}</li>` : ''}${c.tarefas.slice(inicio, fim).map(itemPasso).join('')}${fim < c.tarefas.length ? `<li class="mais" data-n="${c.tarefas.length - fim}">${c.tarefas.length - fim === 1 ? 'restante' : 'restantes'}</li>` : ''}</ol>` : '<p class="tk-meta" style="margin:0">Sem lista de tarefas</p>';
-        return `<div class="tk-cab"><b title="${escapa(c.titulo)}">${escapa(c.titulo)}</b><span class="tk-pct">${Math.round(p * 100)}%</span></div>
-            <div class="tk-meta">${chipModelo(c.modelo)}<span class="tk-sit">${situacao(c)}</span><span>· ${feitas} de ${c.tarefas.length}</span></div>
-            ${htmlAgora(c)}<div class="barra"><div style="width:${Math.round(p * 100)}%"></div></div>${passos}`;
+        const tarefas = tarefasAtuais(c), feitas = tarefas.filter(t => t.status === 'completed').length, p = progressoConversa(c);
+        const { inicio, fim } = janelaTarefas(tarefas);
+        const passos = tarefas.length ? `<div class="barra"><div style="width:${Math.round(p * 100)}%"></div></div><ol class="passos">${inicio > 0 ? `<li class="mais" data-n="${inicio}">${inicio === 1 ? 'anterior' : 'anteriores'}</li>` : ''}${tarefas.slice(inicio, fim).map(itemPasso).join('')}${fim < tarefas.length ? `<li class="mais" data-n="${tarefas.length - fim}">${tarefas.length - fim === 1 ? 'restante' : 'restantes'}</li>` : ''}</ol>` : '';
+        return `<div class="tk-cab"><b title="${escapa(c.titulo)}">${escapa(c.titulo)}</b>${tarefas.length ? `<span class="tk-pct">${Math.round(p * 100)}%</span>` : ''}</div>
+            <div class="tk-meta">${chipModelo(c.modelo)}<span class="tk-sit">${situacao(c)}</span>${tarefas.length ? `<span>· ${feitas} de ${tarefas.length}</span>` : ''}</div>
+            ${htmlAgora(c)}${htmlSolicitacoes(c)}${passos}`;
     }
     // SUB-CARTAO DO AGENTE RODANDO: MASCOTE, TIPO, MODELO, DESCRICAO, O QUE FAZ AGORA E A MINI-LISTA DELE
     function htmlAgoraAgente(s) {
@@ -482,7 +512,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
                 k.corpo = corpo;
                 k.el.innerHTML = corpo;
                 k.el.style.setProperty('--tom', tomModelo(c.modelo));
-                k.el.dataset.busca = [c.titulo, c.nomeProjeto, nomeModelo(c.modelo), ...c.tarefas.map(t => t.texto), ...todosSubs(c).flatMap(s => [s.tipo, s.descricao, ...s.tarefas.map(t => t.texto)])].join(' ').toLowerCase();
+                k.el.dataset.busca = [c.titulo, c.nomeProjeto, nomeModelo(c.modelo), c.pedidoAtual && c.pedidoAtual.texto, ...(c.fila || []).map(x => x.texto), ...c.tarefas.map(t => t.texto), ...todosSubs(c).flatMap(s => [s.tipo, s.descricao, ...s.tarefas.map(t => t.texto)])].join(' ').toLowerCase();
                 k.mediu = false;
                 const tom = tomModelo(c.modelo);
                 k.trilha.setAttribute('style', `--trilha: color-mix(in srgb, ${tom} 45%, var(--linha))`);
@@ -597,7 +627,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     const FAMILIAS_LED = ['fable', 'opus', 'sonnet', 'haiku'];
     function atualizaCentro(visiveis) {
         const chip = $('tkChip'), anel = $('tkAnel');
-        const todas = visiveis.flatMap(c => c.tarefas);
+        const todas = visiveis.flatMap(tarefasAtuais);
         const pct = todas.length ? todas.reduce((s, t) => s + progressoTarefa(t), 0) / todas.length : 0;
         const perguntas = visiveis.filter(c => c.esperando).length, trabalhando = visiveis.some(c => c.vivo);
         const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
@@ -776,15 +806,17 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         const c = dados && dados.conversas.find(x => x.id === selecionada);
         const gaveta = $('tkGaveta');
         if (!c) { gaveta.hidden = true; htmlGaveta = ''; return; }
-        const p = progressoConversa(c), feitas = c.tarefas.filter(t => t.status === 'completed').length;
+        const tarefas = tarefasAtuais(c), p = progressoConversa(c), feitas = tarefas.filter(t => t.status === 'completed').length;
         const subs = (lista) => lista.map(s => `<div class="tk-sub ${escapa(s.status)}">${chipAgente(s)}<span title="${escapa(s.descricao)}">${escapa(s.descricao)}</span><small>${escapa(s.status)}</small></div>${s.tarefas.length ? `<ol class="passos">${s.tarefas.map(itemPasso).join('')}</ol>` : ''}`).join('');
         const novo = `<div class="cabeca-mapa"><h2>${escapa(c.titulo)}</h2><button class="fechar-mapa" data-tk-fecha-gaveta aria-label="Fechar">×</button></div>
             <div class="nota">${chipModelo(c.modelo)}<span>${escapa(c.nomeProjeto)}</span><span>·</span><span class="tk-sit-gaveta" style="color:${c.esperando ? 'var(--atencao)' : c.vivo ? 'var(--voce)' : 'var(--grafite)'}">${situacao(c)}</span></div>
             ${htmlAgora(c)}
             <div class="acoes"><button class="botao principal" data-tk-abrir>Abrir conversa</button></div>
-            <div class="cabeca-plano"><span>Tarefas</span><span>${feitas} de ${c.tarefas.length} · ${Math.round(p * 100)}%</span></div>
+            ${htmlSolicitacoes(c, true)}
+            ${tarefas.length ? `<div class="cabeca-plano"><span>Plano</span><span>${feitas} de ${tarefas.length} · ${Math.round(p * 100)}%</span></div>
             <div class="barra"><div style="width:${Math.round(p * 100)}%"></div></div>
-            ${c.tarefas.map(t => `<ol class="passos">${itemPasso(t)}</ol>${subs(t.subagentes.filter(ativo))}`).join('') || '<p class="nota">Sem lista de tarefas.</p>'}
+            ${tarefas.map(t => `<ol class="passos">${itemPasso(t)}</ol>${subs(t.subagentes.filter(ativo))}`).join('')}` : (c.pedidoAtual ? '' : '<p class="nota">Sem lista de tarefas.</p>')}
+            ${!tarefas.length && c.tarefas.length ? `<details class="tk-antigo"><summary>Plano anterior · ${c.tarefas.filter(t => t.status === 'completed').length} de ${c.tarefas.length}</summary>${c.tarefas.map(t => `<ol class="passos">${itemPasso(t)}</ol>`).join('')}</details>` : ''}
             ${c.subagentesSoltos.some(ativo) ? '<h4>Subagentes da conversa</h4>' + subs(c.subagentesSoltos.filter(ativo)) : ''}`;
         if (novo !== htmlGaveta) {
             const rolagem = gaveta.scrollTop, focado = document.activeElement && gaveta.contains(document.activeElement) ? [...gaveta.querySelectorAll('button')].indexOf(document.activeElement) : -1;

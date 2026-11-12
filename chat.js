@@ -262,6 +262,7 @@ async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [],
     if (viva && (viva.status === 'rodando' || viva.status === 'parando')) {
         // Comentário no meio do trabalho: entra no próximo passo; o modo não muda agora
         viva.fila.push(mensagemUsuario(texto, imagens, 'next'));
+        registraEnfileirada(viva, texto);
         viva.comentarios = (viva.comentarios || 0) + 1;
         viva.ultimoUso = Date.now();
         return viva;
@@ -278,6 +279,7 @@ async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [],
             viva.modo = modoValido;
         }
         viva.fila.push(mensagemUsuario(texto, imagens));
+        registraEnfileirada(viva, texto);
         viva.status = 'rodando';
         viva.texto = String(texto).slice(0, 3000);
         viva.inicio = new Date().toISOString();
@@ -585,6 +587,14 @@ async function acaoMcp(sessionId, servidor, acao) {
     return viva.q.mcpServerStatus();
 }
 
+// Mensagem entregue à fila do processo e ainda não vista no transcript: a Tasks mostra como "na fila"
+function registraEnfileirada(viva, texto) {
+    (viva.enfileiradas = viva.enfileiradas || []).push({ texto: String(texto || '').slice(0, 400), hora: new Date().toISOString() });
+}
+// Listas vivas (por referência) para o servidor podar o que já apareceu no transcript
+function enfileiradas() {
+    return [...conversas.values()].filter(c => c.vivo && c.enfileiradas && c.enfileiradas.length).map(c => ({ sessionId: c.sessionId, chave: c.chave, itens: c.enfileiradas }));
+}
 function estado() {
     // Esquece conversas encerradas há mais de 10 min
     const limite = Date.now() - 10 * 60 * 1000;
@@ -610,4 +620,4 @@ function agentesRodandoNa(chave) {
     return !!(c && c.sessionId && temAgentesRodando(c.projeto, c.sessionId));
 }
 
-module.exports = { CHAT_DIR, ehChat, agentesRodandoNa, voltarArquivos, ramificar, statusMcp, acaoMcp, comandosDisponiveis, usoDoPlano, modelosDisponiveis, configura, enviar, responder, parar, pararTarefa, trocaModo, fechaOciosas, estado, rodandoNaSessao, vivaNaSessao, pastaDoProjeto, MODOS };
+module.exports = { CHAT_DIR, ehChat, agentesRodandoNa, enfileiradas, voltarArquivos, ramificar, statusMcp, acaoMcp, comandosDisponiveis, usoDoPlano, modelosDisponiveis, configura, enviar, responder, parar, pararTarefa, trocaModo, fechaOciosas, estado, rodandoNaSessao, vivaNaSessao, pastaDoProjeto, MODOS };

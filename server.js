@@ -877,6 +877,28 @@ function indiceTarefaPai(estado, a) {
     if (a.tarefaPaiId != null && estado.tarefas[a.tarefaPaiId]) return Object.keys(estado.tarefas).indexOf(a.tarefaPaiId);
     return a.tarefaPai;
 }
+// Solicitações da conversa: o pedido que abriu o turno, os comentários entregues no meio dele e o que ainda está na fila
+const normalizaTexto = (s) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+function solicitacoes(s, estado) {
+    const pedidos = estado.eventos.filter(e => e.tipo === 'pedido');
+    const principais = pedidos.filter(e => !e.comentario && e.uuid);
+    const atual = principais[principais.length - 1] || null;
+    const complementos = atual ? pedidos.filter(e => e.comentario && Date.parse(e.hora) >= Date.parse(atual.hora)).map(e => ({ texto: corta(e.texto, 200), hora: e.hora })) : [];
+    // Fila: mensagens enviadas pelo painel que ainda não apareceram no transcript (poda as que já chegaram)
+    const info = chat.enfileiradas().find(x => x.sessionId === s.id);
+    let fila = [];
+    if (info) {
+        for (let i = info.itens.length - 1; i >= 0; i--) {
+            const item = info.itens[i];
+            const chegou = pedidos.some(e => Date.parse(e.hora) >= Date.parse(item.hora) - 1000 && normalizaTexto(e.texto) === normalizaTexto(item.texto));
+            if (chegou) info.itens.splice(i, 1);
+        }
+        fila = info.itens.map(i => ({ texto: corta(i.texto, 200), hora: i.hora }));
+    }
+    // Plano "antigo" como no cartão Plano do app: feito antes do último pedido do usuário
+    const planoAtual = !(estado.planoHora && atual && Date.parse(estado.planoHora) < Date.parse(atual.hora));
+    return { pedidoAtual: atual ? { texto: corta(atual.texto, 200), hora: atual.hora } : null, complementos, fila, planoAtual, planoHora: estado.planoHora || null };
+}
 function montaTasks(itens) {
     const conversas = itens.map(({ s, estado }) => {
         const tarefas = tarefasDoPlano(estado.plano).map(t => ({ ...t, subagentes: [] }));
@@ -895,6 +917,7 @@ function montaTasks(itens) {
             id: s.id, projeto: s.projeto, nomeProjeto: s.nomeProjeto, titulo: s.titulo, modelo: s.modelo,
             vivo: s.ativa, esperando: !s.ativa && !!estado.pergunta, ultimo: s.atualizado,
             pergunta: estado.pergunta ? corta(estado.pergunta.texto, 140) : null, acaoAtual: s.acaoAtual || null,
+            ...solicitacoes(s, estado),
             pulsos: pulsosRecentes(estado.pulsos), tarefas, subagentesSoltos,
         };
     });
@@ -916,6 +939,7 @@ function listaTasks() {
     }
     const versao = itens.map(({ s, estado }) => [
         s.id, s.atualizado, s.ativa, s.esperando, s.titulo, s.modelo, estado.pergunta && estado.pergunta.texto, s.acaoAtual && s.acaoAtual.texto,
+        JSON.stringify(solicitacoes(s, estado)),
         estado.plano.map(t => t.status + t.texto).join(','),
         Object.values(estado.agentes).map(a => [a.id, a.status, a.modelo, a.fim, (a.plano || []).map(t => t.status).join(''), a.acaoAtual && a.acaoAtual.tipo + a.acaoAtual.texto].join(':')).join(','),
     ].join('|')).join('\n') + '|' + seqPulso;
