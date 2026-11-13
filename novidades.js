@@ -3,6 +3,13 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.18', data: '2026-11-13', itens: [
+            'Tasks: nova visão no seletor do topo (Chat | Código | Tasks) ou com Ctrl+Shift+T. Mostra num só lugar as conversas trabalhando ou esperando você, o plano de cada uma, os subagentes e pulsos de luz do Claude recebendo e respondendo (feita pelo Guilherme)',
+            'Respostas do Claude na Tasks: o painel Agora mostra as respostas que o Claude vai dando em cada conversa, junto com os avisos',
+            'Em segundo plano: conversa com comando ou processo ainda rodando (como uma bateria de testes acompanhada no terminal) aparece como "Em segundo plano" na lista e na Tasks',
+        ],
+    },
+    {
         versao: '1.0.17', data: '2026-11-11', itens: [
             'Correção da 1.0.16: as perguntas do Claude voltam a aparecer no Red Code (não ficam mais como "responda no VS Code") e o painel volta a se atualizar sozinho',
             'Botão de extensões de volta no topo da lista',

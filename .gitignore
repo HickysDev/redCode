@@ -11,6 +11,9 @@ desktop/janela.json
 desktop/navegador.json
 desktop/*.log
 desktop/red-code.ico
+# Extensões instaladas e os dados delas (rodando pelo código, ficam na pasta do Red Code)
+extensoes/
+extensoes-dados/
 
 # Testes e sobras
 teste-chat/
