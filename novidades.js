@@ -3,6 +3,14 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.20', data: '2026-11-16', itens: [
+            'Quartinho do mascote: cada mascote dos agentes agora mora num quartinho atrás dele. São 9 temas prontos (Gamer, Escritório, Cabana, Biblioteca, Nave, Matrix, Doce, Balada e um que combina com a cor dele) e dá para montar o seu: parede, piso, cores, janela (dia, pôr do sol, noite, chuva, cidade, espaço, Matrix), 13 móveis e enfeites e 6 iluminações. Quem preferir pode deixar só o mascote',
+            'Personalidade e atributos: escolha entre 8 personalidades (animado, curioso, zen, caótico, sarcástico, tímido, ranzinza, sonhador). O mascote fala num balão quando você clica nele e de vez em quando sozinho, com frases sorteadas. Energia muda o ritmo, Tagarelice o quanto ele fala, Sono faz cochilar e Carisma faz brilhar',
+            'Mais roupas e acessórios: o mascote ganhou roupas com cor própria, estampas, costas (braços, pés, rabo, asas), bochechas, mais chapéus e óculos, e pode usar vários acessórios e até 3 objetos ao mesmo tempo',
+            'Editor do mascote em três grupos: Mascote, Quartinho e Personalidade, com prévia grande e o botão Aleatório sorteando tudo, inclusive o quarto',
+        ],
+    },
+    {
         versao: '1.0.19', data: '2026-11-16', itens: [
             'Red Code bem mais leve: com música tocando e uma conversa trabalhando, o uso do processador pela tela caiu de cerca de 50% para 3%. As animações (ponto pulsando, giro e brilho do "trabalhando", anel da pergunta) continuam iguais, só deixaram de pesar',
             'Conversa atualiza só o que mudou: a tela troca apenas o trecho novo em vez de remontar a conversa inteira (3 vezes mais rápido), e o texto que você selecionou não se perde mais quando chega novidade',

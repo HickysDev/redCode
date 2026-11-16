@@ -2905,16 +2905,28 @@ const servidor = http.createServer(async (req, res) => {
                 dados.visualPets = dados.visualPets || {};
                 if (!corpo.visual) delete dados.visualPets[nome];
                 else {
-                    // Só partes conhecidas, com valores curtos e cor em hexadecimal
+                    // Só partes conhecidas, com valores curtos (várias escolhas vêm separadas por vírgula) e cor em hexadecimal
                     const v = {};
-                    for (const k of ['forma', 'olhos', 'boca', 'chapeu', 'cara', 'bochechas', 'item', 'jeito']) {
+                    for (const k of ['forma', 'olhos', 'boca', 'chapeu', 'cara', 'bochechas', 'item', 'jeito', 'roupa', 'estampa', 'costas', 'quarto', 'parede', 'piso', 'janela', 'moveis', 'luz', 'pers']) {
                         const val = String(corpo.visual[k] == null ? '' : corpo.visual[k]);
-                        if (!/^[a-z]{0,20}$/.test(val)) return responde(res, 400, { erro: 'Visual inválido.' });
+                        if (!/^[a-z]{0,20}(,[a-z]{1,20}){0,11}$/.test(val)) return responde(res, 400, { erro: 'Visual inválido.' });
                         v[k] = val;
                     }
                     const cor = String(corpo.visual.cor || '');
                     if (!/^#[0-9a-f]{6}$/i.test(cor)) return responde(res, 400, { erro: 'Cor inválida.' });
                     v.cor = cor.toLowerCase();
+                    const corRoupa = String(corpo.visual.corRoupa || '#e8483d');
+                    if (!/^#[0-9a-f]{6}$/i.test(corRoupa)) return responde(res, 400, { erro: 'Cor da roupa inválida.' });
+                    v.corRoupa = corRoupa.toLowerCase();
+                    // Quartinho: cor da parede e do piso (vazio = automática) e os quatro atributos, de 1 a 5
+                    for (const k of ['corParede', 'corPiso']) {
+                        const c = String(corpo.visual[k] || '');
+                        if (c && !/^#[0-9a-f]{6}$/i.test(c)) return responde(res, 400, { erro: 'Cor do quarto inválida.' });
+                        v[k] = c.toLowerCase();
+                    }
+                    const atr = String(corpo.visual.atr || '3323');
+                    if (!/^[1-5]{4}$/.test(atr)) return responde(res, 400, { erro: 'Atributos inválidos.' });
+                    v.atr = atr;
                     dados.visualPets[nome] = v;
                 }
                 gravaDados(dados);
