@@ -291,7 +291,7 @@ async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [],
     const { query } = await carregaSdk();
     const conversa = {
         chave: novaChave(), cwd, sessionId: sessao || null, projeto: pastaDoProjeto(cwd), texto: String(texto).slice(0, 3000),
-        status: 'rodando', vivo: true, pendentes: new Map(), tarefasBg: [], tarefasFim: new Set(), erro: null, inicio: new Date().toISOString(), fim: null,
+        status: 'rodando', vivo: true, pendentes: new Map(), tarefasBg: [], tarefasFrente: [], tarefasFim: new Set(), erro: null, inicio: new Date().toISOString(), fim: null,
         ultimoUso: Date.now(), fila: criaFila(), q: null, modo: modoValido, podeIgnorar: modoValido === 'bypassPermissions',
         modelo: modelo || null, esforco: esforco || null, tipo: chat ? 'chat' : 'codigo',
         // Conta/identidade desta conversa (env próprio) e a pasta da conta do Claude que ela usa
@@ -347,6 +347,7 @@ async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [],
                 if (mensagem.type === 'result') {
                     // Fim de um turno: o processo continua vivo, esperando a próxima mensagem
                     conversa.status = conversa.status === 'parando' ? 'interrompida' : 'ociosa';
+                    conversa.tarefasFrente = [];
                     conversa.erro = mensagem.is_error ? String(mensagem.result || mensagem.subtype || 'erro') : null;
                 } else if (mensagem.type === 'assistant' && conversa.status === 'ociosa') {
                     // O Claude voltou a trabalhar sozinho (ex.: um agente em segundo plano terminou)
@@ -360,7 +361,8 @@ async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [],
         } finally {
             conversa.vivo = false;
             conversa.tarefasBg = [];
-            conversa.fim = new Date().toISOString();
+            conversa.tarefasFrente = [];
+            conversa.fim =new Date().toISOString();
             conversa.fila.close();
             conversa.pendentes.forEach(p => p.resolve({ behavior: 'deny', message: 'Conversa encerrada.' }));
             conversa.pendentes.clear();
@@ -407,6 +409,12 @@ function registraTarefas(conversa, m) {
             id: t.task_id, tipo: t.task_type, agente: t.subagent_type || null, descricao: String(t.description || '').slice(0, 200),
             inicio: (antes.get(t.task_id) || {}).inicio || Date.now(),
         }));
+    } else if (m.subtype === 'task_started' && m.is_backgrounded === false && m.subagent_type) {
+        // Agente de primeiro plano: não entra na lista de segundo plano, mas tem id e pode ser parado sozinho
+        conversa.tarefasFrente.push({ id: m.task_id, tipo: 'local_agent', agente: m.subagent_type, descricao: String(m.description || '').slice(0, 200), inicio: Date.now(), frente: true });
+    } else if (m.subtype === 'task_updated' && m.patch && m.patch.is_backgrounded) {
+        // Foi para o segundo plano: passa a vir no retrato das tarefas em segundo plano
+        conversa.tarefasFrente = conversa.tarefasFrente.filter(t => t.id !== m.task_id);
     } else if (m.subtype === 'task_notification') {
         // Terminou (concluída, falhou ou parada): sai da lista já, sem esperar o próximo retrato
         // (se ele se perde, a tarefa ficava "rodando" para sempre)
@@ -419,12 +427,13 @@ function registraTarefas(conversa, m) {
 }
 function tiraTarefa(conversa, id) {
     if (id && conversa.tarefasBg.some(t => t.id === id)) conversa.tarefasBg = conversa.tarefasBg.filter(t => t.id !== id);
+    if (id && conversa.tarefasFrente.some(t => t.id === id)) conversa.tarefasFrente = conversa.tarefasFrente.filter(t => t.id !== id);
 }
 
-// Para uma tarefa em segundo plano, sem interromper a conversa
+// Para uma tarefa em segundo plano ou um agente de primeiro plano, sem interromper a conversa
 async function pararTarefa(chave, id) {
     const conversa = conversas.get(chave);
-    if (!conversa || !conversa.vivo || !conversa.tarefasBg.some(t => t.id === id)) return false;
+    if (!conversa || !conversa.vivo || ![...conversa.tarefasBg, ...conversa.tarefasFrente].some(t => t.id === id)) return false;
     // O Claude Code recusa parar o que já acabou: aí ela só estava presa na lista, e sai dela
     try { await conversa.q.stopTask(id); } catch (e) { tiraTarefa(conversa, id); return false; }
     return true;
@@ -609,7 +618,7 @@ function estado() {
     return [...conversas.values()].map(c => ({
         chave: c.chave, sessionId: c.sessionId, projeto: c.projeto, cwd: c.cwd, status: c.status, vivo: c.vivo,
         erro: c.erro, inicio: c.inicio, fim: c.fim, texto: c.texto, modo: c.modo, modelo: c.modelo, tipo: c.tipo,
-        tarefasBg: c.tarefasBg, tarefasFim: c.tarefasFim.size,
+        tarefasBg: c.tarefasBg, tarefasFrente: c.tarefasFrente, tarefasFim: c.tarefasFim.size,
         pendentes: [...c.pendentes.values()].map(p => ({
             id: p.id, tipo: p.tipo, ferramenta: p.ferramenta, titulo: p.titulo, descricao: p.descricao,
             podeSempre: p.podeSempre, resumo: resumoEntrada(p.ferramenta, p.entrada),

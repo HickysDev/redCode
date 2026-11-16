@@ -432,6 +432,8 @@ li.pending .marcador { border: 1.5px dashed var(--grafite); }
 .pet-tempo { font: 11px var(--mono); opacity: .7; }
 .tarefas-bg .pet .parar-tarefa { position: absolute; left: 8px; top: -6px; width: 12px; height: 12px; opacity: 0; transition: opacity .15s; }
 .tarefas-bg .pet:hover .parar-tarefa { opacity: .9; }
+.tarefas-bg .pet-tarefa { cursor: pointer; }
+.tarefas-bg .pet.com-quarto .parar-tarefa { left: 6px; top: 6px; z-index: 3; box-shadow: 0 0 0 2px var(--papel); }
 /* Modelo do agente */
 .pet-modelo { margin-top: 3px; padding: 0 6px; border-radius: 8px; font-size: 10.5px; line-height: 16px; color: var(--cor-pet); border: 1px solid color-mix(in srgb, var(--cor-pet) 45%, transparent); }
 .pet-extra { position: absolute; inset: 0; pointer-events: none; }
@@ -746,6 +748,58 @@ html[data-tema-efetivo="claro"] { --pet-acessorio: #1b1b1b; }
 @keyframes petFala { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.9); } 8%, 86% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -4px) scale(.96); } }
 .pet .pet-corpo.pet-toque { animation: petToque .55s ease-out !important; }
 @keyframes petToque { 0% { transform: translateY(0) scale(1.14, .86); } 45% { transform: translateY(-16px) scale(.92, 1.1); } 100% { transform: translateY(0) scale(1, 1); } }
+/* ---------- Dança com música: de vez em quando, por alguns segundos (o JS põe as classes em cada mascote) ---------- */
+.pet.dancando .pet-corpo { transform-origin: 50% 100%; }
+.danca-notas { position: absolute; left: 0; right: 0; top: 0; height: 0; pointer-events: none; font: 700 12px var(--sans); color: #fff; text-shadow: 0 0 3px #000, 0 0 2px #000; }
+.danca-notas::before, .danca-notas::after { content: "♪"; position: absolute; left: calc(50% + 16px); top: 40px; opacity: 0; animation: dNota 1s ease-out infinite; }
+.danca-notas::after { content: "♫"; left: calc(50% - 26px); animation-delay: .5s; }
+.pet:not(.com-quarto) .danca-notas::before, .pet:not(.com-quarto) .danca-notas::after { top: -8px; }
+.danca-notas.coracao::before, .danca-notas.coracao::after { content: "♥"; color: #ff8fab; }
+.danca-notas.grande { font-size: 16px; }
+@keyframes dNota { 0% { opacity: 0; transform: translate(0, 6px) rotate(-10deg); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(6px, -22px) rotate(14deg); } }
+@keyframes dBalanco { 0%, 100% { transform: translateX(-4px) rotate(-11deg); } 25%, 75% { transform: translate(0, -5px) rotate(0); } 50% { transform: translateX(4px) rotate(11deg); } }
+@keyframes dPulo { 0%, 100% { transform: translateY(0) scale(1.16, .84); } 18% { transform: translateY(-2px) scale(.94, 1.08); } 50% { transform: translateY(-17px) scale(.96, 1.05); } 82% { transform: translateY(-2px) scale(1, 1); } }
+@keyframes dPuloSombra { 0%, 100% { transform: scale(1.15); opacity: .9; } 50% { transform: scale(.55); opacity: .4; } }
+@keyframes dPirueta { 0%, 25%, 50% { transform: translateY(0) rotateY(0); } 12.5%, 37.5% { transform: translateY(-8px) rotateY(0); } 75% { transform: translateY(-16px) rotateY(180deg); } 100% { transform: translateY(0) rotateY(360deg); } }
+@keyframes dMoon { 0% { transform: translateX(12px) rotate(-7deg); } 12.5% { transform: translate(8px, -3px) rotate(-7deg); } 25% { transform: translateX(4px) rotate(-7deg); } 37.5% { transform: translate(0, -3px) rotate(-7deg); } 50% { transform: translateX(-4px) rotate(-7deg); } 62.5% { transform: translate(-8px, -3px) rotate(-7deg); } 75% { transform: translateX(-12px) rotate(0) scale(1.1, .9); } 87.5% { transform: translate(-12px, -12px) rotate(0) scale(.95, 1.08); } 100% { transform: translateX(12px) rotate(-7deg); } }
+@keyframes dRobo { 0% { transform: none; } 12.5% { transform: rotate(-14deg); } 25% { transform: rotate(-14deg) translateY(-6px); } 37.5% { transform: translateY(-6px); } 50% { transform: rotate(14deg) translateY(-6px); } 62.5% { transform: rotate(14deg); } 75% { transform: scale(1.14, .86); } 87.5% { transform: scale(.9, 1.12) translateY(-5px); } 100% { transform: none; } }
+@keyframes dRock { 0%, 100% { transform: rotate(-3deg) translateY(-2px); } 35% { transform: rotate(20deg) translate(3px, 2px) scale(1.05, .92); } 60% { transform: rotate(4deg); } }
+@keyframes dRebola { 0%, 100% { transform: skewX(16deg) translateX(-3px) scale(1.03, .97); } 50% { transform: skewX(-16deg) translateX(3px) scale(1.03, .97); } 25%, 75% { transform: skewX(0) translateY(-3px); } }
+@keyframes dCamba { 0%, 38% { transform: none; } 19% { transform: translateY(-5px); } 46% { transform: scale(1.22, .78); } 58% { transform: translateY(-22px) rotate(-130deg); } 70% { transform: translateY(-25px) rotate(-250deg); } 82% { transform: translateY(0) rotate(-360deg); } 88% { transform: scale(1.18, .82) rotate(-360deg); } 100% { transform: rotate(-360deg); } }
+@keyframes dValsa { 0%, 100% { transform: translate(11px, 0) rotate(9deg); } 25% { transform: translate(0, -9px) rotate(0); } 50% { transform: translate(-11px, 0) rotate(-9deg); } 75% { transform: translate(0, 3px) scale(1.06, .94); } }
+@keyframes dLadoE { 0%, 100% { transform: none; } 25% { transform: translateX(-9px) rotate(-15deg); } 50% { transform: translate(-9px, -7px) rotate(-15deg); } 75% { transform: translateX(-3px) rotate(-4deg); } }
+@keyframes dLadoD { 0%, 100% { transform: none; } 25% { transform: translateX(9px) rotate(15deg); } 50% { transform: translate(9px, -7px) rotate(15deg); } 75% { transform: translateX(3px) rotate(4deg); } }
+@keyframes dMarca { 0%, 100% { transform: scale(1.12, .88); } 50% { transform: translateY(-12px); } }
+@keyframes dCanta { 0%, 100% { transform: rotate(-4deg) scale(1, 1); } 50% { transform: rotate(4deg) scale(1.06, .95) translateY(-3px); } }
+@keyframes dTorce { 0%, 100% { transform: translateX(-3px) rotate(-7deg); } 50% { transform: translateX(3px) rotate(7deg); } }
+@keyframes dBastao { 0%, 100% { transform: rotate(-35deg); } 50% { transform: rotate(35deg); } }
+@keyframes dGlobo { to { filter: hue-rotate(360deg); background-position: 4px 0; } }
+@keyframes dFlash { 0% { opacity: 1; } 100% { opacity: .1; } }
+.pet.danca-balanco .pet-corpo { animation: dBalanco 1s ease-in-out infinite !important; }
+.pet.danca-pulinho .pet-corpo, .pet.danca-festa .pet-corpo { animation: dPulo .5s cubic-bezier(.3, 0, .4, 1) infinite !important; }
+.pet.danca-pulinho .pet-sombra, .pet.danca-festa .pet-sombra { animation: dPuloSombra .5s cubic-bezier(.3, 0, .4, 1) infinite !important; }
+.pet.danca-pirueta .pet-corpo { animation: dPirueta 2s ease-in-out infinite !important; }
+.pet.danca-moonwalk .pet-corpo { animation: dMoon 2s linear infinite !important; }
+.pet.danca-robo .pet-corpo { animation: dRobo 2s steps(1, end) infinite !important; }
+.pet.danca-rock .pet-corpo { animation: dRock .5s cubic-bezier(.5, 0, .3, 1) infinite !important; transform-origin: 50% 90%; }
+.pet.danca-rebolado .pet-corpo { animation: dRebola 1s ease-in-out infinite !important; }
+.pet.danca-cambalhota .pet-corpo { animation: dCamba 2s ease-in-out infinite !important; transform-origin: 50% 50%; }
+.pet.danca-valsa .pet-corpo { animation: dValsa 2s ease-in-out infinite !important; }
+.pet.danca-espelho-e .pet-corpo { animation: dLadoE 1s ease-in-out infinite !important; }
+.pet.danca-espelho-d .pet-corpo { animation: dLadoD 1s ease-in-out infinite !important; }
+.pet.danca-marca .pet-corpo { animation: dMarca .5s ease-in-out infinite !important; }
+.pet.danca-canta .pet-corpo { animation: dCanta .5s ease-in-out infinite !important; }
+.pet.danca-torce .pet-corpo { animation: dTorce 1s ease-in-out infinite !important; }
+/* Festa em onda: cada mascote entra um pouco depois do anterior (depois das regras acima, que zeram o atraso) */
+.pet.dancando .pet-corpo, .pet.dancando .pet-sombra { animation-delay: var(--danca-atraso, 0s) !important; }
+.danca-globo { position: absolute; left: 50%; top: 0; width: 1px; height: 12px; background: #c0c0c0; }
+.danca-globo::after { content: ""; position: absolute; left: -6px; top: 11px; width: 13px; height: 13px; border-radius: 50%; background: conic-gradient(#fff 0 25%, #9aa 0 50%, #fff 0 75%, #9aa 0) 0 0 / 4px 4px; box-shadow: 0 0 8px 2px #ffffffb0, 18px 26px 0 -4px #f7768e80, -22px 30px 0 -4px #7aa2f780, 8px 44px 0 -4px #9ece6a80; animation: dGlobo 1s linear infinite; }
+.danca-flash { position: absolute; inset: 0; background: radial-gradient(circle at 50% 30%, #ff3b3b70, transparent 70%); animation: dFlash .5s steps(2, jump-none) infinite; }
+.danca-mic { position: absolute; left: calc(50% + 17px); top: 50px; width: 3px; height: 15px; border-radius: 1px; background: #3a3a46; transform: rotate(-28deg); transform-origin: 50% 100%; pointer-events: none; }
+.danca-mic::before { content: ""; position: absolute; left: -3px; top: -7px; width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(#0000 1px, #0000003d 1.2px) 0 0 / 3px 3px, #cfd3dc; }
+.danca-bastao { position: absolute; left: calc(50% + 18px); top: 44px; width: 4px; height: 17px; border-radius: 3px; background: linear-gradient(#fff, var(--cor-pet)); box-shadow: 0 0 8px 2px color-mix(in srgb, var(--cor-pet) 70%, transparent); transform-origin: 50% 100%; animation: dBastao 1s ease-in-out infinite; pointer-events: none; }
+.pet:not(.com-quarto) .danca-mic { top: 8px; }
+.pet:not(.com-quarto) .danca-bastao { top: 2px; }
 /* Editor: grupos, prévia com quarto, miniaturas de quarto, personalidade e atributos */
 .pet-grupos { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--linha); border-radius: 11px; background: var(--folha); }
 .pet-grupo { flex: 1; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--grafite); font: 600 12.5px var(--sans); transition: background .15s, color .15s; }
@@ -5898,12 +5952,19 @@ function petMiniVisual(v, rodando) {
 }
 function petMini(tipo, rodando, papelFixo, corFixa) { return petMiniVisual(visualPet(tipo, papelFixo, corFixa), rodando); }
 fetch('/api/visual-pets', { headers: { 'X-Painel': '1' } }).then(r => (r.ok ? r.json() : {})).then(v => { VISUAL_PETS = v || {}; if (typeof ultimosDados !== 'undefined' && ultimosDados) redesenha(ultimosDados); }).catch(() => { /* sem visual próprio */ });
-function petsAgentes(d, emCurso) {
+function petsAgentes(d, emCurso, tarefas, usadas, podeInterromper) {
     const lista = (d.agentes || []).filter(a => a.status === 'rodando').map(a => ({ tipo: a.tipoAgente || 'agente', desc: a.descricao || '', modelo: a.modelo || '' }));
     // Agente recém-chamado que ainda não apareceu na pasta de subagentes
     if (!lista.length && emCurso && emCurso.tipo === 'agente') lista.push({ tipo: emCurso.texto.split(':')[0].trim() || 'agente', desc: emCurso.texto.split(':').slice(1).join(':').trim() });
     return lista.slice(0, 8).map((a, n) => {
         const [, , faz] = PETS[String(a.tipo).toLowerCase()] || ['', '', 'trabalhando'];
+        // Botão de parar: o agente em segundo plano é a tarefa de mesma descrição (ou do mesmo tipo); o de primeiro plano
+        // não é tarefa do SDK, então parar interrompe a resposta da conversa (só na conversa rodando pelo painel)
+        const livres = (tarefas || []).filter(t => !usadas.has(t.id));
+        const tarefa = livres.find(t => t.descricao === a.desc) || livres.find(t => t.agente && t.agente === a.tipo);
+        if (tarefa) usadas.add(tarefa.id);
+        const parar = tarefa ? `<button type="button" class="parar-tarefa" data-tarefas="parar" data-id="${esc(tarefa.id)}" title="Parar este agente" aria-label="Parar este agente"></button>`
+            : podeInterromper ? '<button type="button" class="parar-tarefa" data-tarefas="interromper" title="Parar: este agente roda junto com a resposta, então a resposta inteira é interrompida" aria-label="Parar este agente e a resposta"></button>' : '';
         const v = visualPet(a.tipo);
         const modelo = a.modelo ? modeloCurto(a.modelo) : '';
         return `<div class="pet ${classesPet(v)}" data-pet-pers="${esc(v.pers)}" data-pet-fala="${atrPet(v)[1]}" data-chave="a:${esc(a.tipo)}:${n}" title="${esc(a.tipo + (modelo ? ' (' + modelo + ')' : '') + (a.desc ? ': ' + a.desc : ''))}" style="${estiloPet(v)};--atraso:${(n * 0.27).toFixed(2)}s">
@@ -5912,6 +5973,7 @@ function petsAgentes(d, emCurso) {
             <span class="pet-nome">${esc(a.tipo)}</span>
             <span class="pet-faz">${faz}</span>
             ${modelo ? `<span class="pet-modelo">${esc(modelo)}</span>` : ''}
+            ${parar}
         </div>`;
     }).join('');
 }
@@ -7849,7 +7911,7 @@ function falaPet(pet) {
 }
 document.addEventListener('click', (ev) => {
     const pet = ev.target.closest('.pets .pet[data-pet-pers]');
-    if (!pet) return;
+    if (!pet || ev.target.closest('button')) return;
     falaPet(pet);
     const corpo = pet.querySelector('.pet-corpo');
     corpo.classList.remove('pet-toque'); void corpo.offsetWidth; corpo.classList.add('pet-toque');
@@ -7862,6 +7924,67 @@ setInterval(() => {
     const pet = lista[Math.floor(Math.random() * lista.length)];
     if (Math.random() < (+pet.dataset.petFala || 3) * .1) falaPet(pet);
 }, 6000);
+
+// Dança com música: com a música do Windows tocando, de vez em quando (a cada 1 a 3 min) os mascotes dançam por uns 8 s.
+// A dança é sorteada; as de grupo (festa, espelho, karaokê) só com 2 ou mais mascotes na mesma caixa
+const DANCAS_SOLO = ['balanco', 'pulinho', 'pirueta', 'moonwalk', 'robo', 'rock', 'rebolado', 'cambalhota', 'valsa'];
+const DANCAS_GRUPO = ['festa', 'espelho', 'karaoke'];
+const DURACAO_DANCA = 8000;
+let proximaDanca = 0, fimDanca = 0;
+const sorteiaDanca = (lista) => lista[Math.floor(Math.random() * lista.length)];
+const musicaTocando = () => !playerMidia.hidden && !playerMidia.classList.contains('pausado') && !playerMidia.classList.contains('aviso-midia');
+function poeDanca(pet, danca, extra, noQuarto) {
+    pet.classList.add('dancando', 'danca-' + danca);
+    pet.insertAdjacentHTML('beforeend', extra);
+    const quarto = pet.querySelector('.pet-quarto');
+    if (quarto && noQuarto) quarto.insertAdjacentHTML('beforeend', noQuarto);
+}
+function paraDanca() {
+    fimDanca = 0;
+    document.querySelectorAll('.pet.dancando').forEach(p => {
+        [...p.classList].filter(c => c === 'dancando' || c.startsWith('danca-')).forEach(c => p.classList.remove(c));
+        p.style.removeProperty('--danca-atraso');
+    });
+    document.querySelectorAll('.danca-extra').forEach(e => e.remove());
+}
+function comecaDanca() {
+    const notas = '<span class="danca-notas danca-extra"></span>';
+    const brilho = '<span class="pet-brilhos danca-extra"></span>';
+    for (const caixa of document.querySelectorAll('.pets')) {
+        const pets = [...caixa.querySelectorAll('.pet:not(.pet-tarefa)')];
+        if (!pets.length) continue;
+        if (pets.length >= 2 && Math.random() < .35) {
+            const danca = sorteiaDanca(DANCAS_GRUPO);
+            if (danca === 'festa') {
+                // Em onda, com globo de discoteca e luz colorida no quarto
+                pets.forEach((p, n) => { poeDanca(p, 'festa', notas, '<span class="danca-globo danca-extra"></span><span class="q-luz luz-disco danca-extra"></span>'); p.style.setProperty('--danca-atraso', (-n * .17) + 's'); });
+            } else if (danca === 'espelho') {
+                // As pontas fazem o passo espelhado; os do meio marcam o tempo
+                pets.forEach((p, n) => poeDanca(p, n === 0 ? 'espelho-e' : n === pets.length - 1 ? 'espelho-d' : 'marca', notas));
+            } else {
+                // Karaokê: um canta com holofote, os outros torcem com bastão de luz
+                const cantor = Math.floor(Math.random() * pets.length);
+                pets.forEach((p, n) => (n === cantor
+                    ? poeDanca(p, 'canta', '<span class="danca-mic danca-extra"></span><span class="danca-notas grande danca-extra"></span>', '<span class="q-luz luz-foco danca-extra"></span>')
+                    : poeDanca(p, 'torce', '<span class="danca-bastao danca-extra"></span>')));
+            }
+        } else {
+            // Dança de um: às vezes só um mascote, às vezes todos juntos
+            const danca = sorteiaDanca(DANCAS_SOLO);
+            const extra = danca === 'pirueta' || danca === 'cambalhota' ? brilho : danca === 'valsa' ? '<span class="danca-notas coracao danca-extra"></span>' : notas;
+            for (const p of Math.random() < .5 ? [sorteiaDanca(pets)] : pets) poeDanca(p, danca, extra, danca === 'rock' ? '<span class="danca-flash danca-extra"></span>' : '');
+        }
+    }
+    fimDanca = Date.now() + DURACAO_DANCA;
+}
+setInterval(() => {
+    if (fimDanca && Date.now() >= fimDanca) paraDanca();
+    // Sem música (ou com a janela escondida): para e recomeça a contagem quando voltar a tocar
+    if (document.hidden || !musicaTocando()) { if (fimDanca) paraDanca(); proximaDanca = 0; return; }
+    if (!document.querySelector('.pets .pet:not(.pet-tarefa)')) return;
+    if (!proximaDanca) proximaDanca = Date.now() + (20 + Math.random() * 40) * 1000;
+    if (!fimDanca && Date.now() >= proximaDanca) { comecaDanca(); proximaDanca = Date.now() + (60 + Math.random() * 120) * 1000; }
+}, 2000);
 
 /* ---------- /mcp: servidores MCP da conversa (estado, ferramentas, reconectar, ligar/desligar, entrar) ---------- */
 const janelaMcp = document.getElementById('janelaMcp');
@@ -8576,18 +8699,20 @@ function tempoTarefa(inicio) {
 }
 function desenhaTarefasBg(conversa) {
     const caixa = document.getElementById('tarefasBg');
-    const rodando = (conversa && conversa.tarefasBg) || [];
+    // Agentes de primeiro plano entram junto: também têm id e param sem interromper a resposta
+    const rodando = [...((conversa && conversa.tarefasBg) || []), ...((conversa && conversa.tarefasFrente) || [])];
     const finalizadas = (conversa && conversa.tarefasFim) || 0;
     // Agentes da conversa aberta (o transcript diz quais estão rodando)
     const d = ultimosDados && ultimosDados.__chave === sessaoAtual ? ultimosDados : null;
     const trabalhando = d && (d.ativa || d.agentesRodando || (conversa && conversa.status === 'rodando'));
     const emCurso = d ? [...d.eventos].reverse().find(e => e.id && !e.fim) : null;
-    const agentes = trabalhando ? petsAgentes(d, emCurso) : '';
-    // Tarefa que é agente já aparece como pet de agente
-    const tarefas = rodando.filter(t => !(agentes && (t.agente || t.tipo === 'local_agent')));
+    const usadas = new Set();
+    const agentes = trabalhando ? petsAgentes(d, emCurso, rodando.filter(t => t.agente || t.tipo === 'local_agent'), usadas, !!(conversa && conversa.vivo && conversa.status === 'rodando')) : '';
+    // Tarefa que é agente já aparece como pet de agente (com o botão de parar); a que não casou com nenhum fica como tarefa
+    const tarefas = rodando.filter(t => !usadas.has(t.id));
     if (!agentes && !tarefas.length) { caixa.hidden = true; caixa.dataset.html = ''; return; }
     const html = `<div class="pets" aria-label="Trabalhando agora">${agentes}${tarefas.map((t, n) => `
-        <div class="pet pet-tarefa" data-chave="t:${esc(t.id)}" title="${esc(t.descricao || t.tipo)}" style="--atraso:${(n * 0.4).toFixed(2)}s">
+        <div class="pet pet-tarefa" data-chave="t:${esc(t.id)}" data-tarefas="ver" data-id="${esc(t.id)}" title="${esc((t.descricao || t.tipo) + ' · clique para ver o terminal')}" style="--atraso:${(n * 0.4).toFixed(2)}s">
             <div class="pet-corpo"><span class="pet-tela">&gt;_</span><span class="pet-item" aria-hidden="true">${ICONE.engrenagem}</span></div>
             <div class="pet-sombra"></div>
             <span class="pet-nome">${esc(t.descricao || t.tipo)}</span>
@@ -8603,6 +8728,20 @@ function desenhaTarefasBg(conversa) {
     // O cronômetro muda a cada segundo, então atualiza só o texto e não refaz os pets (a animação segue)
     caixa.querySelectorAll('.tempo-tarefa').forEach(el => { el.textContent = tempoTarefa(Number(el.dataset.inicio)); });
 }
+// Saída de um comando em segundo plano: o resultado dele diz o arquivo (...\tasks\<id>.output); abre uma aba acompanhando
+function verSaidaTarefa(id) {
+    const d = ultimosDados && ultimosDados.__chave === sessaoAtual ? ultimosDados : null;
+    const limpo = String(id).replace(/[^\w-]/g, '');
+    // Só o resultado do próprio comando (outros eventos podem citar o mesmo arquivo, como a saída de um teste)
+    const padrao = new RegExp('ID: ' + limpo + '\\b[\\s\\S]*?([A-Za-z]:\\\\[^\'"`$;&|<>\\r\\n*?]+?\\\\' + limpo + '\\.output)');
+    let arquivo = '';
+    for (const e of (d && d.eventos) || []) {
+        const m = String(((e.codigo || {}).saida || {}).texto || e.saida || '').match(padrao);
+        if (m) { arquivo = m[1]; break; }
+    }
+    if (!arquivo) return recado('Não achei a saída deste terminal');
+    acompanhaArquivo(d.cwd, arquivo);
+}
 document.getElementById('tarefasBg').addEventListener('click', async (ev) => {
     const alvo = ev.target.closest('[data-tarefas]');
     if (!alvo) return;
@@ -8611,9 +8750,13 @@ document.getElementById('tarefasBg').addEventListener('click', async (ev) => {
         document.getElementById('tarefasBg').classList.toggle('recolhido', tarefasBgRecolhido);
         return;
     }
+    if (alvo.dataset.tarefas === 'ver') return verSaidaTarefa(alvo.dataset.id);
     const conversa = conversaRelevante();
     if (!conversa) return;
-    try { await api('/api/chat/parar-tarefa', { chave: conversa.chave, id: alvo.dataset.id }); recado('Parando a tarefa…'); } catch (e) { recado(e.message); }
+    try {
+        if (alvo.dataset.tarefas === 'interromper') { await api('/api/chat/parar', { chave: conversa.chave }); recado('Pedindo para parar…'); }
+        else { await api('/api/chat/parar-tarefa', { chave: conversa.chave, id: alvo.dataset.id }); recado('Parando…'); }
+    } catch (e) { recado(e.message); }
     atualizaChat();
 });
 

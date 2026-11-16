@@ -3,6 +3,14 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.21', data: '2026-11-16', itens: [
+            'Mascotes dançam com música: com uma música tocando, de vez em quando (a cada 1 a 3 minutos) os mascotes dançam por alguns segundos. São 12 danças sorteadas, como balancinho, moonwalk, robô, rock, cambalhota e valsinha, e as de grupo: festa com globo de discoteca, coreografia espelhada e karaokê. Pausou a música, eles param',
+            'Parar agentes: passe o mouse no mascote de um agente e clique no quadradinho para parar só aquele agente; a conversa continua',
+            'Ver o terminal: clique no mascote de um comando rodando em segundo plano para abrir uma aba com a saída dele ao vivo',
+            'Pensando sem sumir: quando o Claude pensa por mais de 90 segundos, a conversa continua aparecendo como trabalhando na lista',
+        ],
+    },
+    {
         versao: '1.0.20', data: '2026-11-16', itens: [
             'Quartinho do mascote: cada mascote dos agentes agora mora num quartinho atrás dele. São 9 temas prontos (Gamer, Escritório, Cabana, Biblioteca, Nave, Matrix, Doce, Balada e um que combina com a cor dele) e dá para montar o seu: parede, piso, cores, janela (dia, pôr do sol, noite, chuva, cidade, espaço, Matrix), 13 móveis e enfeites e 6 iluminações. Quem preferir pode deixar só o mascote',
             'Personalidade e atributos: escolha entre 8 personalidades (animado, curioso, zen, caótico, sarcástico, tímido, ranzinza, sonhador). O mascote fala num balão quando você clica nele e de vez em quando sozinho, com frases sorteadas. Energia muda o ritmo, Tagarelice o quanto ele fala, Sono faz cochilar e Carisma faz brilhar',

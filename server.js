@@ -441,6 +441,8 @@ function processaRegistro(estado, r, origem) {
     if (!msg) return;
 
     if (r.type === 'user') {
+        // Mensagem ou resultado de ferramenta gravado: o modelo começa a pensar e nada é escrito até a resposta sair
+        if (!r.isSidechain) estado.esperaModelo = r.timestamp;
         // Aviso do sistema sobre tarefa/agente (<task-notification>): não é mensagem sua
         const textoBruto = typeof msg.content === 'string' ? msg.content : ((msg.content || []).find(b => b.type === 'text') || {}).text || '';
         if (/^\s*<task-notification>/.test(textoBruto)) {
@@ -537,7 +539,8 @@ function processaRegistro(estado, r, origem) {
     }
 
     if (r.type === 'assistant') {
-        const modeloValido = msg.model && msg.model !== '<synthetic>' && !r.isSidechain;
+        if (!r.isSidechain) estado.esperaModelo = null;
+        const modeloValido =msg.model && msg.model !== '<synthetic>' && !r.isSidechain;
         if (modeloValido) {
             // Troca de modelo no meio da conversa: o cache do modelo novo começa do zero
             if (estado.modelo && estado.modelo !== msg.model) {
@@ -790,7 +793,10 @@ function situacaoSessao(estado, mtime, id) {
     const ultimoEvento = estado.eventos[estado.eventos.length - 1];
     const ferramentaAberta = ultimoEvento && ultimoEvento.id && !ultimoEvento.fim && ultimoEvento.tipo !== 'agente'
         && Date.now() - Date.parse(ultimoEvento.hora || 0) < 15 * 60 * 1000;
-    const recente = Date.now() - mtime < SEGUNDOS_ATIVA * 1000 || ferramentaAberta;
+    // Pensando: a última coisa gravada foi sua mensagem ou um resultado e a resposta ainda não chegou.
+    // O transcript fica parado enquanto o modelo pensa (já passou de 3 min), então vale até 15 min
+    const pensando = !!estado.esperaModelo && Date.now() - mtime < 15 * 60 * 1000;
+    const recente = Date.now() - mtime < SEGUNDOS_ATIVA * 1000 || ferramentaAberta || pensando;
     const ativa = (!estado.turnoEncerrado && !estado.pergunta && recente) || (agentesRodando > 0 && !estado.pergunta);
     return { ativa, esperando: !ativa && (estado.turnoEncerrado || !!estado.pergunta), agentesRodando };
 }
