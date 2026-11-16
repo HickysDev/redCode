@@ -127,8 +127,10 @@ kbd { font: 11px var(--mono); border: 1px solid var(--linha); border-bottom-widt
 .nivel-atencao { color: var(--atencao); background: var(--atencao-fundo); }
 .nivel-trocar { color: var(--erro); background: var(--erro-fundo); }
 .vivo { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--linha); position: relative; top: -1px; }
-.vivo.ativo { background: var(--ok); animation: pulso 2s infinite; }
-@keyframes pulso { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 50%, transparent); } 70% { box-shadow: 0 0 0 6px transparent; } }
+.vivo.ativo { background: var(--ok); }
+/* O anel é um disco que cresce e some (transform + opacity): animar box-shadow redesenhava a página a cada quadro */
+.vivo.ativo::after, .estado.rodando::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: color-mix(in srgb, var(--ok) 50%, transparent); pointer-events: none; animation: pulso 2s infinite; }
+@keyframes pulso { 0% { transform: scale(1); opacity: 1; } 70%, 100% { transform: scale(2.5); opacity: 0; } }
 
 /* ---------- Centro ---------- */
 .centro { overflow-y: auto; min-width: 0; scroll-padding-top: 120px; }
@@ -371,10 +373,22 @@ li.pending .marcador { border: 1.5px dashed var(--grafite); }
 .acao.pensou .alvo { font-style: normal; }
 .trabalhando { display: flex; align-items: center; gap: 10px; margin: 14px 0 0 76px; padding: 8px 0; font-size: 14px; }
 .trabalhando .giro { width: 16px; text-align: center; color: var(--voce); font-size: 16px; line-height: 1; }
-.trabalhando .giro::before { content: "✢"; animation: giro 1.2s steps(1) infinite; }
-@keyframes giro { 0% { content: "·"; } 16% { content: "✢"; } 33% { content: "✳"; } 50% { content: "✶"; } 66% { content: "✻"; } 83% { content: "✽"; } }
-.trabalhando strong { font-weight: 600; background: linear-gradient(90deg, var(--voce), var(--agente), var(--modelo), var(--voce)); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: brilho 3s linear infinite; }
-@keyframes brilho { to { background-position: 300% 0; } }
+/* Os seis símbolos ficam empilhados e a pilha sobe um por vez (transform): trocar o content redesenhava a página a cada quadro */
+.trabalhando .giro, .giro-mini { display: inline-block; height: 1.3em; line-height: 1.3; overflow: hidden; vertical-align: -.28em; }
+.trabalhando .giro::before, .giro-mini::before { content: "·\A✢\A✳\A✶\A✻\A✽"; display: block; white-space: pre; animation: giro 1.2s steps(6) infinite; }
+@keyframes giro { to { transform: translateY(-100%); } }
+.trabalhando strong { font-weight: 600; color: var(--voce); position: relative; }
+/* Brilho do texto: cópias coloridas do texto atrás de uma janela esfumada que anda por transform, com a cópia andando o mesmo
+   tanto ao contrário (fica parada em cima do texto). O degradê recortado no texto redesenhava a página a cada quadro */
+.bri { display: none; position: absolute; left: 0; top: 0; width: 200%; height: 100%; overflow: hidden; pointer-events: none; user-select: none; -webkit-mask-image: linear-gradient(90deg, transparent, #000 50%, transparent); mask-image: linear-gradient(90deg, transparent, #000 50%, transparent); will-change: transform; }
+.bri > span { display: block; box-sizing: border-box; width: 100%; padding-right: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; will-change: transform; }
+.trabalhando strong .bri { display: block; animation: brilho-janela 1.5s linear infinite reverse; }
+.trabalhando strong .bri > span { animation: brilho-texto 1.5s linear infinite reverse; }
+.trabalhando strong .bri-1 { color: var(--agente); }
+.trabalhando strong .bri-2 { color: var(--modelo); }
+.trabalhando strong .bri-2, .trabalhando strong .bri-2 > span { animation-delay: -1s; }
+@keyframes brilho-janela { from { transform: translateX(-100%); } to { transform: translateX(50%); } }
+@keyframes brilho-texto { from { transform: translateX(100%); } to { transform: translateX(-50%); } }
 .trabalhando.com-robo { margin-left: 40px; }
 /* Passos ao vivo: ✓ feitos, ✗ falhou, ● agora (pulsando) */
 .trabalhando.passos-vivo { display: block; margin-left: 40px; }
@@ -578,7 +592,9 @@ html[data-tema-efetivo="claro"] { --pet-acessorio: #1b1b1b; }
 .agente .tipo { font: 600 15px var(--estreita); color: var(--agente); display: flex; align-items: center; gap: 7px; }
 .etiqueta { font: 500 12px var(--mono); padding: 1px 7px; border-radius: 4px; background: var(--modelo-fundo); color: var(--modelo); white-space: nowrap; }
 .estado { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.estado.rodando { background: var(--voce); animation: pulso 2s infinite; }
+.estado.rodando { background: var(--voce); position: relative; }
+/* A bolinha vermelha é redesenhada por cima do disco verde, para o anel não tingir ela */
+.estado.rodando::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: inherit; z-index: 1; }
 .estado.concluido { background: var(--ok); }
 .estado.erro { background: var(--erro); }
 .estado.interrompido { background: var(--atencao); }
@@ -1302,7 +1318,10 @@ button.partes:hover, button.partes[aria-expanded="true"] { color: var(--voce); b
 .barra-contexto.nivel-trocar span { background: var(--erro); opacity: 1; }
 /* Estados bem visíveis na lista */
 .sessao.estado-parada .titulo-item { color: var(--grafite); font-weight: 400; }
-.sessao.estado-trabalhando { background: linear-gradient(90deg, color-mix(in srgb, var(--ok) 14%, transparent), transparent 85%); border-left-color: var(--ok); animation: faixa-viva 2.2s ease-in-out infinite; }
+.sessao.estado-trabalhando { background: linear-gradient(90deg, color-mix(in srgb, var(--ok) 14%, transparent), transparent 85%); border-left-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+/* A faixa viva é uma barra por cima da borda, piscando por opacity (animar a cor da borda redesenhava a lista a cada quadro).
+   Mora na linha do selo porque o ::before e o ::after da conversa já têm dono */
+.sessao.estado-trabalhando .linha-selo::before { content: ""; position: absolute; left: -2px; top: 0; bottom: 0; width: 2px; background: var(--ok); pointer-events: none; animation: faixa-viva 2.2s ease-in-out infinite; }
 .sessao.estado-pergunta { background: linear-gradient(90deg, color-mix(in srgb, var(--voce) 18%, transparent), transparent 85%); border-left-color: var(--voce); }
 .sessao.estado-agente { background: linear-gradient(90deg, color-mix(in srgb, var(--agente) 10%, transparent), transparent 85%); border-left-color: var(--agente); }
 .sessao.estado-respondeu { border-left-color: color-mix(in srgb, var(--modelo) 60%, transparent); }
@@ -1310,7 +1329,7 @@ button.partes:hover, button.partes[aria-expanded="true"] { color: var(--voce); b
 .sessao[aria-current="true"] { background-color: var(--realce); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--voce) 70%, transparent); }
 .sessao[aria-current="true"] .titulo-item { color: var(--tinta); font-weight: 600; }
 .sessao[aria-current="true"]::after { content: ""; position: absolute; right: 0; top: 50%; translate: 0 -50%; border: 6px solid transparent; border-right-color: var(--voce); }
-@keyframes faixa-viva { 50% { border-left-color: color-mix(in srgb, var(--ok) 35%, transparent); } }
+@keyframes faixa-viva { 50% { opacity: 0; } }
 .linha-selo { display: flex; align-items: center; gap: 6px; margin: 4px 0 1px 21px; min-width: 0; }
 .linha-selo .fazendo { flex: 1; min-width: 0; }
 /* Selo maior que a lista (ex.: "Agente rodando, continua sozinha quando terminar"): cabe na largura e corta com reticências */
@@ -1322,15 +1341,20 @@ button.partes:hover, button.partes[aria-expanded="true"] { color: var(--voce); b
 .selo-status { display: inline-flex; align-items: center; gap: 5px; flex: none; font: 600 11px var(--sans); padding: 1px 8px 1px 6px; border-radius: 10px; }
 .selo-status b { font-weight: 700; }
 .selo-status.trabalhando { background: var(--ok-fundo); color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 45%, transparent); }
-.selo-status.pergunta { background: var(--voce); color: #fff; animation: pulso-selo 1.6s ease-in-out infinite; }
+.selo-status.pergunta { background: var(--voce); color: #fff; position: relative; }
+/* Anéis que piscam: o anel é fixo num ::after e só a opacity anima (animar box-shadow redesenhava a página a cada quadro) */
+.selo-status.pergunta::after, .botao.enviar.ocupado::after, .chip-perfil.pendente::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 4px color-mix(in srgb, var(--voce) 25%, transparent); opacity: 0; pointer-events: none; animation: pulso-selo 1.6s ease-in-out infinite; }
+/* O selo corta o texto comprido (overflow), mas deixa o anel de 4px aparecer */
+.linha-selo .selo-status.pergunta { overflow: clip; overflow-clip-margin: 4px; }
 .selo-status.agente { background: var(--atencao-fundo); color: var(--agente); border: 1px solid color-mix(in srgb, var(--agente) 45%, transparent); }
 .selo-status.respondeu { background: var(--modelo-fundo); color: var(--modelo); }
-@keyframes pulso-selo { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--voce) 25%, transparent); } }
+@keyframes pulso-selo { 50% { opacity: 1; } }
 .giro-mini { font-style: normal; width: 11px; text-align: center; }
-.giro-mini::before { content: "✢"; animation: giro 1.2s steps(1) infinite; }
-.fazendo { min-width: 0; font-size: 11.5px; color: var(--tinta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fazendo { position: relative; min-width: 0; font-size: 11.5px; color: var(--tinta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fazendo.calmo { color: var(--grafite); }
-.sessao.estado-trabalhando .fazendo:not(.calmo) { background: linear-gradient(90deg, var(--grafite), var(--tinta), var(--grafite)); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: brilho 2.4s linear infinite; }
+.sessao.estado-trabalhando .fazendo:not(.calmo) { color: var(--grafite); }
+.sessao.estado-trabalhando .fazendo:not(.calmo) .bri { display: block; color: var(--tinta); animation: brilho-janela 2.4s linear infinite reverse; }
+.sessao.estado-trabalhando .fazendo:not(.calmo) .bri > span { animation: brilho-texto 2.4s linear infinite reverse; }
 .resumo-status { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 14px 8px; }
 .resumo-status button { margin: 0; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; padding: 2px 9px; border-radius: 10px; border: 1px solid var(--linha); background: var(--folha); color: var(--grafite); }
 .resumo-status button:hover { color: var(--tinta); border-color: var(--grafite); }
@@ -1620,7 +1644,8 @@ body.iniciando-conversa #mensagem { opacity: .6; }
 #formNova .botao.ocupado { opacity: .75; cursor: progress; }
 /* Caixa de mensagem cresce conforme você digita */
 .caixa-mensagem textarea { transition: height .12s ease; overflow-y: auto; }
-.botao.enviar.ocupado { pointer-events: none; animation: pulso-selo 1s ease-in-out infinite; }
+.botao.enviar.ocupado { pointer-events: none; position: relative; }
+.botao.enviar.ocupado::after { inset: -1px; animation-duration: 1s; }
 @media (max-width: 1280px) { .destaques { grid-template-columns: 1fr; } }
 @media (max-width: 1180px) { .layout { grid-template-columns: 250px minmax(0, 1fr); } .lateral { display: none; } }
 @media (max-width: 760px) {
@@ -1769,7 +1794,7 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .player-midia.aberto .pm-tempo { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 10.5px; color: var(--grafite); font-variant-numeric: tabular-nums; }
 .player-midia.aberto.sem-tempo .pm-tempo { display: none; }
 .player-midia .pm-trilho { flex: 1; height: 4px; border-radius: 4px; background: var(--realce); overflow: hidden; }
-.player-midia .pm-trilho i { display: block; width: 0; height: 100%; border-radius: 4px; background: var(--voce); transition: width 1s linear; }
+.player-midia .pm-trilho i { display: block; width: 100%; height: 100%; border-radius: 4px; background: var(--voce); transform: translateX(-100%); transition: transform 1s linear; }
 .player-midia.aberto .pm-botoes { grid-area: botoes; align-self: start; gap: 2px; }
 .player-midia.aberto .pm-btn.pm-so-aberto { display: grid; }
 .player-midia.aberto [data-midia="alternar"] { width: 32px; height: 32px; border-radius: 50%; background: var(--voce); color: #fff; }
@@ -1789,7 +1814,7 @@ body.lista-escondida .rodape-sessoes { display: none; }
 @keyframes pmRola { 0%, 18% { transform: translateX(0); } 82%, 100% { transform: translateX(var(--desloca, 0)); } }
 .player-midia.aviso-midia { border-style: dashed; }
 .player-midia.aviso-midia .pm-titulo { font-size: 12px; }
-.player-midia .pm-prog { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: var(--voce); transition: width 1s linear; }
+.player-midia .pm-prog { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: var(--voce); transform: scaleX(0); transform-origin: 0 50%; transition: transform 1s linear; }
 .player-midia.pausado .pm-prog { opacity: .45; }
 .player-midia .pm-btn.ligado { color: var(--voce); }
 /* Vídeo da mídia no canto (como o picture-in-picture do navegador): em cima do player, tamanho P/M/G ou pela alça */
@@ -1859,8 +1884,8 @@ body.lista-escondida .rodape-sessoes { display: none; }
 body.com-player .uso-plano:not(.minimizado) { bottom: calc(116px + var(--altura-video, 0px) + var(--player-aberto, 0px)); transition: bottom .3s cubic-bezier(.2, .8, .2, 1); }
 .chip-perfil .perfil-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip-perfil .perfil-seta { color: var(--atencao); white-space: nowrap; }
-.chip-perfil.pendente { border-color: var(--atencao); animation: perfilPisca 1.6s ease-in-out infinite; }
-@keyframes perfilPisca { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--atencao) 25%, transparent); } }
+.chip-perfil.pendente { border-color: var(--atencao); }
+.chip-perfil.pendente::after { inset: -1px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--atencao) 25%, transparent); }
 .perfil-bolinha { flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--cor-perfil); color: #fff; font-weight: 700; letter-spacing: -.02em; }
 .menu-perfil { min-width: 260px; }
 .menu-perfil-item { display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px !important; align-items: center; }
@@ -3015,12 +3040,13 @@ function andaProgresso() {
     const base = m.atualizadoEm > 0 ? m.atualizadoEm : m.lidoEm;
     const pos = m.posicao + (m.estado === 'Playing' ? Math.max(0, (Date.now() - base) / 1000) : 0);
     barra.hidden = false;
-    const p = Math.min(100, Math.max(0, pos / m.duracao * 100)).toFixed(2) + '%';
-    barra.style.width = p;
+    // Anda por transform: mexer na largura refazia o layout da página inteira a cada quadro enquanto a música toca
+    const p = Math.min(100, Math.max(0, pos / m.duracao * 100));
+    barra.style.transform = `scaleX(${(p / 100).toFixed(4)})`;
     // Aberto (mouse em cima): tempo andado, total e a trilha
     const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
     const ini = playerMidia.querySelector('.pm-t-ini'), fim = playerMidia.querySelector('.pm-t-fim'), trilho = playerMidia.querySelector('.pm-trilho i');
-    if (ini) { ini.textContent = mmss(Math.min(pos, m.duracao)); fim.textContent = mmss(m.duracao); trilho.style.width = p; }
+    if (ini) { ini.textContent = mmss(Math.min(pos, m.duracao)); fim.textContent = mmss(m.duracao); trilho.style.transform = `translateX(${(p - 100).toFixed(2)}%)`; }
 }
 // Mouse em cima: o título da música, se não cabe, desliza até o fim, pausa e volta (o tempo cresce com o tamanho)
 function rolaTextosPlayer(ligar) {
@@ -4486,8 +4512,18 @@ function marca(htmlEscapado) {
     const termo = esc(procura).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return htmlEscapado.replace(new RegExp(`(${termo})(?![^<]*>)`, 'gi'), '<mark>$1</mark>');
 }
+const FORMATO_HORA = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const horasProntas = new Map();
 function hora(ts) {
-    return ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+    if (!ts) return '';
+    let pronta = horasProntas.get(ts);
+    if (pronta === undefined) {
+        const data = new Date(ts);
+        pronta = isNaN(data) ? 'Invalid Date' : FORMATO_HORA.format(data);
+        if (horasProntas.size > 5000) horasProntas.clear();
+        horasProntas.set(ts, pronta);
+    }
+    return pronta;
 }
 function tempoDecorrido(min) {
     if (min < 1) return 'menos de 1 min';
@@ -4812,7 +4848,7 @@ function itemSessao(s, { numeroParte = 1, total = 1, filho = false, raiz = '', a
         </span>
         ${situacao.classe === 'trabalhando'
             // Trabalhando: uma linha só, com o símbolo girando e o que está fazendo agora
-            ? `<span class="linha-selo"><span class="selo-status trabalhando"><i class="giro-mini" aria-hidden="true"></i></span><span class="fazendo" title="${esc(fazendo)}">${esc(fazendo || 'Trabalhando…')}</span></span>`
+            ? `<span class="linha-selo"><span class="selo-status trabalhando"><i class="giro-mini" aria-hidden="true"></i></span><span class="fazendo" title="${esc(fazendo)}">${comBrilho(esc(fazendo || 'Trabalhando…'))}</span></span>`
             : situacao.selo
             // Demais estados: um selo só, com o texto junto ("✓ Respondeu há 5 min")
             ? `<span class="linha-selo"><span class="selo-status ${situacao.classe}" title="${esc(situacao.selo + ', ' + situacao.texto)}"><b>${situacao.icone}</b>${esc(situacao.selo)}<span class="selo-texto">, ${esc(situacao.texto)}</span></span></span>`
@@ -5101,7 +5137,7 @@ async function abreSessao(chave, { daNova = false } = {}) {
     try {
         const ok = await atualizaSessao(true);
         // A sessão nova existe mas o transcript ainda não foi gravado: segue "Iniciando" até aparecer
-        if (ok === false && veioDeIniciando) principalEl.querySelector('.trabalhando strong')?.replaceChildren('Abrindo a conversa…');
+        if (ok === false && veioDeIniciando) { const forte = principalEl.querySelector('.trabalhando strong'); if (forte) forte.innerHTML = comBrilho('Abrindo a conversa…', 2); }
     } finally { clearTimeout(barra); principalEl.classList.remove('carregando-sessao'); }
 }
 
@@ -5480,6 +5516,11 @@ function descricaoPasso(e) {
     if (e.tipo === 'agente') return String(e.texto).split(':')[0];
     return e.tipo === 'leitura' || e.tipo === 'edicao' || (e.codigo && e.codigo.tipo !== 'comando') ? nomeArquivo(e.texto) : String(e.texto).slice(0, 90);
 }
+// Texto com o brilho passando: junto do texto vão cópias dele (escondidas do leitor de tela), que o CSS colore e faz passar (.bri)
+function comBrilho(textoEsc, cores = 1) {
+    const copia = (qual) => `<span class="bri${qual ? ' bri-' + qual : ''}" aria-hidden="true"><span>${textoEsc}</span></span>`;
+    return textoEsc + (cores > 1 ? copia(1) + copia(2) : copia(0));
+}
 function passosAoVivo(feitos, atual, desde, extra = '') {
     const MAX = 4, antes = Math.max(0, feitos.length - MAX);
     return `<div class="trabalhando passos-vivo" role="status"><ol>
@@ -5488,7 +5529,7 @@ function passosAoVivo(feitos, atual, desde, extra = '') {
             const falhou = e.erro || e.bloqueado;
             return `<li class="passo ${falhou ? 'passo-falhou' : 'passo-ok'}"><span class="m">${falhou ? '✗' : '✓'}</span><span class="t">${esc(verbos[e.tipo] || 'Usou')} ${esc(descricaoPasso(e))}</span></li>`;
         }).join('')}
-        <li class="passo agora"><span class="m"></span><strong class="t">${esc(atual)}</strong><span class="decorrido" data-desde="${esc(desde || '')}"></span></li>
+        <li class="passo agora"><span class="m"></span><strong class="t">${comBrilho(esc(atual), 2)}</strong><span class="decorrido" data-desde="${esc(desde || '')}"></span></li>
     </ol>${extra}</div>`;
 }
 
@@ -5594,6 +5635,61 @@ function indicadorTrabalhando(d) {
     return passosAoVivo(feitos, texto, desde, nota);
 }
 
+// Troca o conteúdo da conversa por blocos: só entra no DOM o bloco cujo HTML mudou; os outros ficam como estão. Trocar tudo
+// refazia o layout da conversa inteira a cada atualização (e derrubava a seleção de texto e as imagens já carregadas).
+// O índice do evento (data-ev) fica fora da comparação: ele anda quando a conversa passa do limite e o evento mais antigo sai.
+// O atraso do aviso de comando longo também: ele é contado a partir de agora, e no bloco que fica o relógio já está andando
+const MOLDE_PRINCIPAL = document.createElement('template');
+const semIndice = (html) => html.replace(/ (data-ev|id)="(cap-)?\d+"| style="animation-delay:[\d.]+s"/g, '');
+const comIndice = (el) => [...(el.matches('[data-ev]') ? [el] : []), ...el.querySelectorAll('[data-ev]')];
+function trocaPrincipal(principal, html) {
+    try {
+        MOLDE_PRINCIPAL.innerHTML = html;
+        const novos = [...MOLDE_PRINCIPAL.content.children], velhos = [...principal.children];
+        const corpoNovo = novos[novos.length - 1], corpoVelho = velhos[velhos.length - 1];
+        // Outra tela no lugar (primeiro desenho, "Iniciando"...): entra tudo de uma vez, lá embaixo
+        if (!corpoNovo || !corpoVelho || velhos.length !== novos.length || velhos.some(v => v.__html === undefined) || !corpoNovo.matches('.corpo') || !corpoVelho.matches('.corpo')) throw new Error('inteiro');
+        // Cabeçalho e ferramentas: um bloco cada
+        novos.slice(0, -1).forEach((novo, n) => {
+            const chave = semIndice(novo.outerHTML);
+            if (velhos[n].__html !== chave) { novo.__html = chave; velhos[n].replaceWith(novo); }
+        });
+        // Corpo: cada fala ou grupo de ações é um bloco, achado pelo HTML (pode ter mudado de posição)
+        const guardados = new Map();
+        for (const velho of corpoVelho.children) {
+            if (velho.__html === undefined) continue;
+            if (!guardados.has(velho.__html)) guardados.set(velho.__html, []);
+            guardados.get(velho.__html).push(velho);
+        }
+        const ficam = new Set();
+        const blocos = [...corpoNovo.children].map(novo => {
+            const chave = semIndice(novo.outerHTML);
+            const velho = (guardados.get(chave) || []).shift();
+            if (!velho) { novo.__html = chave; return novo; }
+            // Mesmo bloco: só o índice do evento acompanha os dados novos
+            const antes = comIndice(velho), agora = comIndice(novo);
+            agora.forEach((el, n) => { if (antes[n].dataset.ev !== el.dataset.ev) { antes[n].dataset.ev = el.dataset.ev; if (el.id) antes[n].id = el.id; } });
+            ficam.add(velho);
+            return velho;
+        });
+        // Sai primeiro o que não tem par: assim quem fica já está no lugar e não é movido (mover refaz o layout do bloco)
+        for (const velho of [...corpoVelho.children]) if (!ficam.has(velho)) velho.remove();
+        let vez = corpoVelho.firstElementChild;
+        for (const bloco of blocos) {
+            if (bloco === vez) vez = vez.nextElementSibling;
+            else corpoVelho.insertBefore(bloco, vez);
+        }
+    } catch (e) {
+        principal.innerHTML = html;
+        const corpo = principal.lastElementChild;
+        for (const bloco of principal.children) bloco.__html = bloco === corpo ? '' : semIndice(bloco.outerHTML);
+        if (corpo && corpo.matches('.corpo')) {
+            [...corpo.childNodes].forEach(no => { if (no.nodeType === 3) no.remove(); });
+            for (const bloco of corpo.children) bloco.__html = semIndice(bloco.outerHTML);
+        }
+    }
+    MOLDE_PRINCIPAL.innerHTML = '';
+}
 function desenhaPrincipal(d) {
     try { verificaAcompanhar(d); } catch (e) { /* não atrapalha o desenho */ }
     const feitos = d.plano.filter(p => p.status === 'completed').length;
@@ -5745,7 +5841,7 @@ function desenhaPrincipal(d) {
     const principal = document.getElementById('principal');
     principal.querySelectorAll('details[open][data-chave]').forEach(el => { if (!procura) abertos.add(el.dataset.chave); });
     BLOCO_PENDENTES.remove();
-    principal.innerHTML = html;
+    trocaPrincipal(principal, html);
     colocaPendentes();
     marcaNovos(principal, d);
     principal.querySelectorAll('details[data-chave]').forEach(el => {
@@ -10368,7 +10464,8 @@ desenhaSino();
 if (JANELA_SECUNDARIA) abreSessao(JANELA_SECUNDARIA);
 carregaSessoes();
 setInterval(carregaSessoes, 5000);
-setInterval(() => atualizaSessao(false), 2000);
+setInterval(() => { if (!document.hidden) atualizaSessao(false); }, 2000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) atualizaSessao(false); });
 setInterval(atualizaChat, 1000);
 
 // Visual minimalista: detalhes da conversa e painel lateral começam escondidos; a escolha fica guardada

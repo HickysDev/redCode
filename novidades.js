@@ -3,6 +3,13 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.19', data: '2026-11-16', itens: [
+            'Red Code bem mais leve: com música tocando e uma conversa trabalhando, o uso do processador pela tela caiu de cerca de 50% para 3%. As animações (ponto pulsando, giro e brilho do "trabalhando", anel da pergunta) continuam iguais, só deixaram de pesar',
+            'Conversa atualiza só o que mudou: a tela troca apenas o trecho novo em vez de remontar a conversa inteira (3 vezes mais rápido), e o texto que você selecionou não se perde mais quando chega novidade',
+            'Janela escondida não trabalha: com o Red Code minimizado ou escondido a conversa aberta deixa de ser consultada, e atualiza na hora quando você volta',
+        ],
+    },
+    {
         versao: '1.0.18', data: '2026-11-13', itens: [
             'Tasks: nova visão no seletor do topo (Chat | Código | Tasks) ou com Ctrl+Shift+T. Mostra num só lugar as conversas trabalhando ou esperando você, o plano de cada uma, os subagentes e pulsos de luz do Claude recebendo e respondendo (feita pelo Guilherme)',
             'Respostas do Claude na Tasks: o painel Agora mostra as respostas que o Claude vai dando em cada conversa, junto com os avisos',
