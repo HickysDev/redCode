@@ -1608,7 +1608,7 @@ videoNativo.configura(videoNavegador.recebe);
 try { playersExternos.configura(PASTA_DADOS, videoNavegador.recebe); } catch (e) { console.log('players externos: ' + e.message); }
 const ARQUIVO_DADOS = path.join(PASTA_DADOS, 'dados.json');
 function leDados() {
-    const vazio = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], pastasExtras: [], navegador: 'padrao' };
+    const vazio = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], grupos: [], pastasExtras: [], navegador: 'padrao' };
     try { return { ...vazio, ...JSON.parse(fs.readFileSync(ARQUIVO_DADOS, 'utf8')) }; }
     catch (e) { return vazio; }
 }
@@ -1629,6 +1629,7 @@ function registraVivas() {
     vivasGravadas = json;
     try { fs.writeFileSync(ARQUIVO_VIVAS, json); } catch (e) { /* só otimização */ }
 }
+const CORES_GRUPO = ['voce', 'atencao', 'ok', 'agente', 'modelo', 'erro'];
 function chaveValida(chave) {
     return typeof chave === 'string' && /^[A-Za-z0-9-]+\/[A-Za-z0-9-]+$/.test(chave);
 }
@@ -2696,6 +2697,36 @@ async function rotaChat(req, res, url) {
         gravaDados(dados);
         return responde(res, 200, { favorita: !ja });
     }
+    if (url.pathname === '/api/grupos') {
+        const dados = leDados();
+        const grupos = Array.isArray(dados.grupos) ? dados.grupos : [];
+        const grupo = grupos.find(g => g.id === corpo.id);
+        const nome = String(corpo.nome || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+        const chaves = (Array.isArray(corpo.chaves) ? corpo.chaves : []).filter(chaveValida);
+        const acao = corpo.acao;
+        if (acao !== 'criar' && acao !== 'tirar' && !grupo) return responde(res, 404, { erro: 'grupo não encontrado' });
+        if ((acao === 'criar' || acao === 'renomear') && !nome) return responde(res, 400, { erro: 'dê um nome ao grupo' });
+        if ((acao === 'colocar' || acao === 'tirar') && !chaves.length) return responde(res, 400, { erro: 'conversa inválida' });
+        const tiraDeTodos = () => grupos.forEach(g => { g.conversas = g.conversas.filter(c => !chaves.includes(c)); });
+        let criado = null;
+        if (acao === 'criar') {
+            criado = { id: 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), nome, cor: CORES_GRUPO.includes(corpo.cor) ? corpo.cor : CORES_GRUPO[0], conversas: [] };
+            grupos.push(criado);
+            if (chaves.length) { tiraDeTodos(); criado.conversas.push(chaves[0]); }
+        } else if (acao === 'renomear') { grupo.nome = nome; if (CORES_GRUPO.includes(corpo.cor)) grupo.cor = corpo.cor; }
+        else if (acao === 'cor') { if (!CORES_GRUPO.includes(corpo.cor)) return responde(res, 400, { erro: 'cor inválida' }); grupo.cor = corpo.cor; }
+        else if (acao === 'mover') {
+            const de = grupos.indexOf(grupo), para = de + (corpo.passo < 0 ? -1 : 1);
+            if (para >= 0 && para < grupos.length) [grupos[de], grupos[para]] = [grupos[para], grupos[de]];
+        } else if (acao === 'apagar') grupos.splice(grupos.indexOf(grupo), 1);
+        // A CADEIA INTEIRA SAI DE QUALQUER GRUPO ANTES: NO MÁXIMO 1 GRUPO POR CONVERSA
+        else if (acao === 'colocar') { tiraDeTodos(); grupo.conversas.push(chaves[0]); }
+        else if (acao === 'tirar') tiraDeTodos();
+        else return responde(res, 400, { erro: 'ação inválida' });
+        dados.grupos = grupos;
+        gravaDados(dados);
+        return responde(res, 200, { grupos, criado: criado && criado.id });
+    }
     if (url.pathname === '/api/chat/responder') {
         return chat.responder(corpo.id, corpo) ? responde(res, 200, { ok: true }) : responde(res, 404, { erro: 'Este pedido já foi respondido ou expirou.' });
     }
@@ -2834,7 +2865,7 @@ const servidor = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=86400', 'X-Content-Type-Options': 'nosniff' });
             return res.end(fs.readFileSync(arq));
         }
-        if (url.pathname.startsWith('/api/chat/') || url.pathname === '/api/auth/entrar' || url.pathname === '/api/auth/cancelar' || url.pathname === '/api/auth/codigo' || url.pathname === '/api/plugins/acao' || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta', '/api/economia'].includes(url.pathname)) return await rotaChat(req, res, url);
+        if (url.pathname.startsWith('/api/chat/') || url.pathname === '/api/auth/entrar' || url.pathname === '/api/auth/cancelar' || url.pathname === '/api/auth/codigo' || url.pathname === '/api/plugins/acao' || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/grupos', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta', '/api/economia'].includes(url.pathname)) return await rotaChat(req, res, url);
         if (url.pathname === '/api/auth/estado') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
             return responde(res, 200, await login.estado());

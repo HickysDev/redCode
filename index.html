@@ -1969,6 +1969,36 @@ body.lateral-aberta .lateral { display: block; }
 .projeto:hover { color: var(--tinta); }
 .projeto .seta { font-size: 9px; opacity: .7; }
 .projeto .contagem { display: none; }
+.lista .projeto.trabalhando-agora { color: var(--ok); }
+.lista .projeto.grupo-usuario { color: var(--cor-grupo); cursor: pointer; border-radius: 6px; }
+.lista .projeto.grupo-usuario:hover { color: var(--tinta); }
+.lista .projeto.grupo-usuario.alvo-soltar { background: var(--realce); outline: 1px dashed var(--cor-grupo); outline-offset: -2px; color: var(--tinta); }
+.bola-grupo { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--cor-grupo); }
+.nome-grupo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mais-grupo { display: grid; place-items: center; margin-left: auto; padding: 0 2px; color: var(--grafite); opacity: 0; transition: opacity .15s; }
+.projeto.grupo-usuario:hover .mais-grupo, .mais-grupo:focus-visible, .mais-grupo[aria-expanded="true"] { opacity: 1; }
+.mais-grupo:hover { color: var(--tinta); }
+.grupo-vazio { padding: 2px 18px 8px 34px; font-size: 12px; color: var(--grafite); }
+.novo-grupo { display: block; margin: 6px 18px 2px; padding: 0; font-size: 12px; color: var(--grafite); opacity: .8; }
+.novo-grupo:hover { color: var(--tinta); }
+.menu-sessao .seta-sub { margin-left: auto; font-size: 10px; color: var(--grafite); }
+.menu-sessao [data-menu-por-grupo] .bola-grupo { margin: 0 3px; }
+.menu-sessao [data-menu-por-grupo][aria-current="true"] { color: var(--cor-grupo); }
+.menu-sessao .apagar-grupo { color: var(--edicao); }
+.menu-sessao .apagar-grupo svg { color: currentColor; }
+.menu-sessao button:disabled { opacity: .4; cursor: default; background: none; }
+.cores-grupo-menu { display: flex; gap: 7px; padding: 6px 10px 4px; }
+.cores-grupo-menu button { width: 16px; height: 16px; padding: 0; border-radius: 50%; background: var(--cor-grupo); border: 2px solid transparent; box-shadow: 0 0 0 1px var(--linha); }
+.cores-grupo-menu button[aria-pressed="true"] { border-color: var(--tinta); }
+.form-grupo { display: grid; gap: 12px; }
+.form-grupo label { display: grid; gap: 4px; font-size: 13px; }
+.form-grupo input[name="nomeGrupo"] { width: 100%; }
+.cores-grupo { display: flex; gap: 10px; }
+.cores-grupo label { display: block; cursor: pointer; }
+.cores-grupo input { position: absolute; opacity: 0; pointer-events: none; }
+.cores-grupo .bola-grupo { width: 20px; height: 20px; border: 2px solid transparent; box-shadow: 0 0 0 1px var(--linha); }
+.cores-grupo input:checked + .bola-grupo { border-color: var(--tinta); }
+.cores-grupo input:focus-visible + .bola-grupo { outline: 2px solid var(--voce); outline-offset: 2px; }
 .sessao.parte { position: relative; padding-left: 30px; }
 .sessao.parte::before { content: "\2514"; position: absolute; left: 17px; top: 6px; color: var(--grafite); opacity: .5; }
 .sessao { padding: 7px 14px 7px 15px; border-left-width: 2px; }
@@ -5034,11 +5064,13 @@ const ICONES = {
     continua: svg('<path d="M3 2.5v5A2.5 2.5 0 0 0 5.5 10H13"/><path d="M10 7l3 3-3 3"/>', 'class="icone-continua"'),
     mais: svg('<circle cx="3.5" cy="8" r=".9"/><circle cx="8" cy="8" r=".9"/><circle cx="12.5" cy="8" r=".9"/>'),
     estrela: svg('<path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/>', 'class="icone-estrela"'),
+    grupo: svg('<path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 1.5h4.5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/>'),
 };
 
-let dadosPainel = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [] };
+let dadosPainel = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], grupos: [] };
 let todasSessoes = [];
 let editandoNome = false;
+let arrastandoConversa = false;
 let gruposFechados = new Set();
 try { gruposFechados = new Set(JSON.parse(localStorage.getItem('painelGruposFechados') || '[]')); } catch (e) { /* sem armazenamento */ }
 
@@ -5123,7 +5155,7 @@ function itemSessao(s, { numeroParte = 1, total = 1, filho = false, raiz = '', a
     const arquivada = dadosPainel.arquivadas.includes(chave);
     const largura = Math.min(100, (s.contexto || 0) / LIMITES.janela * 100).toFixed(1);
     const fazendo = situacao.fazendo || s.acaoAtual ? situacao.fazendo || `${gerundiosLista[s.acaoAtual.tipo] || 'Trabalhando em'} ${s.acaoAtual.texto}…` : s.ativa && !s.agentesRodando ? 'Pensando…' : '';
-    return `<div class="sessao ${filho ? 'parte' : ''} estado-${situacao.classe}" role="button" tabindex="0" data-chave="${esc(chave)}" aria-current="${!iniciando && sessaoAtual === chave}">
+    return `<div class="sessao ${filho ? 'parte' : ''} estado-${situacao.classe}" role="button" tabindex="0" draggable="true" data-chave="${esc(chave)}" aria-current="${!iniciando && sessaoAtual === chave}">
         <span class="linha-titulo">
             <i class="status-item ${situacao.classe}" title="${esc(situacao.selo || situacao.texto)}">${situacao.icone}</i>
             <span class="titulo-item" data-renomear="${esc(chave)}" title="Duplo clique para renomear">${ehContinuacao(s) ? `<span class="marca-continua" title="Continuação de outra conversa">${ICONES.continua}</span>` : ''}${esc(nomeExibido(s, numeroParte))}${seloConta(s)}</span>
@@ -5268,14 +5300,14 @@ function tiraCarregandoInicio() {
 }
 setTimeout(() => { if (!carregouInicio && document.getElementById('carregandoInicioTexto')) document.getElementById('carregandoInicioTexto').textContent = 'Ainda carregando… o servidor está demorando para responder'; }, 12000);
 async function carregaSessoes() {
-    if (editandoNome) return;
+    if (editandoNome || arrastandoConversa) return;
     const [sessoes, dados] = await Promise.all([
         fetch('/api/sessoes').then(r => r.json()),
         fetch('/api/dados').then(r => r.json()).catch(() => dadosPainel),
     ]);
     todasSessoes = sessoes;
     if (window.tasksAtualizaSelo) window.tasksAtualizaSelo(sessoes);
-    dadosPainel = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], ...dados };
+    dadosPainel = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], grupos: [], ...dados };
     // Primeira lista chegou: o carregando sai depois que ela estiver desenhada
     if (!carregouInicio) { carregouInicio = true; requestAnimationFrame(() => requestAnimationFrame(tiraCarregandoInicio)); }
     if (sessaoAtual && document.visibilityState === 'visible') marcaVista(sessaoAtual);
@@ -5306,6 +5338,18 @@ async function carregaSessoes() {
     const pega = (filtroCadeia) => cadeias.filter(c => !usadas.has(c) && filtroCadeia(c)).map(c => { usadas.add(c); return c; });
     const precisam = abaSessoes === 'arquivadas' ? [] : pega(precisaCadeia);
     if (precisam.length) secoes.push({ id: 'precisam', titulo: 'Precisam de você', classe: 'precisam', cadeias: precisam });
+    const janelaTrabalhando = (Number(lePref('janelaTrabalhando', '3')) || 3) * 3600000;
+    const rodando = (m) => m.ativa || m.agentesRodando || estadoChat.some(x => x.sessionId === m.id && x.status === 'rodando');
+    const trabalhandoCadeia = (c) => c.membros.some(rodando) || Date.now() - c.atualizado < janelaTrabalhando;
+    const trabalhando = abaSessoes === 'arquivadas' ? [] : pega(trabalhandoCadeia);
+    if (trabalhando.length) secoes.push({ id: 'trabalhando', titulo: 'Trabalhando agora', classe: 'trabalhando-agora', cadeias: trabalhando });
+    // GRUPOS DO USUÁRIO NÃO USAM O pega: A CONVERSA CONTINUA TAMBÉM NO PROJETO
+    const comGrupos = abaSessoes === 'todas' || abaSessoes === 'ativas';
+    if (comGrupos) for (const g of dadosPainel.grupos) {
+        const lista = cadeias.filter(c => c.membros.some(m => g.conversas.includes(chaveDe(m))));
+        if (lista.length || !filtro) secoes.push({ id: 'g:' + g.id, titulo: g.nome, grupo: g, cadeias: lista });
+    }
+    if (comGrupos && !filtro) secoes.push({ id: 'novo-grupo', novoGrupo: true, cadeias: [] });
     const favoritas = abaSessoes === 'todas' || abaSessoes === 'ativas' ? pega(favoritaCadeia) : [];
     if (favoritas.length) secoes.push({ id: 'favoritas', titulo: 'Fixadas', classe: 'favoritas', cadeias: favoritas });
     // Demais conversas por projeto; o projeto com atividade mais recente vem primeiro
@@ -5317,17 +5361,21 @@ async function carregaSessoes() {
     }
     for (const [id, { titulo, cadeias: lista }] of porProjeto) secoes.push({ id: 'p:' + id, titulo, cadeias: lista });
 
-    sessoesVisiveis = secoes.flatMap(sec => sec.cadeias.flatMap(c => partesAbertas(c) ? [...c.membros].reverse() : [c.membros[c.membros.length - 1]]));
+    const jaListadas = new Set();
+    sessoesVisiveis = secoes.flatMap(sec => sec.cadeias.flatMap(c => partesAbertas(c) ? [...c.membros].reverse() : [c.membros[c.membros.length - 1]]))
+        .filter(s => !jaListadas.has(chaveDe(s)) && jaListadas.add(chaveDe(s)));
     let html = '';
     for (const sec of secoes) {
+        if (sec.novoGrupo) { html += '<button type="button" class="novo-grupo" data-novo-grupo>+ Novo grupo</button>'; continue; }
         const fechado = gruposFechados.has(sec.id) && !filtro;
-        html += `<button class="projeto ${sec.classe || ''}" data-grupo="${esc(sec.id)}" aria-expanded="${!fechado}">
+        html += sec.grupo ? cabecalhoGrupo(sec, fechado) : `<button class="projeto ${sec.classe || ''}" data-grupo="${esc(sec.id)}" aria-expanded="${!fechado}">
             <span class="seta">${fechado ? '▸' : '▾'}</span>${esc(sec.titulo)}<span class="contagem">${sec.cadeias.length}</span></button>`;
         if (fechado) continue;
+        if (sec.grupo && !sec.cadeias.length) html += '<div class="grupo-vazio">Arraste uma conversa para cá ou use ⋯ › Mover para grupo.</div>';
         for (const c of sec.cadeias) html += blocoCadeia(c);
     }
     const vazios = { ativas: 'Nenhuma conversa ativa agora.', favoritas: 'Nenhuma favorita. Use a estrela ☆ numa conversa.', arquivadas: 'Nada arquivado.', todas: 'Nenhuma conversa encontrada.' };
-    document.getElementById('listaSessoes').innerHTML = html || `<div class="vazio" style="padding:20px 18px">${vazios[abaSessoes]}</div>`;
+    document.getElementById('listaSessoes').innerHTML = html + (secoes.some(s => s.cadeias.length) ? '' : `<div class="vazio" style="padding:20px 18px">${vazios[abaSessoes]}</div>`);
     // Janela secundária: a sessão abriu antes de saber qual é a pasta do Chat; acerta o modo e redesenha a lista
     if (sessaoAtual && ehChatChave(sessaoAtual) !== (modoApp === 'chat')) { aplicaModo(ehChatChave(sessaoAtual) ? 'chat' : 'codigo'); return carregaSessoes(); }
     if (grupoRecemAberto) {
@@ -5343,6 +5391,115 @@ function alternaGrupo(id) {
     if (gruposFechados.has(id)) { gruposFechados.delete(id); grupoRecemAberto = id; } else gruposFechados.add(id);
     try { localStorage.setItem('painelGruposFechados', JSON.stringify([...gruposFechados])); } catch (e) { /* sem armazenamento */ }
     carregaSessoes();
+}
+
+const CORES_GRUPO = [['voce', 'Vermelho'], ['atencao', 'Âmbar'], ['ok', 'Verde'], ['agente', 'Sálvia'], ['modelo', 'Lavanda'], ['erro', 'Salmão']];
+const estiloCorGrupo = (cor) => `--cor-grupo: var(--${CORES_GRUPO.some(([v]) => v === cor) ? cor : 'voce'})`;
+function cabecalhoGrupo(sec, fechado) {
+    const g = sec.grupo;
+    return `<div class="projeto grupo-usuario" role="button" tabindex="0" data-grupo="${esc(sec.id)}" data-grupo-usuario="${esc(g.id)}" aria-expanded="${!fechado}" style="${estiloCorGrupo(g.cor)}">
+        <span class="seta">${fechado ? '▸' : '▾'}</span><i class="bola-grupo" aria-hidden="true"></i><span class="nome-grupo">${esc(sec.titulo)}</span><span class="contagem">${sec.cadeias.length}</span>
+        <button type="button" class="mais-grupo" data-menu-grupo="${esc(g.id)}" title="Opções do grupo" aria-label="Opções do grupo" aria-haspopup="menu">${ICONES.mais}</button></div>`;
+}
+async function acaoGrupo(corpo, aviso) {
+    try {
+        const r = await api('/api/grupos', corpo);
+        dadosPainel.grupos = r.grupos;
+        if (aviso) recado(aviso);
+        carregaSessoes();
+        return r;
+    } catch (e) { recado(e.message); return null; }
+}
+// A CLICADA VAI PRIMEIRO; AS OUTRAS PARTES DA CADEIA SÓ SERVEM PARA SAIR DE OUTRO GRUPO
+function chavesDaCadeia(chave) {
+    const cadeia = montaCadeias(todasSessoes).find(c => c.membros.some(m => chaveDe(m) === chave));
+    return [chave, ...(cadeia ? cadeia.membros.map(chaveDe).filter(k => k !== chave) : [])];
+}
+function grupoDaConversa(chave) {
+    const chaves = chavesDaCadeia(chave);
+    return dadosPainel.grupos.find(g => g.conversas.some(k => chaves.includes(k))) || null;
+}
+async function pedeDadosGrupo(titulo, rotulo, g = { nome: '', cor: 'voce' }) {
+    const html = `<div class="form-grupo"><label>Nome<input class="campo-config" name="nomeGrupo" maxlength="60" value="${esc(g.nome)}" placeholder="Ex.: Fechamento do mês"></label>
+        <div class="cores-grupo" role="radiogroup" aria-label="Cor">${CORES_GRUPO.map(([v, n]) => `<label title="${esc(n)}"><input type="radio" name="corGrupo" value="${v}" ${v === g.cor ? 'checked' : ''}><i class="bola-grupo" style="${estiloCorGrupo(v)}"></i></label>`).join('')}</div></div>`;
+    const resposta = confirmaNaPagina(titulo, html, rotulo);
+    const campo = document.querySelector('#corpoConfirma [name="nomeGrupo"]');
+    campo.focus();
+    campo.select();
+    campo.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); document.getElementById('btnConfirmaSim').click(); } });
+    if (!(await resposta)) return null;
+    const nome = campo.value.trim();
+    if (!nome) { recado('Dê um nome ao grupo'); return null; }
+    return { nome, cor: (document.querySelector('#corpoConfirma [name="corGrupo"]:checked') || {}).value || g.cor };
+}
+async function novoGrupo(chave) {
+    const d = await pedeDadosGrupo('Novo grupo', 'Criar');
+    if (d) acaoGrupo({ acao: 'criar', ...d, chaves: chave ? chavesDaCadeia(chave) : [] }, chave ? `Grupo "${d.nome}" criado com a conversa` : `Grupo "${d.nome}" criado`);
+}
+function colocaNoGrupo(chave, id) {
+    const g = dadosPainel.grupos.find(x => x.id === id);
+    if (g) acaoGrupo({ acao: 'colocar', id, chaves: chavesDaCadeia(chave) }, `Conversa no grupo "${g.nome}"`);
+}
+async function apagaGrupo(g) {
+    const ok = await confirmaNaPagina(`Apagar o grupo "${g.nome}"?`, '<p>Nenhuma conversa é apagada: elas continuam na lista, nos projetos delas. Só o agrupamento some.</p>', 'Apagar grupo');
+    if (ok) acaoGrupo({ acao: 'apagar', id: g.id }, 'Grupo apagado');
+}
+let menuGrupo = null;
+let menuGrupoFechado = { id: '', quando: 0 };
+function abreMenuGrupo(botao) {
+    if (!window.tippy) return;
+    const id = botao.dataset.menuGrupo;
+    const g = dadosPainel.grupos.find(x => x.id === id);
+    if (!g) return;
+    if (menuGrupo && menuGrupo.id === id) return menuGrupo.menu.hide();
+    if (menuGrupoFechado.id === id && Date.now() - menuGrupoFechado.quando < 400) return;
+    if (menuGrupo) menuGrupo.menu.hide();
+    const pos = dadosPainel.grupos.indexOf(g), ultimo = dadosPainel.grupos.length - 1;
+    const menu = tippy(botao, {
+        content: `<div class="menu-sessao" role="menu">
+                <button type="button" role="menuitem" data-grupo-acao="renomear">${ICONES.lapis} Renomear…</button>
+                <div class="cores-grupo-menu" role="group" aria-label="Cor">${CORES_GRUPO.map(([v, n]) => `<button type="button" data-grupo-cor="${v}" title="${esc(n)}" aria-label="Cor ${esc(n)}" aria-pressed="${v === g.cor}" style="${estiloCorGrupo(v)}"></button>`).join('')}</div>
+                <hr>
+                <button type="button" role="menuitem" data-grupo-acao="subir" ${pos === 0 ? 'disabled' : ''}>↑ Subir</button>
+                <button type="button" role="menuitem" data-grupo-acao="descer" ${pos === ultimo ? 'disabled' : ''}>↓ Descer</button>
+                <hr>
+                <button type="button" role="menuitem" class="apagar-grupo" data-grupo-acao="apagar">${ICONES.arquivar} Apagar grupo</button>
+            </div>`,
+        allowHTML: true, interactive: true, trigger: 'manual', hideOnClick: true, placement: 'bottom-end', theme: 'redcode menu', animation: 'redcode',
+        arrow: false, offset: [0, 6], duration: [140, 80], appendTo: () => document.body,
+        getReferenceClientRect: () => (document.querySelector('[data-menu-grupo="' + CSS.escape(id) + '"]') || botao).getBoundingClientRect(),
+        onShow() { botao.setAttribute('aria-expanded', 'true'); },
+        onClickOutside(i) { i.hide(); },
+        onHide() {
+            menuGrupoFechado = { id, quando: Date.now() };
+            if (menuGrupo && menuGrupo.menu === menu) menuGrupo = null;
+        },
+        onHidden(i) { botao.removeAttribute('aria-expanded'); i.destroy(); },
+    });
+    menuGrupo = { id, menu };
+    menu.show();
+    menu.popper.addEventListener('click', async (ev) => {
+        const cor = ev.target.closest('[data-grupo-cor]');
+        const acao = ev.target.closest('[data-grupo-acao]');
+        if (!cor && !acao) return;
+        menu.hide();
+        if (cor) return acaoGrupo({ acao: 'cor', id, cor: cor.dataset.grupoCor });
+        const qual = acao.dataset.grupoAcao;
+        if (qual === 'subir' || qual === 'descer') return acaoGrupo({ acao: 'mover', id, passo: qual === 'subir' ? -1 : 1 });
+        if (qual === 'apagar') return apagaGrupo(g);
+        const d = await pedeDadosGrupo('Renomear grupo', 'Salvar', g);
+        if (d) acaoGrupo({ acao: 'renomear', id, ...d }, 'Grupo salvo');
+    });
+}
+function menuMoverParaGrupo(chave) {
+    const atual = grupoDaConversa(chave);
+    return `<div class="menu-sessao" role="menu">
+            <button type="button" role="menuitem" data-menu-voltar>‹ Voltar</button>
+            <hr>
+            ${dadosPainel.grupos.map(g => `<button type="button" role="menuitem" data-menu-por-grupo="${esc(g.id)}" style="${estiloCorGrupo(g.cor)}" ${atual === g ? 'aria-current="true"' : ''}><i class="bola-grupo" aria-hidden="true"></i><span class="nome-grupo">${esc(g.nome)}</span>${atual === g ? ' ✓' : ''}</button>`).join('')}
+            <button type="button" role="menuitem" data-menu-novo-grupo>+ Novo grupo…</button>
+            ${atual ? `<hr><button type="button" role="menuitem" data-menu-tirar-grupo>Tirar do grupo "${esc(atual.nome)}"</button>` : ''}
+        </div>`;
 }
 
 async function alternaArquivo(chave) {
@@ -6503,6 +6660,9 @@ function irParaSessao(passo) {
 }
 
 document.getElementById('listaSessoes').addEventListener('click', (ev) => {
+    const maisGrupo = ev.target.closest('[data-menu-grupo]');
+    if (maisGrupo) { ev.stopPropagation(); return abreMenuGrupo(maisGrupo); }
+    if (ev.target.closest('[data-novo-grupo]')) return novoGrupo();
     const grupo = ev.target.closest('[data-grupo]');
     if (grupo) return alternaGrupo(grupo.dataset.grupo);
     const estrela = ev.target.closest('[data-favoritar]');
@@ -6568,13 +6728,15 @@ function abreMenuSessao(botao) {
     if (menuSessao) menuSessao.menu.hide();
     if (botao._menu) botao._menu.destroy();
     if (botao._tippy) botao._tippy.hide();
-    const menu = tippy(botao, {
-        content: `<div class="menu-sessao" role="menu">
+    const principal = `<div class="menu-sessao" role="menu">
                 <button type="button" role="menuitem" data-menu-renomear="${esc(chave)}">${ICONES.lapis} Renomear</button>
                 <button type="button" role="menuitem" data-menu-conta="${esc(chave)}">${ICONE_GIT_VAGA} Conta e Git…</button>
+                ${arquivada ? '' : `<button type="button" role="menuitem" data-menu-grupos>${ICONES.grupo} Mover para grupo <span class="seta-sub">▸</span></button>`}
                 <hr>
                 <button type="button" role="menuitem" data-menu-arquivar="${esc(chave)}">${arquivada ? ICONES.desarquivar + ' Tirar do arquivo' : ICONES.arquivar + ' Arquivar'}</button>
-            </div>`,
+            </div>`;
+    const menu = tippy(botao, {
+        content: principal,
         allowHTML: true, interactive: true, trigger: 'manual', hideOnClick: true, placement: 'bottom-end', theme: 'redcode menu', animation: 'redcode',
         arrow: false, offset: [0, 6], duration: [140, 80], appendTo: () => document.body,
         // A lista é redesenhada enquanto o menu está aberto: segue o botão novo da mesma conversa
@@ -6600,6 +6762,12 @@ function abreMenuSessao(botao) {
         const arq = ev.target.closest('[data-menu-arquivar]');
         const cta = ev.target.closest('[data-menu-conta]');
         if (cta) { menu.hide(); return abreContaDaConversa(cta.dataset.menuConta); }
+        if (ev.target.closest('[data-menu-grupos]')) return menu.setContent(menuMoverParaGrupo(chave));
+        if (ev.target.closest('[data-menu-voltar]')) return menu.setContent(principal);
+        const porGrupo = ev.target.closest('[data-menu-por-grupo]');
+        if (porGrupo) { menu.hide(); return colocaNoGrupo(chave, porGrupo.dataset.menuPorGrupo); }
+        if (ev.target.closest('[data-menu-novo-grupo]')) { menu.hide(); return novoGrupo(chave); }
+        if (ev.target.closest('[data-menu-tirar-grupo]')) { menu.hide(); return acaoGrupo({ acao: 'tirar', chaves: chavesDaCadeia(chave) }, 'Conversa fora do grupo'); }
         if (!ren && !arq) return;
         menu.hide();
         if (ren) comecaRenomear(ren.dataset.menuRenomear);
@@ -6611,9 +6779,42 @@ document.getElementById('listaSessoes').addEventListener('dblclick', (ev) => {
     if (titulo) { ev.preventDefault(); comecaRenomear(titulo.dataset.renomear); }
 });
 document.getElementById('listaSessoes').addEventListener('keydown', (ev) => {
+    const cab = ev.target.closest('[data-grupo-usuario]');
+    if (cab && ev.target === cab && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); return alternaGrupo(cab.dataset.grupo); }
     const item = ev.target.closest('.sessao');
     if (item && ev.target === item && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); abreSessao(item.dataset.chave); }
 });
+// A LISTA NÃO REDESENHA DURANTE O ARRASTE (arrastandoConversa) OU O ELEMENTO ARRASTADO SOME
+const TIPO_ARRASTE = 'text/x-redcode-conversa';
+const fimArraste = () => { arrastandoConversa = false; document.querySelectorAll('.alvo-soltar').forEach(el => el.classList.remove('alvo-soltar')); };
+document.getElementById('listaSessoes').addEventListener('dragstart', (ev) => {
+    const item = ev.target.closest && ev.target.closest('.sessao');
+    if (!item || ev.target.closest('.campo-nome') || abaSessoes === 'arquivadas') return ev.preventDefault();
+    arrastandoConversa = true;
+    ev.dataTransfer.setData(TIPO_ARRASTE, item.dataset.chave);
+    ev.dataTransfer.effectAllowed = 'move';
+});
+document.getElementById('listaSessoes').addEventListener('dragover', (ev) => {
+    const cab = ev.target.closest('[data-grupo-usuario]');
+    if (!cab || !ev.dataTransfer.types.includes(TIPO_ARRASTE)) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.alvo-soltar').forEach(el => { if (el !== cab) el.classList.remove('alvo-soltar'); });
+    cab.classList.add('alvo-soltar');
+});
+document.getElementById('listaSessoes').addEventListener('dragleave', (ev) => {
+    const cab = ev.target.closest('[data-grupo-usuario]');
+    if (cab && !cab.contains(ev.relatedTarget)) cab.classList.remove('alvo-soltar');
+});
+document.getElementById('listaSessoes').addEventListener('drop', (ev) => {
+    const cab = ev.target.closest('[data-grupo-usuario]');
+    const chave = ev.dataTransfer.getData(TIPO_ARRASTE);
+    fimArraste();
+    if (!cab || !chave) return;
+    ev.preventDefault();
+    colocaNoGrupo(chave, cab.dataset.grupoUsuario);
+});
+document.addEventListener('dragend', fimArraste);
 document.getElementById('filtro').addEventListener('input', carregaSessoes);
 document.getElementById('resumoStatus').addEventListener('click', (ev) => {
     if (ev.target.closest('[data-ir-ativas]')) document.querySelector('.abas [data-aba="ativas"]').click();
@@ -6942,7 +7143,10 @@ const SECOES_CONFIG = {
             + linhaConfig('Fonte da interface', '', opcoesConfig('fonteUi', [['padrao', 'Padrão · IBM Plex Sans'], ['sistema', 'Sistema · Segoe UI']], lePref('fonteUi', 'padrao')))
             + linhaConfig('Fonte das respostas', 'A letra das respostas do Claude.', opcoesConfig('fonteResposta', [['interface', 'Combinar com a interface'], ['serifada', 'Serifada'], ['mono', 'Monoespaçada']], lePref('fonteResposta', 'interface')))
             + linhaConfig('Tamanho do texto da conversa', '', opcoesConfig('tamTexto', [['pequeno', 'Pequeno'], ['medio', 'Médio'], ['grande', 'Grande']], lePref('tamTexto', 'medio')))
-            + linhaConfig('Movimento', 'Reduzido desliga as animações do app (pets, entradas e deslizes).', opcoesConfig('movimento', [['normal', 'Normal'], ['reduzido', 'Reduzido']], lePref('movimento', 'normal')), 'animacao');
+            + linhaConfig('Movimento', 'Reduzido desliga as animações do app (pets, entradas e deslizes).', opcoesConfig('movimento', [['normal', 'Normal'], ['reduzido', 'Reduzido']], lePref('movimento', 'normal')), 'animacao')
+            + '<h3 class="config-titulo">Lista de conversas</h3>'
+            + linhaConfig('Trabalhando agora', 'Por quanto tempo a conversa fica na seção "Trabalhando agora" depois da última atividade. Enquanto está rodando, ela fica sempre.',
+                opcoesConfig('janelaTrabalhando', [['1', '1 hora'], ['3', '3 horas'], ['6', '6 horas'], ['12', '12 horas'], ['24', '24 horas']], lePref('janelaTrabalhando', '3')), 'recentes ativas grupos');
     },
     async codigo() {
         const dados = await getPainel('/api/dados').catch(() => dadosPainel);
@@ -7084,6 +7288,7 @@ janelaConfig.addEventListener('change', async (evt) => {
         if (alvo.dataset.pref === 'visualCodigo') return defineVisualCodigo(alvo.value);
         gravaPref(alvo.dataset.pref, alvo.value);
         aplicaAparencia();
+        if (alvo.dataset.pref === 'janelaTrabalhando') carregaSessoes();
         return recado('Configuração salva');
     }
     if (alvo.dataset.prefServidor === 'navegador') {
