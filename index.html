@@ -1970,6 +1970,7 @@ body.lateral-aberta .lateral { display: block; }
 .projeto .seta { font-size: 9px; opacity: .7; }
 .projeto .contagem { display: none; }
 .lista .projeto.trabalhando-agora { color: var(--ok); }
+.subprojeto { padding: 8px 18px 2px 30px; font-size: 11px; letter-spacing: .02em; color: var(--grafite); opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lista .projeto.grupo-usuario { color: var(--cor-grupo); cursor: pointer; border-radius: 6px; }
 .lista .projeto.grupo-usuario:hover { color: var(--tinta); }
 .lista .projeto.grupo-usuario.alvo-soltar { background: var(--realce); outline: 1px dashed var(--cor-grupo); outline-offset: -2px; color: var(--tinta); }
@@ -5341,13 +5342,11 @@ async function carregaSessoes() {
     const secoes = [];
     const usadas = new Set();
     const pega = (filtroCadeia) => cadeias.filter(c => !usadas.has(c) && filtroCadeia(c)).map(c => { usadas.add(c); return c; });
-    const precisam = abaSessoes === 'arquivadas' ? [] : pega(precisaCadeia);
-    if (precisam.length) secoes.push({ id: 'precisam', titulo: 'Precisam de você', classe: 'precisam', cadeias: precisam });
     const janelaTrabalhando = (Number(lePref('janelaTrabalhando', '3')) || 3) * 3600000;
     const rodando = (m) => m.ativa || m.agentesRodando || estadoChat.some(x => x.sessionId === m.id && x.status === 'rodando');
-    const trabalhandoCadeia = (c) => c.membros.some(rodando) || Date.now() - c.atualizado < janelaTrabalhando;
-    const trabalhando = abaSessoes === 'arquivadas' ? [] : pega(trabalhandoCadeia);
-    if (trabalhando.length) secoes.push({ id: 'trabalhando', titulo: 'Trabalhando agora', classe: 'trabalhando-agora', cadeias: trabalhando });
+    const trabalhandoCadeia = (c) => precisaCadeia(c) || c.membros.some(rodando) || Date.now() - c.atualizado < janelaTrabalhando;
+    const trabalhando = abaSessoes === 'arquivadas' ? [] : pega(trabalhandoCadeia).sort((a, b) => precisaCadeia(b) - precisaCadeia(a));
+    if (trabalhando.length) secoes.push({ id: 'trabalhando', titulo: 'Trabalhando agora', classe: 'trabalhando-agora', cadeias: trabalhando, porProjeto: modoApp !== 'chat' });
     // GRUPOS DO USUÁRIO NÃO USAM O pega: A CONVERSA CONTINUA TAMBÉM NO PROJETO
     const comGrupos = abaSessoes === 'todas' || abaSessoes === 'ativas';
     if (comGrupos) for (const g of dadosPainel.grupos) {
@@ -5377,6 +5376,7 @@ async function carregaSessoes() {
             <span class="seta">${fechado ? '▸' : '▾'}</span>${esc(sec.titulo)}<span class="contagem">${sec.cadeias.length}</span></button>`;
         if (fechado) continue;
         if (sec.grupo && !sec.cadeias.length) html += '<div class="grupo-vazio">Arraste uma conversa para cá ou use ⋯ › Mover para grupo.</div>';
+        if (sec.porProjeto) { html += sublistaPorProjeto(sec.cadeias); continue; }
         for (const c of sec.cadeias) html += blocoCadeia(c);
     }
     const vazios = { ativas: 'Nenhuma conversa ativa agora.', favoritas: 'Nenhuma favorita. Use a estrela ☆ numa conversa.', arquivadas: 'Nada arquivado.', todas: 'Nenhuma conversa encontrada.' };
@@ -5390,6 +5390,16 @@ async function carregaSessoes() {
         grupoRecemAberto = null;
     }
     if (!sessaoAtual && !chatVazioAberto && !iniciando) { if (modoApp === 'chat') mostraChatVazio(); else if (sessoesVisiveis[0]) abreSessao(chaveDe(sessoesVisiveis[0])); }
+}
+
+function sublistaPorProjeto(cadeias) {
+    const porProjeto = new Map();
+    for (const c of cadeias) {
+        const { id, nome } = grupoDoProjeto(c.membros[c.membros.length - 1]);
+        if (!porProjeto.has(id)) porProjeto.set(id, { nome, cadeias: [] });
+        porProjeto.get(id).cadeias.push(c);
+    }
+    return [...porProjeto.values()].map(p => `<div class="subprojeto">${esc(p.nome)}</div>` + p.cadeias.map(blocoCadeia).join('')).join('');
 }
 
 function marcaAreasDeGrupo() {
