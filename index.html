@@ -1632,6 +1632,11 @@ button.partes:hover, button.partes[aria-expanded="true"] { color: var(--voce); b
 .selo-status.pergunta::after, .botao.enviar.ocupado::after, .chip-perfil.pendente::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 4px color-mix(in srgb, var(--voce) 25%, transparent); opacity: 0; pointer-events: none; animation: pulso-selo 1.6s ease-in-out infinite; }
 /* O selo corta o texto comprido (overflow), mas deixa o anel de 4px aparecer */
 .linha-selo .selo-status.pergunta { overflow: clip; overflow-clip-margin: 4px; }
+.pets-lista { display: inline-flex; align-items: flex-end; gap: 1px; flex: none; height: 16px; }
+.pets-lista .pet-mini { zoom: .38; }
+.pets-lista .pet-mini.rodando .pet-corpo { animation-duration: 1.8s; animation-delay: var(--atraso, 0s); }
+.pets-lista .pets-mais { font: 600 10.5px var(--sans); color: var(--agente); margin-left: 2px; align-self: center; }
+html[data-movimento="reduzido"] .pets-lista .pet-mini .pet-corpo { animation: none !important; }
 .selo-status.agente { background: var(--atencao-fundo); color: var(--agente); border: 1px solid color-mix(in srgb, var(--agente) 45%, transparent); }
 .selo-status.respondeu { background: var(--modelo-fundo); color: var(--modelo); }
 @keyframes pulso-selo { 50% { opacity: 1; } }
@@ -5156,6 +5161,16 @@ function situacaoItem(s) {
     if (s.esperando && Date.now() - s.atualizado < 30 * 60 * 1000 && !jaViu(s)) return { icone: '✓', classe: 'respondeu', selo: 'Respondeu', texto: haQuanto(s.atualizado) };
     return { icone: '', classe: 'parada', selo: '', texto: haQuanto(s.atualizado) };
 }
+// Mini-slimes dos subagentes rodando na conversa (até 3 + "+N"), para a lista lateral
+function petsDaLista(s) {
+    let agentes = s.agentesTipos || [];
+    if (!agentes.length && s.acaoAtual && s.acaoAtual.tipo === 'agente') agentes = [{ tipo: String(s.acaoAtual.texto).split(':')[0].trim() || 'agente', modelo: '' }];
+    if (!agentes.length) return '';
+    const total = Math.max(s.agentesRodando || 0, agentes.length);
+    const mostrados = agentes.slice(0, 3);
+    const titulo = agentes.map(a => a.tipo + (a.modelo ? ` (${modeloCurto(a.modelo)})` : '')).join(', ') + (total > agentes.length ? ` e mais ${total - agentes.length}` : '');
+    return `<span class="pets-lista" title="${esc('Rodando: ' + titulo)}">${mostrados.map((a, n) => `<span class="pet-lista" style="--atraso:${(n * 0.3).toFixed(1)}s">${petMini(a.tipo, true)}</span>`).join('')}${total > mostrados.length ? `<b class="pets-mais">+${total - mostrados.length}</b>` : ''}</span>`;
+}
 const gerundiosLista = { comando: 'Rodando', edicao: 'Editando', leitura: 'Lendo', busca: 'Buscando', agente: 'Delegando', web: 'Consultando', skill: 'Usando a skill', ferramenta: 'Usando' };
 
 // Cadeias de continuação: a original e as partes seguintes ficam juntas
@@ -5198,6 +5213,7 @@ function itemSessao(s, { numeroParte = 1, total = 1, filho = false, raiz = '', a
     const favorita = dadosPainel.favoritos.includes(chave);
     const arquivada = dadosPainel.arquivadas.includes(chave);
     const largura = Math.min(100, (s.contexto || 0) / LIMITES.janela * 100).toFixed(1);
+    const pets = s.agentesRodando || (s.ativa && s.acaoAtual && s.acaoAtual.tipo === 'agente') ? petsDaLista(s) : '';
     const fazendo = situacao.fazendo || s.acaoAtual ? situacao.fazendo || `${gerundiosLista[s.acaoAtual.tipo] || 'Trabalhando em'} ${s.acaoAtual.texto}…` : s.ativa && !s.agentesRodando ? 'Pensando…' : '';
     return `<div class="sessao ${filho ? 'parte' : ''} estado-${situacao.classe}" role="button" tabindex="0" draggable="true" data-chave="${esc(chave)}" aria-current="${!iniciando && sessaoAtual === chave}">
         <span class="linha-titulo">
@@ -5210,10 +5226,10 @@ function itemSessao(s, { numeroParte = 1, total = 1, filho = false, raiz = '', a
         </span>
         ${situacao.classe === 'trabalhando'
             // Trabalhando: uma linha só, com o símbolo girando e o que está fazendo agora
-            ? `<span class="linha-selo"><span class="selo-status trabalhando"><i class="giro-mini" aria-hidden="true"></i></span><span class="fazendo" title="${esc(fazendo)}">${comBrilho(esc(fazendo || 'Trabalhando…'))}</span></span>`
+            ? `<span class="linha-selo"><span class="selo-status trabalhando"><i class="giro-mini" aria-hidden="true"></i></span>${pets}<span class="fazendo" title="${esc(fazendo)}">${comBrilho(esc(fazendo || 'Trabalhando…'))}</span></span>`
             : situacao.selo
             // Demais estados: um selo só, com o texto junto ("✓ Respondeu há 5 min")
-            ? `<span class="linha-selo"><span class="selo-status ${situacao.classe}" title="${esc(situacao.selo + ', ' + situacao.texto)}"><b>${situacao.icone}</b>${esc(situacao.selo)}<span class="selo-texto">, ${esc(situacao.texto)}</span></span></span>`
+            ? `<span class="linha-selo">${pets}<span class="selo-status ${situacao.classe}" title="${esc(situacao.selo + ', ' + situacao.texto)}">${pets && situacao.classe === 'agente' ? '' : `<b>${situacao.icone}</b>`}${esc(situacao.selo)}<span class="selo-texto">, ${esc(situacao.texto)}</span></span></span>`
             : ''}
         <span class="info-item">${!filho && total > 1 ? `<button class="partes" data-partes="${esc(raiz)}" aria-expanded="${aberta}" title="${aberta ? 'Esconder as partes anteriores' : 'Ver as partes anteriores'}">${total} partes ${aberta ? '▴' : '▾'}</button>` : ''}<span class="etiqueta-projeto" title="${esc(s.nomeProjeto)}">${esc(nomeProjetoBonito(s.nomeProjeto))}</span>${esc(modeloCurto(s.modelo))}${situacao.selo ? '' : ', ' + esc(situacao.texto)}${s.contexto ? `, ${mil(s.contexto)}` : ''}</span>
         ${s.contexto ? `<span class="barra-contexto nivel-${nivel}" title="Contexto: ${mil(s.contexto)} de ${mil(LIMITES.janela)}"><span style="width:${largura}%"></span></span>` : ''}

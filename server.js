@@ -782,12 +782,14 @@ function leSubagentes(pastaSessao, estadoPai) {
 function situacaoSessao(estado, mtime, id) {
     // Estava rodando no painel quando ele fechou e ninguém mexeu desde então: processo morto, conversa livre
     if (id && orfas.has(id)) {
-        if (mtime <= INICIO_PAINEL) return { ativa: false, esperando: false, agentesRodando: 0 };
+        if (mtime <= INICIO_PAINEL) return { ativa: false, esperando: false, agentesRodando: 0, agentesTipos: [] };
         orfas.delete(id);
     }
     // Só conta agente com atividade recente ou lançado há menos de 30 min
-    const agentesRodando = Object.values(estado.agentes).filter(a => a.status === 'rodando'
-        && (a.ativoHa !== undefined || Date.now() - Date.parse(a.inicio || 0) < 30 * 60 * 1000)).length;
+    const agentesVivos = Object.values(estado.agentes).filter(a => a.status === 'rodando'
+        && (a.ativoHa !== undefined || Date.now() - Date.parse(a.inicio || 0) < 30 * 60 * 1000));
+    const agentesRodando = agentesVivos.length;
+    const agentesTipos = agentesVivos.slice(0, 4).map(a => ({ tipo: a.tipoAgente || 'agente', modelo: a.modelo || '' }));
     // Ferramenta começada e sem resultado (ex.: comando longo): o transcript fica parado enquanto
     // ela roda, então conta como ativa até 15 min do início (o limite de um comando é 10 min)
     const ultimoEvento = estado.eventos[estado.eventos.length - 1];
@@ -798,7 +800,7 @@ function situacaoSessao(estado, mtime, id) {
     const pensando = !!estado.esperaModelo && Date.now() - mtime < 15 * 60 * 1000;
     const recente = Date.now() - mtime < SEGUNDOS_ATIVA * 1000 || ferramentaAberta || pensando;
     const ativa = (!estado.turnoEncerrado && !estado.pergunta && recente) || (agentesRodando > 0 && !estado.pergunta);
-    return { ativa, esperando: !ativa && (estado.turnoEncerrado || !!estado.pergunta), agentesRodando };
+    return { ativa, esperando: !ativa && (estado.turnoEncerrado || !!estado.pergunta), agentesRodando, agentesTipos };
 }
 
 // Arquivos de andamento (ACOMPANHAR) ainda sendo escritos: mexido nos últimos 2 min, pedido nas últimas 24 h
@@ -879,7 +881,7 @@ function listaSessoes(opcoes = {}) {
                 modelo: estado.modelo, atualizado: stat.mtimeMs, contexto: estado.contexto,
                 compactacoes: estado.compactacoes.length, inicio: estado.inicio, cwd: cwdDaPasta(estado, pasta), custo: estado.custo,
                 custoHoje: stat.mtimeMs >= new Date(diaLocal() + 'T00:00:00').getTime() ? custoHojeSessao(path.join(caminhoPasta, nome.replace('.jsonl', '')), estado) : 0,
-                ativa: situacao.ativa, esperando: situacao.esperando, agentesRodando: situacao.agentesRodando,
+                ativa: situacao.ativa, esperando: situacao.esperando, agentesRodando: situacao.agentesRodando, agentesTipos: situacao.agentesTipos,
                 pergunta: !!estado.pergunta, fimTurno: estado.fimTurno, acompanhando: arquivosAcompanhados(estado),
                 // Selo do botão Tasks na lista (conta sem chamar /api/tasks)
                 tarefasAndamento: (() => { const pd = planoDoPedido(estado); return pd.planoAtual ? pd.tarefas.filter(i => i.status === 'in_progress').length : 0; })(),
