@@ -1970,7 +1970,10 @@ body.lateral-aberta .lateral { display: block; }
 .projeto .seta { font-size: 9px; opacity: .7; }
 .projeto .contagem { display: none; }
 .lista .projeto.trabalhando-agora { color: var(--ok); }
-.subprojeto { padding: 8px 18px 2px 30px; font-size: 11px; letter-spacing: .02em; color: var(--grafite); opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bloco-subprojeto { margin: 6px 10px 8px; border: 1px solid var(--linha); border-radius: 10px; background: color-mix(in srgb, var(--tinta) 3%, transparent); overflow: hidden; }
+.subprojeto { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-bottom: 1px solid var(--linha); font: 600 11px var(--sans); color: var(--tinta); }
+.nome-subprojeto { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conta-subprojeto { margin-left: auto; font-size: 10.5px; color: var(--grafite); }
 .lista .projeto.grupo-usuario { color: var(--cor-grupo); cursor: pointer; border-radius: 6px; }
 .lista .projeto.grupo-usuario:hover { color: var(--tinta); }
 .lista .projeto.grupo-usuario.alvo-soltar { background: var(--realce); outline: 1px dashed var(--cor-grupo); outline-offset: -2px; color: var(--tinta); }
@@ -5399,7 +5402,8 @@ function sublistaPorProjeto(cadeias) {
         if (!porProjeto.has(id)) porProjeto.set(id, { nome, cadeias: [] });
         porProjeto.get(id).cadeias.push(c);
     }
-    return [...porProjeto.values()].map(p => `<div class="subprojeto">${esc(p.nome)}</div>` + p.cadeias.map(blocoCadeia).join('')).join('');
+    return [...porProjeto.values()].map(p => `<div class="bloco-subprojeto"><div class="subprojeto"><span class="nome-subprojeto">${esc(p.nome)}</span><span class="conta-subprojeto">${p.cadeias.length}</span></div>`
+        + p.cadeias.map(blocoCadeia).join('') + '</div>').join('');
 }
 
 function marcaAreasDeGrupo() {
