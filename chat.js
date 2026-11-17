@@ -474,6 +474,14 @@ function fechaOciosas(minutos = MINUTOS_OCIOSA) {
 }
 setInterval(() => fechaOciosas(), 60 * 1000).unref();
 
+// /clear: fecha o processo parado da sessão de origem (a conversa segue numa sessão nova)
+function fechaSessao(sessionId) {
+    const c = vivaNaSessao(sessionId);
+    if (!c || (c.status !== 'ociosa' && c.status !== 'interrompida') || c.pendentes.size || c.tarefasBg.length) return false;
+    c.fila.close();
+    return true;
+}
+
 // Limites de uso do plano (sessão de 5 h, semanal, por modelo). Usa um processo vivo do
 // painel se houver; senão sobe um processo que não recebe mensagem nenhuma (não gasta tokens).
 async function usoDoPlano() {
@@ -636,4 +644,4 @@ function agentesRodandoNa(chave) {
     return !!(c && c.sessionId && temAgentesRodando(c.projeto, c.sessionId));
 }
 
-module.exports = { CHAT_DIR, ehChat, agentesRodandoNa, enfileiradas, voltarArquivos, ramificar, statusMcp, acaoMcp, comandosDisponiveis, usoDoPlano, modelosDisponiveis, configura, enviar, responder, parar, pararTarefa, trocaModo, fechaOciosas, estado, rodandoNaSessao, vivaNaSessao, pastaDoProjeto, MODOS };
+module.exports = { CHAT_DIR, ehChat, agentesRodandoNa, enfileiradas, voltarArquivos, ramificar, statusMcp, acaoMcp, comandosDisponiveis, usoDoPlano, modelosDisponiveis, configura, enviar, responder, parar, pararTarefa, trocaModo, fechaOciosas, fechaSessao, estado, rodandoNaSessao, vivaNaSessao, pastaDoProjeto, MODOS };

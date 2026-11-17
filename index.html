@@ -5116,7 +5116,7 @@ const ICONES = {
     grupo: svg('<path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 1.5h4.5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/>'),
 };
 
-let dadosPainel = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], grupos: [] };
+let dadosPainel = { favoritos: [], vinculos: {}, vinculosClear: {}, nomes: {}, arquivadas: [], grupos: [] };
 let todasSessoes = [];
 let editandoNome = false;
 let arrastandoConversa = false;
@@ -5195,6 +5195,7 @@ function montaCadeias(sessoes) {
 
 // Conversa que continua outra: vínculo feito pelo painel ou título gerado pelo Claude Code
 function ehContinuacao(s) {
+    if (dadosPainel.vinculosClear[chaveDe(s)]) return false;
     return !!dadosPainel.vinculos[chaveDe(s)] || /^(Continuação da conversa|This session is being continued)/.test(String(s.titulo || ''));
 }
 
@@ -5367,7 +5368,7 @@ async function carregaSessoes() {
     ]);
     todasSessoes = sessoes;
     if (window.tasksAtualizaSelo) window.tasksAtualizaSelo(sessoes);
-    dadosPainel = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], grupos: [], ...dados };
+    dadosPainel = { favoritos: [], vinculos: {}, vinculosClear: {}, nomes: {}, arquivadas: [], grupos: [], ...dados };
     // Primeira lista chegou: o carregando sai depois que ela estiver desenhada
     if (!carregouInicio) { carregouInicio = true; requestAnimationFrame(() => requestAnimationFrame(tiraCarregandoInicio)); }
     if (sessaoAtual && document.visibilityState === 'visible') marcaVista(sessaoAtual);
@@ -5635,7 +5636,7 @@ async function alternaFavorita(chave) {
     if (ultimosDados) redesenha(ultimosDados);
 }
 
-async function abreSessao(chave, { daNova = false } = {}) {
+async function abreSessao(chave, { daNova = false, deClear = false } = {}) {
     saiChatVazio();
     const principalEl = document.getElementById('principal');
     evTrocaSessao();
@@ -5647,21 +5648,20 @@ async function abreSessao(chave, { daNova = false } = {}) {
     // Sai da conversa anterior marcando-a como vista até aqui; a nova também fica vista
     if (sessaoAtual && sessaoAtual !== chave) marcaVista(sessaoAtual);
     marcaVista(chave);
-    if (sessaoAtual !== chave) { guardaRascunho(sessaoAtual); restauraRascunho(chave); }
+    if (sessaoAtual !== chave && !deClear) { guardaRascunho(sessaoAtual); restauraRascunho(chave); }
     if (sessaoAtual !== chave) {
         seguirFim = true; historicoAberto = false; procura = ''; filtroAtual = 'tudo';
         abertos.clear(); fechados.clear();
         // Conversa nova na tela: nada "entra" animado no primeiro desenho dela
         vistos.clear();
         primeiroDesenho = true;
-        principalEl.classList.add('trocando');
-        setTimeout(() => principalEl.classList.remove('trocando'), 140);
+        if (!deClear) { principalEl.classList.add('trocando'); setTimeout(() => principalEl.classList.remove('trocando'), 140); }
     }
     sessaoAtual = chave;
     ultimoJson = '';
     if (ehChatChave(chave) !== (modoApp === 'chat')) { aplicaModo(ehChatChave(chave) ? 'chat' : 'codigo'); carregaSessoes(); }
     document.querySelectorAll('.sessao').forEach(e => e.setAttribute('aria-current', String(e.dataset.chave === chave)));
-    const barra = setTimeout(() => principalEl.classList.add('carregando-sessao'), 150);
+    const barra = deClear ? null : setTimeout(() => principalEl.classList.add('carregando-sessao'), 150);
     try {
         const ok = await atualizaSessao(true);
         // A sessão nova existe mas o transcript ainda não foi gravado: segue "Iniciando" até aparecer
@@ -5682,9 +5682,50 @@ async function atualizaSessao(forcar) {
     if (sessaoAtual !== chave || iniciando) return;
     if (texto === ultimoJson && !forcar) return;
     ultimoJson = texto;
-    const dados = JSON.parse(texto);
+    let dados = JSON.parse(texto);
+    if (limpeza && limpeza.origem === chave) dados = telaLimpa(dados);
     dados.__chave = projeto + '/' + id;   // de que conversa estes dados são (o editor ao vivo confere)
     redesenha(dados);
+}
+
+// /clear: a tela fica limpa e a próxima mensagem abre uma sessão nova atrelada a esta (mesma entrada da lista,
+// mesmo nome, contexto do zero). { origem, chave (processo da sessão nova, depois de enviar), texto }
+let limpeza = null;
+function telaLimpa(d) {
+    return { ...d, eventos: [], plano: [], planoHora: null, agentes: [], agentesRodando: 0, pergunta: null, fimTurno: null, contexto: 0, compactacoes: [], __limpa: true };
+}
+function limpaContexto() {
+    const conversa = conversaRelevante();
+    if ((conversa && (conversa.status === 'rodando' || conversa.status === 'parando' || (conversa.tarefasBg || []).length)) || (ultimosDados && (ultimosDados.ativa || ultimosDados.agentesRodando))) {
+        return recado('A conversa está trabalhando. Espere ela terminar (ou pare) antes de limpar o contexto.');
+    }
+    if (limpeza && limpeza.chave) return recado('Espere a conversa limpa começar.');
+    limpeza = { origem: sessaoAtual, chave: null, texto: '' };
+    seguirFim = true; procura = ''; filtroAtual = 'tudo';
+    abertos.clear(); fechados.clear(); vistos.clear();
+    primeiroDesenho = true;
+    if (ultimosDados && ultimosDados.__chave === sessaoAtual) redesenha(telaLimpa(ultimosDados));
+    ultimoJson = '';
+    atualizaSessao(true);
+    recado('Contexto limpo: a próxima mensagem começa do zero, nesta mesma conversa');
+}
+// Processo da sessão limpa: quando ganha o id, a tela passa para ela sem animação de troca; se morrer antes, avisa
+async function acompanhaLimpeza() {
+    if (!limpeza || !limpeza.chave) return;
+    const nova = estadoChat.find(c => c.chave === limpeza.chave);
+    if (nova && nova.sessionId) {
+        const origem = limpeza.origem, destino = nova.projeto + '/' + nova.sessionId;
+        limpeza = null;
+        if (chaveNova === nova.chave) chaveNova = null;
+        await carregaSessoes();
+        if (sessaoAtual === origem) await abreSessao(destino, { daNova: true, deClear: true });
+    } else if (!nova || nova.status !== 'rodando') {
+        recado((nova && nova.erro) || 'O Claude Code terminou antes de começar a conversa limpa. Tente de novo.');
+        const campo = document.getElementById('mensagem');
+        if (sessaoAtual === limpeza.origem && !campo.value.trim()) { campo.value = limpeza.texto; ajustaAlturaCaixa(); }
+        if (chaveNova === limpeza.chave) chaveNova = null;
+        limpeza.chave = null;
+    }
 }
 
 // Perguntas e permissões do Claude ficam no fim da conversa (rolam com ela); sem conversa desenhada, voltam para cima da caixa.
@@ -6314,11 +6355,13 @@ function desenhaPrincipal(d) {
     const c = d.contagem;
 
     const favorita = dadosPainel.favoritos.includes(sessaoAtual);
-    const origem = dadosPainel.vinculos[sessaoAtual];
-    const continuacoes = Object.entries(dadosPainel.vinculos).filter(([, o]) => o === sessaoAtual).map(([k]) => k);
+    const deClear = !!dadosPainel.vinculosClear[sessaoAtual];
+    const origem = deClear ? null : dadosPainel.vinculos[sessaoAtual];
+    const continuacoes = Object.entries(dadosPainel.vinculos).filter(([k, o]) => o === sessaoAtual && !dadosPainel.vinculosClear[k]).map(([k]) => k);
     const tituloDe = (chave) => ((todasSessoes.find(s => s.projeto + '/' + s.id === chave) || {}).titulo || 'conversa de mais de 7 dias');
+    const titulo = ((deClear || d.__limpa) && dadosPainel.nomes[sessaoAtual]) || d.titulo || 'Sessão sem título';
     let html = `<div class="topo-sessao">
-        <h1 class="titulo">${esc(d.titulo || 'Sessão sem título')}<button class="estrela-titulo ${favorita ? 'marcada' : ''}" data-acao="favoritar" aria-pressed="${favorita}" title="${favorita ? 'Tirar das favoritas' : 'Marcar como favorita'}">${favorita ? '★' : '☆'}</button></h1>
+        <h1 class="titulo">${esc(titulo)}<button class="estrela-titulo ${favorita ? 'marcada' : ''}" data-acao="favoritar" aria-pressed="${favorita}" title="${favorita ? 'Tirar das favoritas' : 'Marcar como favorita'}">${favorita ? '★' : '☆'}</button></h1>
         ${origem || continuacoes.length ? `<div class="vinculos">
             ${origem ? `<span>Continuação de <button data-abrir="${esc(origem)}">${esc(tituloDe(origem))}</button></span>` : ''}
             ${continuacoes.map(c => `<span>Continuada em <button data-abrir="${esc(c)}">${esc(tituloDe(c))}</button></span>`).join('')}
@@ -6411,7 +6454,7 @@ function desenhaPrincipal(d) {
         const escolhidas = indexados.filter(x => !ehConversa(x.e) && casaFiltro(x.e) && casaProcura(x.e));
         if (escolhidas.length) corpo = `<div class="lista-plana">${escolhidas.map(x => desenhaAcao(x, d.ativa)).join('')}</div>`;
     }
-    html += corpo || `<div class="vazio">${procura ? `Nada encontrado para "${esc(procura)}".` : 'Nenhum evento para este filtro.'}</div>`;
+    html += corpo || `<div class="vazio">${d.__limpa && !procura ? 'Contexto limpo. A próxima mensagem começa do zero, nesta mesma conversa (as mensagens anteriores ficam nas partes dela, na lista).' : procura ?`Nada encontrado para "${esc(procura)}".` : 'Nenhum evento para este filtro.'}</div>`;
     // Comentários feitos no meio do trabalho que o Claude ainda não leu: aparecem "na fila"
     const pedidosJaLidos = d.eventos.filter(e => e.tipo === 'pedido');
     // Sai da fila quando o comentário aparece na conversa: pelo texto, ou por qualquer comentário
@@ -8522,7 +8565,8 @@ const ACOES_BARRA = [
     { grupo: 'Contexto', nome: 'Mencionar arquivo do projeto…', chave: 'mencionar arquivo @', faz: () => insereNoCampo('@') },
     { grupo: 'Contexto', nome: 'Exportar conversa', chave: 'exportar baixar markdown', faz: () => document.querySelector('a[href^="/api/exportar/"]')?.click() },
     { grupo: 'Contexto', nome: 'Capítulos', chave: 'capitulos marcadores bookmarks', quando: () => ultimosDados && ultimosDados.eventos.some(e => e.tipo === 'capitulo'), faz: () => { const b = document.querySelector('[data-acao="sumario"]'); if (b) abreSumario(b); } },
-    { grupo: 'Contexto', nome: 'Continuar em conversa nova', chave: 'continuar nova resumo limpar clear', faz: () => continuarEmNova() },
+    { grupo: 'Contexto', nome: 'Limpar contexto', chave: 'clear limpar contexto zerar', detalhe: () => 'continua nesta conversa', quando: () => !!sessaoAtual && !iniciando, faz: () => limpaContexto() },
+    { grupo: 'Contexto', nome: 'Continuar em conversa nova', chave: 'continuar nova resumo', faz: () => continuarEmNova() },
     { grupo: 'Contexto', nome: 'Nova conversa', chave: 'nova conversa', faz: () => abreNovaConversa() },
     { grupo: 'Contexto', nome: 'Editor', chave: 'editor arquivo abrir codigo monaco', faz: () => abreEditor() },
     { grupo: 'Contexto', nome: 'Terminal', chave: 'terminal console powershell prompt', faz: () => mostraTerminal() },
@@ -9179,6 +9223,7 @@ async function atualizaChat() {
     try {
         estadoChat = await (await fetch('/api/chat/estado')).json();
     } catch (e) { return; }
+    await acompanhaLimpeza();
     // Conversa nova: assim que o Claude Code cria a sessão, abre ela
     if (chaveNova) {
         const nova = estadoChat.find(c => c.chave === chaveNova);
@@ -9228,17 +9273,23 @@ async function enviaMensagem() {
     // /mcp não vai para o Claude: abre a janela dos servidores MCP (como no VS Code)
     if (/^\/mcp\s*$/i.test(texto)) { campo.value = ''; ajustaAlturaCaixa(); return abreMcp(); }
     if (iniciando) return recado('Espere a conversa nova abrir: esta mensagem iria para a conversa anterior.');
+    if (/^\/clear\s*$/i.test(texto)) { campo.value = ''; ajustaAlturaCaixa(); return limpaContexto(); }
+    const limpando = !!(limpeza && limpeza.origem === sessaoAtual);
+    if (limpando && limpeza.chave) return recado('Espere a conversa limpa começar.');
     const [projeto, sessao] = sessaoAtual.split('/');
     const conversa = conversaRelevante();
-    const comentando = conversa && (conversa.status === 'rodando' || conversa.status === 'parando');
+    const comentando = !limpando && conversa && (conversa.status === 'rodando' || conversa.status === 'parando');
     const botao = document.getElementById('btnEnviar');
     if (botao.classList.contains('ocupado')) return;
     botao.classList.add('ocupado');
     try {
-        await api('/api/chat/enviar', {
-            projeto, sessao, texto, modelo: modeloEscolhido().modelo, esforco: modeloEscolhido().esforco, modo: modoAtual(),
+        const daTela = todasSessoes.find(s => chaveDe(s) === sessaoAtual);
+        const resposta = await api('/api/chat/enviar', {
+            ...(limpando ? { origem: sessaoAtual, limpar: true, nome: daTela ? nomeExibido(daTela, 1) : '' } : { projeto, sessao }),
+            texto, modelo: modeloEscolhido().modelo, esforco: modeloEscolhido().esforco, modo: modoAtual(),
             anexos: anexosPendentes.map(a => ({ nome: a.nome, tipo: a.tipo, dados: a.dados })),
         });
+        if (limpando) { limpeza.chave = resposta.chave; limpeza.texto = texto; chaveNova = resposta.chave; }
         const previas = anexosPendentes.filter(a => a.previa).map(a => a.previa);
         ultimasPrevias = previas.length ? { sessao: sessaoAtual, imagens: previas, hora: Date.now() } : null;
         if (comentando) {

@@ -1610,7 +1610,7 @@ videoNativo.configura(videoNavegador.recebe);
 try { playersExternos.configura(PASTA_DADOS, videoNavegador.recebe); } catch (e) { console.log('players externos: ' + e.message); }
 const ARQUIVO_DADOS = path.join(PASTA_DADOS, 'dados.json');
 function leDados() {
-    const vazio = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], grupos: [], pastasExtras: [], navegador: 'padrao' };
+    const vazio = { favoritos: [], vinculos: {}, vinculosClear: {}, nomes: {}, arquivadas: [], grupos: [], pastasExtras: [], navegador: 'padrao' };
     try { return { ...vazio, ...JSON.parse(fs.readFileSync(ARQUIVO_DADOS, 'utf8')) }; }
     catch (e) { return vazio; }
 }
@@ -2009,8 +2009,12 @@ function regrasEAgentes(cwd) {
 }
 
 // Comandos e skills para o menu "/" da caixa de mensagem (do usuário e do projeto)
+// /clear É do Red Code: limpa a tela e a próxima mensagem abre sessão nova atrelada a esta (mesma entrada da lista)
+const COMANDO_CLEAR = { nome: 'clear', descricao: 'Limpa o contexto e continua nesta conversa', origem: 'Red Code' };
+const comClear = (lista) => [COMANDO_CLEAR, ...lista.filter(x => x.nome !== 'clear')];
 function listaComandos(cwd) {
     const lista = [
+        COMANDO_CLEAR,
         { nome: 'compact', descricao: 'Resume a conversa para liberar contexto', origem: 'Claude Code' },
         { nome: 'context', descricao: 'Mostra o que está ocupando o contexto', origem: 'Claude Code' },
         { nome: 'cost', descricao: 'Mostra o custo da conversa', origem: 'Claude Code' },
@@ -2555,6 +2559,19 @@ async function rotaChat(req, res, url) {
         let cwd = corpo.cwd;
         // Conversa Chat nova: o servidor escolhe a pasta; numa sessão existente vale só o cwd do transcript
         if (!corpo.sessao && corpo.tipo === 'chat') { fs.mkdirSync(chat.CHAT_DIR, { recursive: true }); cwd = chat.CHAT_DIR; }
+        // /clear: sessão nova na mesma pasta e conta da origem, que é fechada (o contexto recomeça do zero)
+        const limpar = !corpo.sessao && !!corpo.limpar;
+        let projetoOrigem = '', sessaoOrigem = '';
+        if (limpar) {
+            if (!chaveValida(corpo.origem)) return responde(res, 400, { erro: 'conversa inválida' });
+            [projetoOrigem, sessaoOrigem] = corpo.origem.split('/');
+            const detalheOrigem = detalheSessao(projetoOrigem, sessaoOrigem);
+            if (!detalheOrigem) return responde(res, 404, { erro: 'Sessão não encontrada.' });
+            if (chat.rodandoNaSessao(sessaoOrigem) || detalheOrigem.agentesRodando || (!chat.vivaNaSessao(sessaoOrigem) && detalheOrigem.ativa)) {
+                return responde(res, 409, { erro: 'A conversa está trabalhando. Espere ela terminar (ou pare) antes de limpar o contexto.' });
+            }
+            cwd = detalheOrigem.cwd;
+        }
         if (corpo.sessao) {
             if (/[\\/]|\.\./.test(corpo.projeto + corpo.sessao)) return responde(res, 400, { erro: 'sessão inválida' });
             const detalhe = detalheSessao(corpo.projeto, corpo.sessao);
@@ -2580,6 +2597,7 @@ async function rotaChat(req, res, url) {
         // Conta/identidade: conversa existente usa a escolha dela; nova usa o que veio da tela (ids conferidos)
         let entrada = null;
         if (corpo.sessao) entrada = entradaDaConversa(corpo.projeto, corpo.sessao);
+        else if (limpar) { const daOrigem = entradaDaConversa(projetoOrigem, sessaoOrigem); entrada = daOrigem ? { claude: daOrigem.claude, git: daOrigem.git } : null; }
         else if (corpo.claude || corpo.git) {
             const dadosPerfis = perfis.le();
             const perfilUso = [{ id: 'padrao', claude: dadosPerfis.padraoClaude, git: dadosPerfis.padraoGit }, ...(dadosPerfis.perfis || [])].find(p => p.id === perfis.perfilEmUso()) || {};
@@ -2594,6 +2612,14 @@ async function rotaChat(req, res, url) {
         const aoCriarSessao = (origem || (entrada && !corpo.sessao)) ? (projeto, sessionId) => {
             const dados = leDados();
             if (origem) dados.vinculos[`${projeto}/${sessionId}`] = origem;
+            if (limpar && origem) {
+                const nova = `${projeto}/${sessionId}`;
+                dados.vinculosClear = dados.vinculosClear || {};
+                dados.vinculosClear[nova] = true;
+                const nome = String(corpo.nome || dados.nomes[origem] || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+                if (nome) dados.nomes[nova] = nome;
+                if (dados.favoritos.includes(origem) && !dados.favoritos.includes(nova)) dados.favoritos.push(nova);
+            }
             if (entrada && !corpo.sessao) { dados.porConversa = dados.porConversa || {}; dados.porConversa[chaveConversa(projeto, sessionId)] = { ...entrada, projeto, sessao: sessionId }; }
             gravaDados(dados);
         } : null;
@@ -2602,6 +2628,7 @@ async function rotaChat(req, res, url) {
             return responde(res, 400, { erro: 'Na conversa de Chat só dá para anexar imagens. Cole o texto do arquivo na mensagem ou use o modo Código.' });
         }
         const { imagens: imagensAnexas, textoExtra } = preparaAnexos(corpo.anexos);
+        if (limpar) chat.fechaSessao(sessaoOrigem);
         const conversa = await chat.enviar({
             cwd, sessao: corpo.sessao, texto: texto + textoExtra, modelo: corpo.modelo, esforco: corpo.esforco,
             modo: corpo.modo, imagens: imagensAnexas, aoCriarSessao, env: envConversa, assinatura: assinaturaDe(entrada),
@@ -3066,7 +3093,7 @@ const servidor = http.createServer(async (req, res) => {
                     return responde(res, 200, doDisco);
                 }
             }
-            return responde(res, 200, cacheComandos.get(chave).lista);
+            return responde(res, 200, comClear(cacheComandos.get(chave).lista));
         }
         if (url.pathname === '/api/arquivos') {
             const cwd = url.searchParams.get('cwd');
