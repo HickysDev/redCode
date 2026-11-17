@@ -2166,6 +2166,13 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .player-midia.aviso-midia .pm-titulo { font-size: 12px; }
 .player-midia .pm-prog { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: var(--voce); transform: scaleX(0); transform-origin: 0 50%; transition: transform 1s linear; }
 .player-midia.pausado .pm-prog { opacity: .45; }
+.player-midia .pm-busca { position: absolute; left: 0; right: 0; bottom: -3px; height: 10px; z-index: 2; cursor: pointer; }
+.player-midia .pm-busca:hover + .pm-prog, .player-midia.buscando .pm-prog { height: 4px; }
+.player-midia.aberto .pm-busca, .player-midia.sem-tempo .pm-busca, .player-midia.sem-busca .pm-busca { display: none; }
+.player-midia .pm-trilho { cursor: pointer; }
+.player-midia .pm-trilho:hover, .player-midia.buscando .pm-trilho { height: 6px; }
+.player-midia.sem-busca .pm-trilho { cursor: default; }
+.player-midia.buscando .pm-prog, .player-midia.buscando .pm-trilho i { transition: none; }
 .player-midia .pm-btn.ligado { color: var(--voce); }
 /* Vídeo da mídia no canto (como o picture-in-picture do navegador): em cima do player, tamanho P/M/G ou pela alça */
 .pip-clipe { position: fixed; left: 10px; bottom: 150px; z-index: 44; width: 300px; aspect-ratio: var(--pip-prop, 1.7778); overflow: hidden; border-radius: 12px; background: #000; border: 1px solid var(--linha); box-shadow: 0 14px 36px rgba(0, 0, 0, .5); animation: playerEntra .3s cubic-bezier(.2, .8, .2, 1); }
@@ -3343,7 +3350,7 @@ function montaPlayer() {
             <button type="button" class="pm-btn" data-midia="alternar"></button>
             <button type="button" class="pm-btn" data-midia="proxima" title="Próxima música" aria-label="Próxima música">${ICONE_MIDIA.proxima}</button>
         </div>
-        <span class="pm-prog"></span>`;
+        <span class="pm-busca" title="Clique ou arraste para avançar ou voltar"></span><span class="pm-prog"></span>`;
 }
 let avisoMidiaDispensado = false;
 function desenhaMidia() {
@@ -3388,6 +3395,7 @@ function desenhaMidia() {
     alternar.disabled = m.podeAlternar === false;
     playerMidia.querySelector('[data-midia="proxima"]').disabled = m.podeProxima === false;
     playerMidia.classList.toggle('sem-tempo', !(m.duracao > 1));
+    playerMidia.classList.toggle('sem-busca', m.podeBuscar === false);
     // Vídeo no canto: só no app desktop e quando o som não vem de um app só de música
     const botaoClipe = playerMidia.querySelector('[data-midia-clipe]');
     botaoClipe.hidden = !SUPORTA_CLIPE || SO_AUDIO.test(m.app || '');
@@ -3397,13 +3405,14 @@ function desenhaMidia() {
     document.body.classList.add('com-player');
     andaProgresso();
 }
+let posicaoBusca = null;
 // Posição: a do Windows + o tempo que passou desde a última atualização (se estiver tocando)
 function andaProgresso() {
     const m = midiaAtual, barra = playerMidia.querySelector('.pm-prog');
     if (!barra) return;
     if (!m || !(m.duracao > 1)) { barra.hidden = true; return; }
     const base = m.atualizadoEm > 0 ? m.atualizadoEm : m.lidoEm;
-    const pos = m.posicao + (m.estado === 'Playing' ? Math.max(0, (Date.now() - base) / 1000) : 0);
+    const pos = posicaoBusca ?? m.posicao + (m.estado === 'Playing' ? Math.max(0, (Date.now() - base) / 1000) : 0);
     barra.hidden = false;
     // Anda por transform: mexer na largura refazia o layout da página inteira a cada quadro enquanto a música toca
     const p = Math.min(100, Math.max(0, pos / m.duracao * 100));
@@ -3496,6 +3505,33 @@ playerMidia.addEventListener('click', async (ev) => {
     if (b.dataset.midia === 'alternar' && midiaAtual) { midiaAtual.estado = midiaAtual.estado === 'Playing' ? 'Paused' : 'Playing'; midiaAtual.atualizadoEm = Date.now(); desenhaMidia(); }
     try { await api('/api/midia', { acao: b.dataset.midia }); } catch (e) { recado(e.message); }
     setTimeout(atualizaMidia, 700);
+});
+// BARRA COMO A DE UM PLAYER DE VÍDEO: CLICAR OU ARRASTAR MUDA A POSIÇÃO; SÓ ENVIA AO SOLTAR
+const posicaoNaBarra = (ev, barra) => { const r = barra.getBoundingClientRect(); return Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)) * midiaAtual.duracao; };
+playerMidia.addEventListener('pointerdown', (ev) => {
+    const barra = ev.target.closest('.pm-busca, .pm-trilho');
+    if (!barra || ev.button !== 0 || !midiaAtual || !(midiaAtual.duracao > 1) || midiaAtual.podeBuscar === false) return;
+    ev.preventDefault();
+    barra.setPointerCapture(ev.pointerId);
+    playerMidia.classList.add('buscando');
+    posicaoBusca = posicaoNaBarra(ev, barra);
+    andaProgresso();
+    const move = (e) => { posicaoBusca = posicaoNaBarra(e, barra); andaProgresso(); };
+    const solta = async () => {
+        barra.removeEventListener('pointermove', move);
+        barra.removeEventListener('pointerup', solta);
+        barra.removeEventListener('pointercancel', solta);
+        const segundos = posicaoBusca;
+        Object.assign(midiaAtual, { posicao: segundos, atualizadoEm: Date.now() });
+        posicaoBusca = null;
+        playerMidia.classList.remove('buscando');
+        andaProgresso();
+        try { await api('/api/midia', { acao: 'posicao', segundos }); } catch (e) { recado(e.message); }
+        setTimeout(atualizaMidia, 700);
+    };
+    barra.addEventListener('pointermove', move);
+    barra.addEventListener('pointerup', solta);
+    barra.addEventListener('pointercancel', solta);
 });
 if (!JANELA_SECUNDARIA) vigiaMidia();
 setInterval(() => { if (!playerMidia.hidden && !document.hidden) andaProgresso(); }, 1000);

@@ -3038,7 +3038,7 @@ const servidor = http.createServer(async (req, res) => {
                 if (videoNativo.ehNavegador(estado.app) && !videoNavegador.extensaoAtiva()) videoNativo.usado();
                 return responde(res, 200, estado);
             }
-            try { const corpo = await leCorpo(req, 1e4); midia.comando(String(corpo.acao || '')); return responde(res, 200, { ok: true }); }
+            try { const corpo = await leCorpo(req, 1e4); midia.comando(String(corpo.acao || ''), Number(corpo.segundos)); return responde(res, 200, { ok: true }); }
             catch (e) { return responde(res, 400, { erro: e.message }); }
         }
         // Modelos que a conta pode usar (lista do Claude Code, atualiza quando a Anthropic lança um modelo).
