@@ -1973,6 +1973,11 @@ body.lateral-aberta .lateral { display: block; }
 .lista .projeto.grupo-usuario { color: var(--cor-grupo); cursor: pointer; border-radius: 6px; }
 .lista .projeto.grupo-usuario:hover { color: var(--tinta); }
 .lista .projeto.grupo-usuario.alvo-soltar { background: var(--realce); outline: 1px dashed var(--cor-grupo); outline-offset: -2px; color: var(--tinta); }
+.lista .alvo-soltar-area { background: var(--realce); }
+.lista.arrastando-grupo .projeto.grupo-usuario.alvo-soltar { outline: none; background: none; box-shadow: inset 0 2px 0 var(--cor-grupo); }
+.lista.arrastando-grupo .projeto.grupo-usuario.alvo-soltar-depois { box-shadow: inset 0 -2px 0 var(--cor-grupo); color: var(--tinta); }
+.lista.arrastando-grupo .alvo-soltar-area { background: none; }
+.novo-grupo.alvo-soltar { color: var(--tinta); opacity: 1; outline: 1px dashed var(--grafite); outline-offset: 3px; border-radius: 4px; }
 .bola-grupo { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--cor-grupo); }
 .nome-grupo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mais-grupo { display: grid; place-items: center; margin-left: auto; padding: 0 2px; color: var(--grafite); opacity: 0; transition: opacity .15s; }
@@ -5376,6 +5381,7 @@ async function carregaSessoes() {
     }
     const vazios = { ativas: 'Nenhuma conversa ativa agora.', favoritas: 'Nenhuma favorita. Use a estrela ☆ numa conversa.', arquivadas: 'Nada arquivado.', todas: 'Nenhuma conversa encontrada.' };
     document.getElementById('listaSessoes').innerHTML = html + (secoes.some(s => s.cadeias.length) ? '' : `<div class="vazio" style="padding:20px 18px">${vazios[abaSessoes]}</div>`);
+    marcaAreasDeGrupo();
     // Janela secundária: a sessão abriu antes de saber qual é a pasta do Chat; acerta o modo e redesenha a lista
     if (sessaoAtual && ehChatChave(sessaoAtual) !== (modoApp === 'chat')) { aplicaModo(ehChatChave(sessaoAtual) ? 'chat' : 'codigo'); return carregaSessoes(); }
     if (grupoRecemAberto) {
@@ -5384,6 +5390,12 @@ async function carregaSessoes() {
         grupoRecemAberto = null;
     }
     if (!sessaoAtual && !chatVazioAberto && !iniciando) { if (modoApp === 'chat') mostraChatVazio(); else if (sessoesVisiveis[0]) abreSessao(chaveDe(sessoesVisiveis[0])); }
+}
+
+function marcaAreasDeGrupo() {
+    for (const cab of document.querySelectorAll('#listaSessoes [data-grupo-usuario]')) {
+        for (let el = cab.nextElementSibling; el && !el.matches('.projeto, .novo-grupo'); el = el.nextElementSibling) el.dataset.areaGrupo = cab.dataset.grupoUsuario;
+    }
 }
 
 let grupoRecemAberto = null;
@@ -5397,7 +5409,7 @@ const CORES_GRUPO = [['voce', 'Vermelho'], ['atencao', 'Âmbar'], ['ok', 'Verde'
 const estiloCorGrupo = (cor) => `--cor-grupo: var(--${CORES_GRUPO.some(([v]) => v === cor) ? cor : 'voce'})`;
 function cabecalhoGrupo(sec, fechado) {
     const g = sec.grupo;
-    return `<div class="projeto grupo-usuario" role="button" tabindex="0" data-grupo="${esc(sec.id)}" data-grupo-usuario="${esc(g.id)}" aria-expanded="${!fechado}" style="${estiloCorGrupo(g.cor)}">
+    return `<div class="projeto grupo-usuario" role="button" tabindex="0" draggable="true" data-grupo="${esc(sec.id)}" data-grupo-usuario="${esc(g.id)}" aria-expanded="${!fechado}" style="${estiloCorGrupo(g.cor)}">
         <span class="seta">${fechado ? '▸' : '▾'}</span><i class="bola-grupo" aria-hidden="true"></i><span class="nome-grupo">${esc(sec.titulo)}</span><span class="contagem">${sec.cadeias.length}</span>
         <button type="button" class="mais-grupo" data-menu-grupo="${esc(g.id)}" title="Opções do grupo" aria-label="Opções do grupo" aria-haspopup="menu">${ICONES.mais}</button></div>`;
 }
@@ -6786,33 +6798,68 @@ document.getElementById('listaSessoes').addEventListener('keydown', (ev) => {
 });
 // A LISTA NÃO REDESENHA DURANTE O ARRASTE (arrastandoConversa) OU O ELEMENTO ARRASTADO SOME
 const TIPO_ARRASTE = 'text/x-redcode-conversa';
-const fimArraste = () => { arrastandoConversa = false; document.querySelectorAll('.alvo-soltar').forEach(el => el.classList.remove('alvo-soltar')); };
-document.getElementById('listaSessoes').addEventListener('dragstart', (ev) => {
-    const item = ev.target.closest && ev.target.closest('.sessao');
-    if (!item || ev.target.closest('.campo-nome') || abaSessoes === 'arquivadas') return ev.preventDefault();
+const TIPO_ARRASTE_GRUPO = 'text/x-redcode-grupo';
+let grupoArrastado = null;
+const listaLateral = document.getElementById('listaSessoes');
+const limpaAlvos = () => document.querySelectorAll('.alvo-soltar, .alvo-soltar-area, .alvo-soltar-depois').forEach(el => el.classList.remove('alvo-soltar', 'alvo-soltar-area', 'alvo-soltar-depois'));
+const fimArraste = () => { arrastandoConversa = false; grupoArrastado = null; listaLateral.classList.remove('arrastando-grupo'); limpaAlvos(); };
+const grupoSobOCursor = (ev) => { const el = ev.target.closest('[data-grupo-usuario], [data-area-grupo]'); return el && (el.dataset.grupoUsuario || el.dataset.areaGrupo); };
+function alvoDoArraste(ev) {
+    const tipos = ev.dataTransfer.types;
+    if (tipos.includes(TIPO_ARRASTE_GRUPO)) {
+        const id = grupoSobOCursor(ev);
+        return id && id !== grupoArrastado ? { tipo: 'grupo', id } : null;
+    }
+    if (!tipos.includes(TIPO_ARRASTE)) return null;
+    if (ev.target.closest('[data-novo-grupo]')) return { tipo: 'novo' };
+    const id = grupoSobOCursor(ev);
+    return id ? { tipo: 'conversa', id } : null;
+}
+function realcaAlvo(alvo) {
+    limpaAlvos();
+    if (alvo.tipo === 'novo') return listaLateral.querySelector('[data-novo-grupo]').classList.add('alvo-soltar');
+    const ordem = dadosPainel.grupos.map(g => g.id);
+    const desce = alvo.tipo === 'grupo' && ordem.indexOf(grupoArrastado) < ordem.indexOf(alvo.id);
+    for (const el of listaLateral.querySelectorAll(`[data-grupo-usuario="${CSS.escape(alvo.id)}"], [data-area-grupo="${CSS.escape(alvo.id)}"]`)) {
+        el.classList.add(el.dataset.grupoUsuario ? (desce ? 'alvo-soltar-depois' : 'alvo-soltar') : 'alvo-soltar-area');
+    }
+}
+listaLateral.addEventListener('dragstart', (ev) => {
+    if (!ev.target.closest || abaSessoes === 'arquivadas') return ev.preventDefault();
+    const cab = ev.target.closest('[data-grupo-usuario]');
+    if (cab) {
+        if (ev.target.closest('.mais-grupo')) return ev.preventDefault();
+        grupoArrastado = cab.dataset.grupoUsuario;
+        arrastandoConversa = true;
+        listaLateral.classList.add('arrastando-grupo');
+        ev.dataTransfer.setData(TIPO_ARRASTE_GRUPO, grupoArrastado);
+        ev.dataTransfer.effectAllowed = 'move';
+        return;
+    }
+    const item = ev.target.closest('.sessao');
+    if (!item || ev.target.closest('.campo-nome')) return ev.preventDefault();
     arrastandoConversa = true;
     ev.dataTransfer.setData(TIPO_ARRASTE, item.dataset.chave);
     ev.dataTransfer.effectAllowed = 'move';
 });
-document.getElementById('listaSessoes').addEventListener('dragover', (ev) => {
-    const cab = ev.target.closest('[data-grupo-usuario]');
-    if (!cab || !ev.dataTransfer.types.includes(TIPO_ARRASTE)) return;
+listaLateral.addEventListener('dragover', (ev) => {
+    const alvo = alvoDoArraste(ev);
+    if (!alvo) return limpaAlvos();
     ev.preventDefault();
     ev.dataTransfer.dropEffect = 'move';
-    document.querySelectorAll('.alvo-soltar').forEach(el => { if (el !== cab) el.classList.remove('alvo-soltar'); });
-    cab.classList.add('alvo-soltar');
+    realcaAlvo(alvo);
 });
-document.getElementById('listaSessoes').addEventListener('dragleave', (ev) => {
-    const cab = ev.target.closest('[data-grupo-usuario]');
-    if (cab && !cab.contains(ev.relatedTarget)) cab.classList.remove('alvo-soltar');
-});
-document.getElementById('listaSessoes').addEventListener('drop', (ev) => {
-    const cab = ev.target.closest('[data-grupo-usuario]');
+listaLateral.addEventListener('dragleave', (ev) => { if (!listaLateral.contains(ev.relatedTarget)) limpaAlvos(); });
+listaLateral.addEventListener('drop', (ev) => {
+    const alvo = alvoDoArraste(ev);
     const chave = ev.dataTransfer.getData(TIPO_ARRASTE);
+    const arrastado = grupoArrastado;
     fimArraste();
-    if (!cab || !chave) return;
+    if (!alvo) return;
     ev.preventDefault();
-    colocaNoGrupo(chave, cab.dataset.grupoUsuario);
+    if (alvo.tipo === 'novo') return novoGrupo(chave);
+    if (alvo.tipo === 'conversa') return colocaNoGrupo(chave, alvo.id);
+    acaoGrupo({ acao: 'posicao', id: arrastado, para: dadosPainel.grupos.findIndex(g => g.id === alvo.id) }, 'Grupo reordenado');
 });
 document.addEventListener('dragend', fimArraste);
 document.getElementById('filtro').addEventListener('input', carregaSessoes);

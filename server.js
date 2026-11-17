@@ -2718,6 +2718,9 @@ async function rotaChat(req, res, url) {
         else if (acao === 'mover') {
             const de = grupos.indexOf(grupo), para = de + (corpo.passo < 0 ? -1 : 1);
             if (para >= 0 && para < grupos.length) [grupos[de], grupos[para]] = [grupos[para], grupos[de]];
+        } else if (acao === 'posicao') {
+            grupos.splice(grupos.indexOf(grupo), 1);
+            grupos.splice(Math.max(0, Math.min(grupos.length, Math.trunc(Number(corpo.para)) || 0)), 0, grupo);
         } else if (acao === 'apagar') grupos.splice(grupos.indexOf(grupo), 1);
         // A CADEIA INTEIRA SAI DE QUALQUER GRUPO ANTES: NO MÁXIMO 1 GRUPO POR CONVERSA
         else if (acao === 'colocar') { tiraDeTodos(); grupo.conversas.push(chaves[0]); }
