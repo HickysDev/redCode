@@ -1961,6 +1961,11 @@ body.lateral-aberta .lateral { display: block; }
 .marca:hover .marca-acoes #btnNotificar, .marca:hover .marca-acoes #btnAjuda { opacity: 1; }
 .atalhos-lateral, .resumo-status { display: none; }
 .busca { border-color: transparent; background: var(--realce); }
+.busca-lateral { display: flex; align-items: center; gap: 2px; margin: 6px 14px 8px; }
+.busca-lateral .busca { flex: 1; min-width: 0; margin: 0 4px 0 0; }
+.alterna-secao { display: grid; place-items: center; flex: none; width: 28px; height: 30px; border-radius: 6px; color: var(--grafite); }
+.alterna-secao:hover { color: var(--tinta); background: var(--realce); }
+.alterna-secao[aria-pressed="true"] { color: var(--voce); background: var(--realce); }
 .busca:focus { border-color: var(--linha); outline: none; }
 .abas { background: none; border: 0; padding: 0; margin-bottom: 8px; gap: 0; justify-content: space-between; }
 .abas button { flex: none; padding: 3px 5px; }
@@ -2654,7 +2659,11 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
             <button type="button" id="trilhoVisual" title="Visual das conversas de código" aria-label="Configurar o visual"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
         <button class="botao principal nova-conversa" id="btnNova">Nova conversa</button>
-        <input class="busca" id="filtro" type="search" placeholder="Procurar sessão ou projeto" aria-label="Procurar sessão">
+        <div class="busca-lateral">
+            <input class="busca" id="filtro" type="search" placeholder="Procurar" title="Procurar sessão ou projeto" aria-label="Procurar sessão ou projeto">
+            <button type="button" class="alterna-secao" data-alterna-secao="fixadas" aria-pressed="true" title="Mostrar as Fixadas no topo" aria-label="Mostrar Fixadas"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg></button>
+            <button type="button" class="alterna-secao" data-alterna-secao="arquivo" aria-pressed="false" title="Mostrar o Arquivo no fim" aria-label="Mostrar Arquivo"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="3.5" rx="1"/><path d="M3 6v6.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6M6.5 8.5h3"/></svg></button>
+        </div>
         <div class="atalhos-lateral"><button type="button" id="btnBuscaGlobal" title="Procurar um texto ou arquivo em todas as conversas (Ctrl + Shift + F)">⌕ Buscar em tudo</button><button type="button" id="btnResumoDia" title="O que cada conversa fez hoje"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1"/></svg> Resumo do dia</button></div>
         <div class="abas" role="group" aria-label="Quais sessões mostrar">
             <button data-aba="todas" aria-pressed="true">Todas</button>
@@ -3063,6 +3072,8 @@ let filtroAtual = 'tudo';
 let procura = '';
 let seguirFim = true;
 let abaSessoes = 'todas';
+const verSecao = { fixadas: true, arquivo: false };
+try { Object.assign(verSecao, JSON.parse(localStorage.getItem('painelVerSecao') || '{}')); } catch (e) { /* sem armazenamento */ }
 function inicioDoPeriodo(periodo) {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -5352,7 +5363,7 @@ async function carregaSessoes() {
     const secoes = [];
     const usadas = new Set();
     const pega = (filtroCadeia) => cadeias.filter(c => !usadas.has(c) && filtroCadeia(c)).map(c => { usadas.add(c); return c; });
-    const favoritas = pega(favoritaCadeia);
+    const favoritas = verSecao.fixadas ? pega(favoritaCadeia) : [];
     if (favoritas.length) secoes.push({ id: 'favoritas', titulo: 'Fixadas', classe: 'favoritas', cadeias: favoritas });
     // GRUPOS DO USUÁRIO NÃO USAM O pega: A CONVERSA CONTINUA TAMBÉM NO PROJETO
     const gruposVaziosVisiveis = abaSessoes === 'todas' && !filtro;
@@ -5369,8 +5380,8 @@ async function carregaSessoes() {
         porProjeto.get(id).cadeias.push(c);
     }
     for (const [id, { titulo, cadeias: lista }] of porProjeto) secoes.push({ id: 'p:' + id, titulo, cadeias: lista });
-    const arquivo = abaSessoes === 'ativas' ? [] : montaCadeias(sessoes.filter(s => visivel(s) && arquivada(s))).sort((a, b) => b.atualizado - a.atualizado);
-    if (arquivo.length) secoes.push({ id: 'arquivo', titulo: 'Arquivo', classe: 'arquivo', cadeias: arquivo, fechadoPorPadrao: true });
+    const arquivo = abaSessoes === 'ativas' || !(verSecao.arquivo || filtro) ? [] : montaCadeias(sessoes.filter(s => visivel(s) && arquivada(s))).sort((a, b) => b.atualizado - a.atualizado);
+    if (arquivo.length) secoes.push({ id: 'arquivo', titulo: 'Arquivo', classe: 'arquivo', cadeias: arquivo });
 
     const jaListadas = new Set();
     sessoesVisiveis = secoes.flatMap(sec => sec.cadeias.flatMap(c => partesAbertas(c) ? [...c.membros].reverse() : [c.membros[c.membros.length - 1]]))
@@ -5378,8 +5389,7 @@ async function carregaSessoes() {
     let html = '';
     for (const sec of secoes) {
         if (sec.novoGrupo) { html += '<button type="button" class="novo-grupo" data-novo-grupo>+ Novo grupo</button>'; continue; }
-        // NO FECHADO POR PADRÃO (ARQUIVO) ESTAR NO gruposFechados SIGNIFICA ABERTO
-        const fechado = (sec.fechadoPorPadrao ? !gruposFechados.has(sec.id) : gruposFechados.has(sec.id)) && !filtro;
+        const fechado = gruposFechados.has(sec.id) && !filtro;
         html += sec.grupo ? cabecalhoGrupo(sec, fechado) : `<button class="projeto ${sec.classe || ''}" data-grupo="${esc(sec.id)}" aria-expanded="${!fechado}">
             <span class="seta">${fechado ? '▸' : '▾'}</span>${esc(sec.titulo)}<span class="contagem">${sec.cadeias.length}</span></button>`;
         if (fechado) continue;
@@ -6894,6 +6904,16 @@ document.addEventListener('dragend', fimArraste);
 document.getElementById('filtro').addEventListener('input', carregaSessoes);
 document.getElementById('resumoStatus').addEventListener('click', (ev) => {
     if (ev.target.closest('[data-ir-ativas]')) document.querySelector('.abas [data-aba="ativas"]').click();
+});
+function marcaAlternaSecao() { document.querySelectorAll('[data-alterna-secao]').forEach(b => b.setAttribute('aria-pressed', String(!!verSecao[b.dataset.alternaSecao]))); }
+marcaAlternaSecao();
+document.querySelector('.busca-lateral').addEventListener('click', (ev) => {
+    const botao = ev.target.closest('[data-alterna-secao]');
+    if (!botao) return;
+    verSecao[botao.dataset.alternaSecao] = !verSecao[botao.dataset.alternaSecao];
+    try { localStorage.setItem('painelVerSecao', JSON.stringify(verSecao)); } catch (e) { /* sem armazenamento */ }
+    marcaAlternaSecao();
+    carregaSessoes();
 });
 document.querySelector('.abas').addEventListener('click', (ev) => {
     const botao = ev.target.closest('[data-aba]');
