@@ -787,12 +787,14 @@ function leSubagentes(pastaSessao, estadoPai) {
 function situacaoSessao(estado, mtime, id) {
     // Estava rodando no painel quando ele fechou e ninguém mexeu desde então: processo morto, conversa livre
     if (id && orfas.has(id)) {
-        if (mtime <= INICIO_PAINEL) return { ativa: false, esperando: false, agentesRodando: 0 };
+        if (mtime <= INICIO_PAINEL) return { ativa: false, esperando: false, agentesRodando: 0, agentesTipos: [] };
         orfas.delete(id);
     }
     // Só conta agente com atividade recente ou lançado há menos de 30 min
-    const agentesRodando = Object.values(estado.agentes).filter(a => a.status === 'rodando'
-        && (a.ativoHa !== undefined || Date.now() - Date.parse(a.inicio || 0) < 30 * 60 * 1000)).length;
+    const agentesVivos = Object.values(estado.agentes).filter(a => a.status === 'rodando'
+        && (a.ativoHa !== undefined || Date.now() - Date.parse(a.inicio || 0) < 30 * 60 * 1000));
+    const agentesRodando = agentesVivos.length;
+    const agentesTipos = agentesVivos.slice(0, 4).map(a => ({ tipo: a.tipoAgente || 'agente', modelo: a.modelo || '' }));
     // Ferramenta começada e sem resultado (ex.: comando longo): o transcript fica parado enquanto
     // ela roda, então conta como ativa até 15 min do início (o limite de um comando é 10 min)
     const ultimoEvento = estado.eventos[estado.eventos.length - 1];
@@ -803,7 +805,7 @@ function situacaoSessao(estado, mtime, id) {
     const pensando = !!estado.esperaModelo && Date.now() - mtime < 15 * 60 * 1000;
     const recente = Date.now() - mtime < SEGUNDOS_ATIVA * 1000 || ferramentaAberta || pensando;
     const ativa = (!estado.turnoEncerrado && !estado.pergunta && recente) || (agentesRodando > 0 && !estado.pergunta);
-    return { ativa, esperando: !ativa && (estado.turnoEncerrado || !!estado.pergunta), agentesRodando };
+    return { ativa, esperando: !ativa && (estado.turnoEncerrado || !!estado.pergunta), agentesRodando, agentesTipos };
 }
 
 // Arquivos de andamento (ACOMPANHAR) ainda sendo escritos: mexido nos últimos 2 min, pedido nas últimas 24 h
@@ -884,7 +886,7 @@ function listaSessoes(opcoes = {}) {
                 modelo: estado.modelo, atualizado: stat.mtimeMs, contexto: estado.contexto,
                 compactacoes: estado.compactacoes.length, inicio: estado.inicio, cwd: cwdDaPasta(estado, pasta), custo: estado.custo,
                 custoHoje: stat.mtimeMs >= new Date(diaLocal() + 'T00:00:00').getTime() ? custoHojeSessao(path.join(caminhoPasta, nome.replace('.jsonl', '')), estado) : 0,
-                ativa: situacao.ativa, esperando: situacao.esperando, agentesRodando: situacao.agentesRodando,
+                ativa: situacao.ativa, esperando: situacao.esperando, agentesRodando: situacao.agentesRodando, agentesTipos: situacao.agentesTipos,
                 pergunta: !!estado.pergunta, fimTurno: estado.fimTurno, acompanhando: arquivosAcompanhados(estado),
                 // Selo do botão Tasks na lista (conta sem chamar /api/tasks)
                 tarefasAndamento: (() => { const pd = planoDoPedido(estado); return pd.planoAtual ? pd.tarefas.filter(i => i.status === 'in_progress').length : 0; })(),
@@ -1613,7 +1615,7 @@ videoNativo.configura(videoNavegador.recebe);
 try { playersExternos.configura(PASTA_DADOS, videoNavegador.recebe); } catch (e) { console.log('players externos: ' + e.message); }
 const ARQUIVO_DADOS = path.join(PASTA_DADOS, 'dados.json');
 function leDados() {
-    const vazio = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], pastasExtras: [], navegador: 'padrao' };
+    const vazio = { favoritos: [], vinculos: {}, vinculosClear: {}, nomes: {}, arquivadas: [], grupos: [], pastasExtras: [], navegador: 'padrao' };
     try { return { ...vazio, ...JSON.parse(fs.readFileSync(ARQUIVO_DADOS, 'utf8')) }; }
     catch (e) { return vazio; }
 }
@@ -1634,6 +1636,9 @@ function registraVivas() {
     vivasGravadas = json;
     try { fs.writeFileSync(ARQUIVO_VIVAS, json); } catch (e) { /* só otimização */ }
 }
+const CORES_GRUPO = ['voce', 'atencao', 'ok', 'agente', 'modelo', 'erro'];
+const ICONES_GRUPO = ['', '📁', '⭐', '🔥', '🐛', '🚀', '💡', '🧪', '📊', '💰', '🛠️', '📦', '🧾', '🎯', '🔒', '📝'];
+const corDeGrupoValida = (cor) => CORES_GRUPO.includes(cor) || /^#[0-9a-f]{6}$/i.test(String(cor || ''));
 function chaveValida(chave) {
     return typeof chave === 'string' && /^[A-Za-z0-9-]+\/[A-Za-z0-9-]+$/.test(chave);
 }
@@ -2009,8 +2014,12 @@ function regrasEAgentes(cwd) {
 }
 
 // Comandos e skills para o menu "/" da caixa de mensagem (do usuário e do projeto)
+// /clear É do Red Code: limpa a tela e a próxima mensagem abre sessão nova atrelada a esta (mesma entrada da lista)
+const COMANDO_CLEAR = { nome: 'clear', descricao: 'Limpa o contexto e continua nesta conversa', origem: 'Red Code' };
+const comClear = (lista) => [COMANDO_CLEAR, ...lista.filter(x => x.nome !== 'clear')];
 function listaComandos(cwd) {
     const lista = [
+        COMANDO_CLEAR,
         { nome: 'compact', descricao: 'Resume a conversa para liberar contexto', origem: 'Claude Code' },
         { nome: 'context', descricao: 'Mostra o que está ocupando o contexto', origem: 'Claude Code' },
         { nome: 'cost', descricao: 'Mostra o custo da conversa', origem: 'Claude Code' },
@@ -2555,6 +2564,19 @@ async function rotaChat(req, res, url) {
         let cwd = corpo.cwd;
         // Conversa Chat nova: o servidor escolhe a pasta; numa sessão existente vale só o cwd do transcript
         if (!corpo.sessao && corpo.tipo === 'chat') { fs.mkdirSync(chat.CHAT_DIR, { recursive: true }); cwd = chat.CHAT_DIR; }
+        // /clear: sessão nova na mesma pasta e conta da origem, que é fechada (o contexto recomeça do zero)
+        const limpar = !corpo.sessao && !!corpo.limpar;
+        let projetoOrigem = '', sessaoOrigem = '';
+        if (limpar) {
+            if (!chaveValida(corpo.origem)) return responde(res, 400, { erro: 'conversa inválida' });
+            [projetoOrigem, sessaoOrigem] = corpo.origem.split('/');
+            const detalheOrigem = detalheSessao(projetoOrigem, sessaoOrigem);
+            if (!detalheOrigem) return responde(res, 404, { erro: 'Sessão não encontrada.' });
+            if (chat.rodandoNaSessao(sessaoOrigem) || detalheOrigem.agentesRodando || (!chat.vivaNaSessao(sessaoOrigem) && detalheOrigem.ativa)) {
+                return responde(res, 409, { erro: 'A conversa está trabalhando. Espere ela terminar (ou pare) antes de limpar o contexto.' });
+            }
+            cwd = detalheOrigem.cwd;
+        }
         if (corpo.sessao) {
             if (/[\\/]|\.\./.test(corpo.projeto + corpo.sessao)) return responde(res, 400, { erro: 'sessão inválida' });
             const detalhe = detalheSessao(corpo.projeto, corpo.sessao);
@@ -2580,6 +2602,7 @@ async function rotaChat(req, res, url) {
         // Conta/identidade: conversa existente usa a escolha dela; nova usa o que veio da tela (ids conferidos)
         let entrada = null;
         if (corpo.sessao) entrada = entradaDaConversa(corpo.projeto, corpo.sessao);
+        else if (limpar) { const daOrigem = entradaDaConversa(projetoOrigem, sessaoOrigem); entrada = daOrigem ? { claude: daOrigem.claude, git: daOrigem.git } : null; }
         else if (corpo.claude || corpo.git) {
             const dadosPerfis = perfis.le();
             const perfilUso = [{ id: 'padrao', claude: dadosPerfis.padraoClaude, git: dadosPerfis.padraoGit }, ...(dadosPerfis.perfis || [])].find(p => p.id === perfis.perfilEmUso()) || {};
@@ -2594,6 +2617,14 @@ async function rotaChat(req, res, url) {
         const aoCriarSessao = (origem || (entrada && !corpo.sessao)) ? (projeto, sessionId) => {
             const dados = leDados();
             if (origem) dados.vinculos[`${projeto}/${sessionId}`] = origem;
+            if (limpar && origem) {
+                const nova = `${projeto}/${sessionId}`;
+                dados.vinculosClear = dados.vinculosClear || {};
+                dados.vinculosClear[nova] = true;
+                const nome = String(corpo.nome || dados.nomes[origem] || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+                if (nome) dados.nomes[nova] = nome;
+                if (dados.favoritos.includes(origem) && !dados.favoritos.includes(nova)) dados.favoritos.push(nova);
+            }
             if (entrada && !corpo.sessao) { dados.porConversa = dados.porConversa || {}; dados.porConversa[chaveConversa(projeto, sessionId)] = { ...entrada, projeto, sessao: sessionId }; }
             gravaDados(dados);
         } : null;
@@ -2602,6 +2633,7 @@ async function rotaChat(req, res, url) {
             return responde(res, 400, { erro: 'Na conversa de Chat só dá para anexar imagens. Cole o texto do arquivo na mensagem ou use o modo Código.' });
         }
         const { imagens: imagensAnexas, textoExtra } = preparaAnexos(corpo.anexos);
+        if (limpar) chat.fechaSessao(sessaoOrigem);
         const conversa = await chat.enviar({
             cwd, sessao: corpo.sessao, texto: texto + textoExtra, modelo: corpo.modelo, esforco: corpo.esforco,
             modo: corpo.modo, imagens: imagensAnexas, aoCriarSessao, env: envConversa, assinatura: assinaturaDe(entrada),
@@ -2700,6 +2732,39 @@ async function rotaChat(req, res, url) {
         dados.favoritos = ja ? dados.favoritos.filter(f => f !== corpo.chave) : [...dados.favoritos, corpo.chave];
         gravaDados(dados);
         return responde(res, 200, { favorita: !ja });
+    }
+    if (url.pathname === '/api/grupos') {
+        const dados = leDados();
+        const grupos = Array.isArray(dados.grupos) ? dados.grupos : [];
+        const grupo = grupos.find(g => g.id === corpo.id);
+        const nome = String(corpo.nome || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+        const chaves = (Array.isArray(corpo.chaves) ? corpo.chaves : []).filter(chaveValida);
+        const acao = corpo.acao;
+        if (acao !== 'criar' && acao !== 'tirar' && !grupo) return responde(res, 404, { erro: 'grupo não encontrado' });
+        if ((acao === 'criar' || acao === 'renomear') && !nome) return responde(res, 400, { erro: 'dê um nome ao grupo' });
+        if ((acao === 'colocar' || acao === 'tirar') && !chaves.length) return responde(res, 400, { erro: 'conversa inválida' });
+        const tiraDeTodos = () => grupos.forEach(g => { g.conversas = g.conversas.filter(c => !chaves.includes(c)); });
+        let criado = null;
+        if (acao === 'criar') {
+            criado = { id: 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), nome, cor: corDeGrupoValida(corpo.cor) ? corpo.cor : CORES_GRUPO[0], icone: ICONES_GRUPO.includes(corpo.icone) ? corpo.icone : '', conversas: [] };
+            grupos.push(criado);
+            if (chaves.length) { tiraDeTodos(); criado.conversas.push(chaves[0]); }
+        } else if (acao === 'renomear') { grupo.nome = nome; if (corDeGrupoValida(corpo.cor)) grupo.cor = corpo.cor; if (ICONES_GRUPO.includes(corpo.icone)) grupo.icone = corpo.icone; }
+        else if (acao === 'cor') { if (!corDeGrupoValida(corpo.cor)) return responde(res, 400, { erro: 'cor inválida' }); grupo.cor = corpo.cor; }
+        else if (acao === 'mover') {
+            const de = grupos.indexOf(grupo), para = de + (corpo.passo < 0 ? -1 : 1);
+            if (para >= 0 && para < grupos.length) [grupos[de], grupos[para]] = [grupos[para], grupos[de]];
+        } else if (acao === 'posicao') {
+            grupos.splice(grupos.indexOf(grupo), 1);
+            grupos.splice(Math.max(0, Math.min(grupos.length, Math.trunc(Number(corpo.para)) || 0)), 0, grupo);
+        } else if (acao === 'apagar') grupos.splice(grupos.indexOf(grupo), 1);
+        // A CADEIA INTEIRA SAI DE QUALQUER GRUPO ANTES: NO MÁXIMO 1 GRUPO POR CONVERSA
+        else if (acao === 'colocar') { tiraDeTodos(); grupo.conversas.push(chaves[0]); }
+        else if (acao === 'tirar') tiraDeTodos();
+        else return responde(res, 400, { erro: 'ação inválida' });
+        dados.grupos = grupos;
+        gravaDados(dados);
+        return responde(res, 200, { grupos, criado: criado && criado.id });
     }
     if (url.pathname === '/api/chat/responder') {
         return chat.responder(corpo.id, corpo) ? responde(res, 200, { ok: true }) : responde(res, 404, { erro: 'Este pedido já foi respondido ou expirou.' });
@@ -2839,7 +2904,7 @@ const servidor = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=86400', 'X-Content-Type-Options': 'nosniff' });
             return res.end(fs.readFileSync(arq));
         }
-        if (url.pathname.startsWith('/api/chat/') || url.pathname === '/api/auth/entrar' || url.pathname === '/api/auth/cancelar' || url.pathname === '/api/auth/codigo' || url.pathname === '/api/plugins/acao' || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta', '/api/economia'].includes(url.pathname)) return await rotaChat(req, res, url);
+        if (url.pathname.startsWith('/api/chat/') || url.pathname === '/api/auth/entrar' || url.pathname === '/api/auth/cancelar' || url.pathname === '/api/auth/codigo' || url.pathname === '/api/plugins/acao' || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/grupos', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta', '/api/economia'].includes(url.pathname)) return await rotaChat(req, res, url);
         if (url.pathname === '/api/auth/estado') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
             return responde(res, 200, await login.estado());
@@ -2978,7 +3043,7 @@ const servidor = http.createServer(async (req, res) => {
                 if (videoNativo.ehNavegador(estado.app) && !videoNavegador.extensaoAtiva()) videoNativo.usado();
                 return responde(res, 200, estado);
             }
-            try { const corpo = await leCorpo(req, 1e4); midia.comando(String(corpo.acao || '')); return responde(res, 200, { ok: true }); }
+            try { const corpo = await leCorpo(req, 1e4); midia.comando(String(corpo.acao || ''), Number(corpo.segundos)); return responde(res, 200, { ok: true }); }
             catch (e) { return responde(res, 400, { erro: e.message }); }
         }
         // Modelos que a conta pode usar (lista do Claude Code, atualiza quando a Anthropic lança um modelo).
@@ -3033,7 +3098,7 @@ const servidor = http.createServer(async (req, res) => {
                     return responde(res, 200, doDisco);
                 }
             }
-            return responde(res, 200, cacheComandos.get(chave).lista);
+            return responde(res, 200, comClear(cacheComandos.get(chave).lista));
         }
         if (url.pathname === '/api/arquivos') {
             const cwd = url.searchParams.get('cwd');

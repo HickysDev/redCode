@@ -1632,6 +1632,11 @@ button.partes:hover, button.partes[aria-expanded="true"] { color: var(--voce); b
 .selo-status.pergunta::after, .botao.enviar.ocupado::after, .chip-perfil.pendente::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 4px color-mix(in srgb, var(--voce) 25%, transparent); opacity: 0; pointer-events: none; animation: pulso-selo 1.6s ease-in-out infinite; }
 /* O selo corta o texto comprido (overflow), mas deixa o anel de 4px aparecer */
 .linha-selo .selo-status.pergunta { overflow: clip; overflow-clip-margin: 4px; }
+.pets-lista { display: inline-flex; align-items: flex-end; gap: 1px; flex: none; height: 16px; }
+.pets-lista .pet-mini { zoom: .38; }
+.pets-lista .pet-mini.rodando .pet-corpo { animation-duration: 1.8s; animation-delay: var(--atraso, 0s); }
+.pets-lista .pets-mais { font: 600 10.5px var(--sans); color: var(--agente); margin-left: 2px; align-self: center; }
+html[data-movimento="reduzido"] .pets-lista .pet-mini .pet-corpo { animation: none !important; }
 .selo-status.agente { background: var(--atencao-fundo); color: var(--agente); border: 1px solid color-mix(in srgb, var(--agente) 45%, transparent); }
 .selo-status.respondeu { background: var(--modelo-fundo); color: var(--modelo); }
 @keyframes pulso-selo { 50% { opacity: 1; } }
@@ -1961,14 +1966,73 @@ body.lateral-aberta .lateral { display: block; }
 .marca:hover .marca-acoes #btnNotificar, .marca:hover .marca-acoes #btnAjuda { opacity: 1; }
 .atalhos-lateral, .resumo-status { display: none; }
 .busca { border-color: transparent; background: var(--realce); }
+.busca-lateral { display: flex; align-items: center; gap: 2px; margin: 6px 14px 8px; }
+.busca-lateral .busca { flex: 1; min-width: 0; margin: 0 4px 0 0; }
+.alterna-secao { display: grid; place-items: center; flex: none; width: 28px; height: 30px; border-radius: 6px; color: var(--grafite); }
+.alterna-secao:hover { color: var(--tinta); background: var(--realce); }
+.alterna-secao[aria-pressed="true"] { color: var(--voce); background: var(--realce); }
 .busca:focus { border-color: var(--linha); outline: none; }
-.abas { background: none; border: 0; padding: 0; margin-bottom: 8px; gap: 2px; }
-.abas button { flex: none; padding: 3px 8px; }
+.abas { background: none; border: 0; padding: 0; margin-bottom: 8px; gap: 0; justify-content: space-between; }
+.abas button { flex: none; padding: 3px 5px; }
 .abas button[aria-pressed="true"] { background: none; box-shadow: none; color: var(--tinta); font-weight: 600; }
 .projeto { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 14px 18px 4px; font: 500 12.5px var(--sans); color: var(--grafite); }
 .projeto:hover { color: var(--tinta); }
 .projeto .seta { font-size: 9px; opacity: .7; }
 .projeto .contagem { display: none; }
+.bloco-subprojeto { margin: 6px 10px 8px; border: 1px solid var(--linha); border-radius: 10px; background: color-mix(in srgb, var(--tinta) 3%, transparent); overflow: hidden; }
+.subprojeto { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-bottom: 1px solid var(--linha); font: 600 11px var(--sans); color: var(--tinta); }
+.nome-subprojeto { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conta-subprojeto { margin-left: auto; font-size: 10.5px; color: var(--grafite); }
+.lista .projeto.grupo-usuario { color: var(--cor-grupo); cursor: pointer; border-radius: 6px; }
+.lista .projeto.grupo-usuario:hover { color: var(--tinta); }
+.lista .projeto.grupo-usuario.alvo-soltar { background: var(--realce); outline: 1px dashed var(--cor-grupo); outline-offset: -2px; color: var(--tinta); }
+.lista .alvo-soltar-area { background: var(--realce); }
+.lista .sessao.saindo-do-grupo { opacity: .45; text-decoration: line-through; }
+.lista.arrastando-grupo .projeto.grupo-usuario.alvo-soltar { outline: none; background: none; box-shadow: inset 0 2px 0 var(--cor-grupo); }
+.lista.arrastando-grupo .projeto.grupo-usuario.alvo-soltar-depois { box-shadow: inset 0 -2px 0 var(--cor-grupo); color: var(--tinta); }
+.lista.arrastando-grupo .alvo-soltar-area { background: none; }
+.novo-grupo.alvo-soltar { color: var(--tinta); opacity: 1; outline: 1px dashed var(--grafite); outline-offset: 3px; border-radius: 4px; }
+.bola-grupo { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--cor-grupo); }
+.nome-grupo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mais-grupo { display: grid; place-items: center; margin-left: auto; padding: 0 2px; color: var(--grafite); opacity: 0; transition: opacity .15s; }
+.projeto.grupo-usuario:hover .mais-grupo, .mais-grupo:focus-visible, .mais-grupo[aria-expanded="true"] { opacity: 1; }
+.mais-grupo:hover { color: var(--tinta); }
+.grupo-vazio { padding: 2px 18px 8px 34px; font-size: 12px; color: var(--grafite); }
+.novo-grupo { display: block; margin: 6px 18px 2px; padding: 0; font-size: 12px; color: var(--grafite); opacity: .8; }
+.novo-grupo:hover { color: var(--tinta); }
+.divisor-lista { display: flex; align-items: center; gap: 8px; margin: 16px 18px 0; font: 600 10.5px var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--grafite); }
+.divisor-lista::after { content: ""; flex: 1; height: 1px; background: var(--linha); }
+.divisor-lista .novo-grupo { order: 2; margin: 0; padding: 1px 7px; border: 1px solid var(--linha); border-radius: 999px; font: 500 11px var(--sans); text-transform: none; letter-spacing: 0; color: var(--tinta); opacity: 1; }
+.divisor-lista .novo-grupo:hover { border-color: var(--voce); color: var(--voce); }
+.lista .projeto.arquivo { margin-top: 10px; border-top: 1px solid var(--linha); }
+.menu-sessao .seta-sub { margin-left: auto; font-size: 10px; color: var(--grafite); }
+.menu-sessao [data-menu-por-grupo] .bola-grupo { margin: 0 3px; }
+.menu-sessao [data-menu-por-grupo][aria-current="true"] { color: var(--cor-grupo); }
+.menu-sessao .apagar-grupo { color: var(--edicao); }
+.menu-sessao .apagar-grupo svg { color: currentColor; }
+.menu-sessao button:disabled { opacity: .4; cursor: default; background: none; }
+.cores-grupo-menu { display: flex; gap: 7px; padding: 6px 10px 4px; }
+.cores-grupo-menu button { width: 16px; height: 16px; padding: 0; border-radius: 50%; background: var(--cor-grupo); border: 2px solid transparent; box-shadow: 0 0 0 1px var(--linha); }
+.cores-grupo-menu button[aria-pressed="true"] { border-color: var(--tinta); }
+.form-grupo { display: grid; gap: 12px; }
+.form-grupo label { display: grid; gap: 4px; font-size: 13px; }
+.form-grupo input[name="nomeGrupo"] { width: 100%; }
+.cores-grupo { display: flex; gap: 10px; }
+.cores-grupo label { display: block; cursor: pointer; }
+.cores-grupo input { position: absolute; opacity: 0; pointer-events: none; }
+.cores-grupo .bola-grupo { width: 20px; height: 20px; border: 2px solid transparent; box-shadow: 0 0 0 1px var(--linha); }
+.cores-grupo input:checked + .bola-grupo { border-color: var(--tinta); }
+.cores-grupo input:focus-visible + .bola-grupo { outline: 2px solid var(--voce); outline-offset: 2px; }
+.cores-grupo { flex-wrap: wrap; align-items: center; }
+.cor-livre { position: relative; }
+.cor-livre input[type="color"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.cor-livre .bola-grupo { background: conic-gradient(var(--cor-grupo) 0 75%, #f43f5e 75% 83%, #22c55e 83% 91%, #3b82f6 91%); }
+.rotulo-form { margin-bottom: -6px; font-size: 13px; }
+.icones-grupo { display: grid; grid-template-columns: repeat(8, 30px); gap: 6px; }
+.icones-grupo label { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--linha); cursor: pointer; font-size: 15px; color: var(--grafite); }
+.icones-grupo input { position: absolute; opacity: 0; pointer-events: none; }
+.icones-grupo label:has(input:checked) { border-color: var(--tinta); background: var(--realce); }
+.icone-grupo { flex: none; font-size: 12px; line-height: 1; }
 .sessao.parte { position: relative; padding-left: 30px; }
 .sessao.parte::before { content: "\2514"; position: absolute; left: 17px; top: 6px; color: var(--grafite); opacity: .5; }
 .sessao { padding: 7px 14px 7px 15px; border-left-width: 2px; }
@@ -2102,6 +2166,13 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .player-midia.aviso-midia .pm-titulo { font-size: 12px; }
 .player-midia .pm-prog { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: var(--voce); transform: scaleX(0); transform-origin: 0 50%; transition: transform 1s linear; }
 .player-midia.pausado .pm-prog { opacity: .45; }
+.player-midia .pm-busca { position: absolute; left: 0; right: 0; bottom: -3px; height: 10px; z-index: 2; cursor: pointer; }
+.player-midia .pm-busca:hover + .pm-prog, .player-midia.buscando .pm-prog { height: 4px; }
+.player-midia.aberto .pm-busca, .player-midia.sem-tempo .pm-busca, .player-midia.sem-busca .pm-busca { display: none; }
+.player-midia .pm-trilho { cursor: pointer; }
+.player-midia .pm-trilho:hover, .player-midia.buscando .pm-trilho { height: 6px; }
+.player-midia.sem-busca .pm-trilho { cursor: default; }
+.player-midia.buscando .pm-prog, .player-midia.buscando .pm-trilho i { transition: none; }
 .player-midia .pm-btn.ligado { color: var(--voce); }
 /* Vídeo da mídia no canto (como o picture-in-picture do navegador): em cima do player, tamanho P/M/G ou pela alça */
 .pip-clipe { position: fixed; left: 10px; bottom: 150px; z-index: 44; width: 300px; aspect-ratio: var(--pip-prop, 1.7778); overflow: hidden; border-radius: 12px; background: #000; border: 1px solid var(--linha); box-shadow: 0 14px 36px rgba(0, 0, 0, .5); animation: playerEntra .3s cubic-bezier(.2, .8, .2, 1); }
@@ -2615,13 +2686,18 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
             <button type="button" id="trilhoVisual" title="Visual das conversas de código" aria-label="Configurar o visual"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
         <button class="botao principal nova-conversa" id="btnNova">Nova conversa</button>
-        <input class="busca" id="filtro" type="search" placeholder="Procurar sessão ou projeto" aria-label="Procurar sessão">
+        <div class="busca-lateral">
+            <input class="busca" id="filtro" type="search" placeholder="Procurar" title="Procurar sessão ou projeto" aria-label="Procurar sessão ou projeto">
+            <button type="button" class="alterna-secao" data-alterna-secao="fixadas" aria-pressed="true" title="Mostrar as Fixadas no topo" aria-label="Mostrar Fixadas"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg></button>
+            <button type="button" class="alterna-secao" data-alterna-secao="arquivo" aria-pressed="false" title="Mostrar o Arquivo no fim" aria-label="Mostrar Arquivo"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="3.5" rx="1"/><path d="M3 6v6.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6M6.5 8.5h3"/></svg></button>
+        </div>
         <div class="atalhos-lateral"><button type="button" id="btnBuscaGlobal" title="Procurar um texto ou arquivo em todas as conversas (Ctrl + Shift + F)">⌕ Buscar em tudo</button><button type="button" id="btnResumoDia" title="O que cada conversa fez hoje"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1"/></svg> Resumo do dia</button></div>
         <div class="abas" role="group" aria-label="Quais sessões mostrar">
             <button data-aba="todas" aria-pressed="true">Todas</button>
             <button data-aba="ativas" aria-pressed="false">Ativas</button>
-            <button data-aba="favoritas" aria-pressed="false">Favoritas</button>
-            <button data-aba="arquivadas" aria-pressed="false">Arquivo</button>
+            <button data-aba="hoje" aria-pressed="false" title="Com atividade desde a meia-noite">Hoje</button>
+            <button data-aba="semana" aria-pressed="false" title="Com atividade desde segunda-feira">Semana</button>
+            <button data-aba="mes" aria-pressed="false" title="Com atividade desde o dia 1">Mês</button>
         </div>
         <div class="aviso-versao" id="avisoVersao" role="status" hidden></div>
         <div class="resumo-status" id="resumoStatus" aria-live="polite"></div>
@@ -3023,6 +3099,16 @@ let filtroAtual = 'tudo';
 let procura = '';
 let seguirFim = true;
 let abaSessoes = 'todas';
+const verSecao = { fixadas: true, arquivo: false };
+try { Object.assign(verSecao, JSON.parse(localStorage.getItem('painelVerSecao') || '{}')); } catch (e) { /* sem armazenamento */ }
+function inicioDoPeriodo(periodo) {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    if (periodo === 'semana') d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+    else if (periodo === 'mes') d.setDate(1);
+    else if (periodo !== 'hoje') return 0;
+    return d.getTime();
+}
 let ultimoJson = '';
 let ultimosDados = null;
 let historicoAberto = false;
@@ -3264,7 +3350,7 @@ function montaPlayer() {
             <button type="button" class="pm-btn" data-midia="alternar"></button>
             <button type="button" class="pm-btn" data-midia="proxima" title="Próxima música" aria-label="Próxima música">${ICONE_MIDIA.proxima}</button>
         </div>
-        <span class="pm-prog"></span>`;
+        <span class="pm-busca" title="Clique ou arraste para avançar ou voltar"></span><span class="pm-prog"></span>`;
 }
 let avisoMidiaDispensado = false;
 function desenhaMidia() {
@@ -3309,6 +3395,7 @@ function desenhaMidia() {
     alternar.disabled = m.podeAlternar === false;
     playerMidia.querySelector('[data-midia="proxima"]').disabled = m.podeProxima === false;
     playerMidia.classList.toggle('sem-tempo', !(m.duracao > 1));
+    playerMidia.classList.toggle('sem-busca', m.podeBuscar === false);
     // Vídeo no canto: só no app desktop e quando o som não vem de um app só de música
     const botaoClipe = playerMidia.querySelector('[data-midia-clipe]');
     botaoClipe.hidden = !SUPORTA_CLIPE || SO_AUDIO.test(m.app || '');
@@ -3318,13 +3405,14 @@ function desenhaMidia() {
     document.body.classList.add('com-player');
     andaProgresso();
 }
+let posicaoBusca = null;
 // Posição: a do Windows + o tempo que passou desde a última atualização (se estiver tocando)
 function andaProgresso() {
     const m = midiaAtual, barra = playerMidia.querySelector('.pm-prog');
     if (!barra) return;
     if (!m || !(m.duracao > 1)) { barra.hidden = true; return; }
     const base = m.atualizadoEm > 0 ? m.atualizadoEm : m.lidoEm;
-    const pos = m.posicao + (m.estado === 'Playing' ? Math.max(0, (Date.now() - base) / 1000) : 0);
+    const pos = posicaoBusca ?? m.posicao + (m.estado === 'Playing' ? Math.max(0, (Date.now() - base) / 1000) : 0);
     barra.hidden = false;
     // Anda por transform: mexer na largura refazia o layout da página inteira a cada quadro enquanto a música toca
     const p = Math.min(100, Math.max(0, pos / m.duracao * 100));
@@ -3417,6 +3505,33 @@ playerMidia.addEventListener('click', async (ev) => {
     if (b.dataset.midia === 'alternar' && midiaAtual) { midiaAtual.estado = midiaAtual.estado === 'Playing' ? 'Paused' : 'Playing'; midiaAtual.atualizadoEm = Date.now(); desenhaMidia(); }
     try { await api('/api/midia', { acao: b.dataset.midia }); } catch (e) { recado(e.message); }
     setTimeout(atualizaMidia, 700);
+});
+// BARRA COMO A DE UM PLAYER DE VÍDEO: CLICAR OU ARRASTAR MUDA A POSIÇÃO; SÓ ENVIA AO SOLTAR
+const posicaoNaBarra = (ev, barra) => { const r = barra.getBoundingClientRect(); return Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)) * midiaAtual.duracao; };
+playerMidia.addEventListener('pointerdown', (ev) => {
+    const barra = ev.target.closest('.pm-busca, .pm-trilho');
+    if (!barra || ev.button !== 0 || !midiaAtual || !(midiaAtual.duracao > 1) || midiaAtual.podeBuscar === false) return;
+    ev.preventDefault();
+    barra.setPointerCapture(ev.pointerId);
+    playerMidia.classList.add('buscando');
+    posicaoBusca = posicaoNaBarra(ev, barra);
+    andaProgresso();
+    const move = (e) => { posicaoBusca = posicaoNaBarra(e, barra); andaProgresso(); };
+    const solta = async () => {
+        barra.removeEventListener('pointermove', move);
+        barra.removeEventListener('pointerup', solta);
+        barra.removeEventListener('pointercancel', solta);
+        const segundos = posicaoBusca;
+        Object.assign(midiaAtual, { posicao: segundos, atualizadoEm: Date.now() });
+        posicaoBusca = null;
+        playerMidia.classList.remove('buscando');
+        andaProgresso();
+        try { await api('/api/midia', { acao: 'posicao', segundos }); } catch (e) { recado(e.message); }
+        setTimeout(atualizaMidia, 700);
+    };
+    barra.addEventListener('pointermove', move);
+    barra.addEventListener('pointerup', solta);
+    barra.addEventListener('pointercancel', solta);
 });
 if (!JANELA_SECUNDARIA) vigiaMidia();
 setInterval(() => { if (!playerMidia.hidden && !document.hidden) andaProgresso(); }, 1000);
@@ -5034,11 +5149,13 @@ const ICONES = {
     continua: svg('<path d="M3 2.5v5A2.5 2.5 0 0 0 5.5 10H13"/><path d="M10 7l3 3-3 3"/>', 'class="icone-continua"'),
     mais: svg('<circle cx="3.5" cy="8" r=".9"/><circle cx="8" cy="8" r=".9"/><circle cx="12.5" cy="8" r=".9"/>'),
     estrela: svg('<path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/>', 'class="icone-estrela"'),
+    grupo: svg('<path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 1.5h4.5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/>'),
 };
 
-let dadosPainel = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [] };
+let dadosPainel = { favoritos: [], vinculos: {}, vinculosClear: {}, nomes: {}, arquivadas: [], grupos: [] };
 let todasSessoes = [];
 let editandoNome = false;
+let arrastandoConversa = false;
 let gruposFechados = new Set();
 try { gruposFechados = new Set(JSON.parse(localStorage.getItem('painelGruposFechados') || '[]')); } catch (e) { /* sem armazenamento */ }
 
@@ -5080,6 +5197,16 @@ function situacaoItem(s) {
     if (s.esperando && Date.now() - s.atualizado < 30 * 60 * 1000 && !jaViu(s)) return { icone: '✓', classe: 'respondeu', selo: 'Respondeu', texto: haQuanto(s.atualizado) };
     return { icone: '', classe: 'parada', selo: '', texto: haQuanto(s.atualizado) };
 }
+// Mini-slimes dos subagentes rodando na conversa (até 3 + "+N"), para a lista lateral
+function petsDaLista(s) {
+    let agentes = s.agentesTipos || [];
+    if (!agentes.length && s.acaoAtual && s.acaoAtual.tipo === 'agente') agentes = [{ tipo: String(s.acaoAtual.texto).split(':')[0].trim() || 'agente', modelo: '' }];
+    if (!agentes.length) return '';
+    const total = Math.max(s.agentesRodando || 0, agentes.length);
+    const mostrados = agentes.slice(0, 3);
+    const titulo = agentes.map(a => a.tipo + (a.modelo ? ` (${modeloCurto(a.modelo)})` : '')).join(', ') + (total > agentes.length ? ` e mais ${total - agentes.length}` : '');
+    return `<span class="pets-lista" title="${esc('Rodando: ' + titulo)}">${mostrados.map((a, n) => `<span class="pet-lista" style="--atraso:${(n * 0.3).toFixed(1)}s">${petMini(a.tipo, true)}</span>`).join('')}${total > mostrados.length ? `<b class="pets-mais">+${total - mostrados.length}</b>` : ''}</span>`;
+}
 const gerundiosLista = { comando: 'Rodando', edicao: 'Editando', leitura: 'Lendo', busca: 'Buscando', agente: 'Delegando', web: 'Consultando', skill: 'Usando a skill', ferramenta: 'Usando' };
 
 // Cadeias de continuação: a original e as partes seguintes ficam juntas
@@ -5104,6 +5231,7 @@ function montaCadeias(sessoes) {
 
 // Conversa que continua outra: vínculo feito pelo painel ou título gerado pelo Claude Code
 function ehContinuacao(s) {
+    if (dadosPainel.vinculosClear[chaveDe(s)]) return false;
     return !!dadosPainel.vinculos[chaveDe(s)] || /^(Continuação da conversa|This session is being continued)/.test(String(s.titulo || ''));
 }
 
@@ -5122,8 +5250,9 @@ function itemSessao(s, { numeroParte = 1, total = 1, filho = false, raiz = '', a
     const favorita = dadosPainel.favoritos.includes(chave);
     const arquivada = dadosPainel.arquivadas.includes(chave);
     const largura = Math.min(100, (s.contexto || 0) / LIMITES.janela * 100).toFixed(1);
+    const pets = s.agentesRodando || (s.ativa && s.acaoAtual && s.acaoAtual.tipo === 'agente') ? petsDaLista(s) : '';
     const fazendo = situacao.fazendo || s.acaoAtual ? situacao.fazendo || `${gerundiosLista[s.acaoAtual.tipo] || 'Trabalhando em'} ${s.acaoAtual.texto}…` : s.ativa && !s.agentesRodando ? 'Pensando…' : '';
-    return `<div class="sessao ${filho ? 'parte' : ''} estado-${situacao.classe}" role="button" tabindex="0" data-chave="${esc(chave)}" aria-current="${!iniciando && sessaoAtual === chave}">
+    return `<div class="sessao ${filho ? 'parte' : ''} estado-${situacao.classe}" role="button" tabindex="0" draggable="true" data-chave="${esc(chave)}" aria-current="${!iniciando && sessaoAtual === chave}">
         <span class="linha-titulo">
             <i class="status-item ${situacao.classe}" title="${esc(situacao.selo || situacao.texto)}">${situacao.icone}</i>
             <span class="titulo-item" data-renomear="${esc(chave)}" title="Duplo clique para renomear">${ehContinuacao(s) ? `<span class="marca-continua" title="Continuação de outra conversa">${ICONES.continua}</span>` : ''}${esc(nomeExibido(s, numeroParte))}${seloConta(s)}</span>
@@ -5134,10 +5263,10 @@ function itemSessao(s, { numeroParte = 1, total = 1, filho = false, raiz = '', a
         </span>
         ${situacao.classe === 'trabalhando'
             // Trabalhando: uma linha só, com o símbolo girando e o que está fazendo agora
-            ? `<span class="linha-selo"><span class="selo-status trabalhando"><i class="giro-mini" aria-hidden="true"></i></span><span class="fazendo" title="${esc(fazendo)}">${comBrilho(esc(fazendo || 'Trabalhando…'))}</span></span>`
+            ? `<span class="linha-selo"><span class="selo-status trabalhando"><i class="giro-mini" aria-hidden="true"></i></span>${pets}<span class="fazendo" title="${esc(fazendo)}">${comBrilho(esc(fazendo || 'Trabalhando…'))}</span></span>`
             : situacao.selo
             // Demais estados: um selo só, com o texto junto ("✓ Respondeu há 5 min")
-            ? `<span class="linha-selo"><span class="selo-status ${situacao.classe}" title="${esc(situacao.selo + ', ' + situacao.texto)}"><b>${situacao.icone}</b>${esc(situacao.selo)}<span class="selo-texto">, ${esc(situacao.texto)}</span></span></span>`
+            ? `<span class="linha-selo">${pets}<span class="selo-status ${situacao.classe}" title="${esc(situacao.selo + ', ' + situacao.texto)}">${pets && situacao.classe === 'agente' ? '' : `<b>${situacao.icone}</b>`}${esc(situacao.selo)}<span class="selo-texto">, ${esc(situacao.texto)}</span></span></span>`
             : ''}
         <span class="info-item">${!filho && total > 1 ? `<button class="partes" data-partes="${esc(raiz)}" aria-expanded="${aberta}" title="${aberta ? 'Esconder as partes anteriores' : 'Ver as partes anteriores'}">${total} partes ${aberta ? '▴' : '▾'}</button>` : ''}<span class="etiqueta-projeto" title="${esc(s.nomeProjeto)}">${esc(nomeProjetoBonito(s.nomeProjeto))}</span>${esc(modeloCurto(s.modelo))}${situacao.selo ? '' : ', ' + esc(situacao.texto)}${s.contexto ? `, ${mil(s.contexto)}` : ''}</span>
         ${s.contexto ? `<span class="barra-contexto nivel-${nivel}" title="Contexto: ${mil(s.contexto)} de ${mil(LIMITES.janela)}"><span style="width:${largura}%"></span></span>` : ''}
@@ -5268,14 +5397,14 @@ function tiraCarregandoInicio() {
 }
 setTimeout(() => { if (!carregouInicio && document.getElementById('carregandoInicioTexto')) document.getElementById('carregandoInicioTexto').textContent = 'Ainda carregando… o servidor está demorando para responder'; }, 12000);
 async function carregaSessoes() {
-    if (editandoNome) return;
+    if (editandoNome || arrastandoConversa) return;
     const [sessoes, dados] = await Promise.all([
         fetch('/api/sessoes').then(r => r.json()),
         fetch('/api/dados').then(r => r.json()).catch(() => dadosPainel),
     ]);
     todasSessoes = sessoes;
     if (window.tasksAtualizaSelo) window.tasksAtualizaSelo(sessoes);
-    dadosPainel = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], ...dados };
+    dadosPainel = { favoritos: [], vinculos: {}, vinculosClear: {}, nomes: {}, arquivadas: [], grupos: [], ...dados };
     // Primeira lista chegou: o carregando sai depois que ela estiver desenhada
     if (!carregouInicio) { carregouInicio = true; requestAnimationFrame(() => requestAnimationFrame(tiraCarregandoInicio)); }
     if (sessaoAtual && document.visibilityState === 'visible') marcaVista(sessaoAtual);
@@ -5291,23 +5420,27 @@ async function carregaSessoes() {
     document.getElementById('resumoStatus').innerHTML = Object.entries(contagem).filter(([, n]) => n).map(([c, n]) =>
         `<button class="${c}" data-ir-ativas title="Ver as conversas ativas"><b>${rotulos[c][0]}</b>${n} ${n > 1 && rotulos[c][2] ? rotulos[c][2] : rotulos[c][1]}</button>`).join('');
     const casa = (s) => !filtro || (nomeExibido(s, 1) + ' ' + s.titulo + ' ' + s.nomeProjeto).toLowerCase().includes(filtro);
-    let base = sessoes.filter(s => doModo(s) && (abaSessoes === 'arquivadas' ? arquivada(s) : !arquivada(s)) && casa(s));
+    const desde = inicioDoPeriodo(abaSessoes);
+    const visivel = (s) => doModo(s) && casa(s) && (!desde || s.atualizado >= desde);
+    let base = sessoes.filter(s => visivel(s) && !arquivada(s));
     if (abaSessoes === 'ativas') base = base.filter(s => s.ativa || s.pergunta || (s.esperando && Date.now() - s.atualizado < 30 * 60 * 1000));
 
     const cadeias = montaCadeias(base).sort((a, b) => b.atualizado - a.atualizado);
     const favoritaCadeia = (c) => c.membros.some(m => dadosPainel.favoritos.includes(chaveDe(m)));
-    const precisaCadeia = (c) => c.membros.some(m => m.pergunta || estadoChat.some(x => x.sessionId === m.id && x.pendentes.length));
-    if (abaSessoes === 'favoritas') {
-        cadeias.splice(0, cadeias.length, ...cadeias.filter(favoritaCadeia));
-    }
 
     const secoes = [];
     const usadas = new Set();
     const pega = (filtroCadeia) => cadeias.filter(c => !usadas.has(c) && filtroCadeia(c)).map(c => { usadas.add(c); return c; });
-    const precisam = abaSessoes === 'arquivadas' ? [] : pega(precisaCadeia);
-    if (precisam.length) secoes.push({ id: 'precisam', titulo: 'Precisam de você', classe: 'precisam', cadeias: precisam });
-    const favoritas = abaSessoes === 'todas' || abaSessoes === 'ativas' ? pega(favoritaCadeia) : [];
+    const favoritas = verSecao.fixadas ? pega(favoritaCadeia) : [];
     if (favoritas.length) secoes.push({ id: 'favoritas', titulo: 'Fixadas', classe: 'favoritas', cadeias: favoritas });
+    // GRUPOS DO USUÁRIO NÃO USAM O pega: A CONVERSA CONTINUA TAMBÉM NO PROJETO
+    const gruposVaziosVisiveis = abaSessoes === 'todas' && !filtro;
+    const antesDosGrupos = secoes.length;
+    for (const g of dadosPainel.grupos) {
+        const lista = cadeias.filter(c => c.membros.some(m => g.conversas.includes(chaveDe(m))));
+        if (lista.length || gruposVaziosVisiveis) secoes.push({ id: 'g:' + g.id, titulo: g.nome, grupo: g, cadeias: lista });
+    }
+    if (secoes.length > antesDosGrupos || gruposVaziosVisiveis) secoes.splice(antesDosGrupos, 0, { divisor: 'Grupos', novoGrupo: gruposVaziosVisiveis, cadeias: [] });
     // Demais conversas por projeto; o projeto com atividade mais recente vem primeiro
     const porProjeto = new Map();
     for (const c of pega(() => true)) {
@@ -5315,19 +5448,29 @@ async function carregaSessoes() {
         if (!porProjeto.has(id)) porProjeto.set(id, { titulo: nome, cadeias: [] });
         porProjeto.get(id).cadeias.push(c);
     }
+    if (secoes.length && porProjeto.size) secoes.push({ divisor: modoApp === 'chat' ? 'Conversas' : 'Projetos', cadeias: [] });
     for (const [id, { titulo, cadeias: lista }] of porProjeto) secoes.push({ id: 'p:' + id, titulo, cadeias: lista });
+    const arquivo = abaSessoes === 'ativas' || !(verSecao.arquivo || filtro) ? [] : montaCadeias(sessoes.filter(s => visivel(s) && arquivada(s))).sort((a, b) => b.atualizado - a.atualizado);
+    if (arquivo.length) secoes.push({ id: 'arquivo', titulo: 'Arquivo', classe: 'arquivo', cadeias: arquivo });
 
-    sessoesVisiveis = secoes.flatMap(sec => sec.cadeias.flatMap(c => partesAbertas(c) ? [...c.membros].reverse() : [c.membros[c.membros.length - 1]]));
+    const jaListadas = new Set();
+    sessoesVisiveis = secoes.flatMap(sec => sec.cadeias.flatMap(c => partesAbertas(c) ? [...c.membros].reverse() : [c.membros[c.membros.length - 1]]))
+        .filter(s => !jaListadas.has(chaveDe(s)) && jaListadas.add(chaveDe(s)));
     let html = '';
     for (const sec of secoes) {
+        if (sec.divisor) { html += `<div class="divisor-lista"><span>${sec.divisor}</span>${sec.novoGrupo ? '<button type="button" class="novo-grupo" data-novo-grupo title="Criar um grupo">+ Novo grupo</button>' : ''}</div>`; continue; }
         const fechado = gruposFechados.has(sec.id) && !filtro;
-        html += `<button class="projeto ${sec.classe || ''}" data-grupo="${esc(sec.id)}" aria-expanded="${!fechado}">
+        html += sec.grupo ? cabecalhoGrupo(sec, fechado) : `<button class="projeto ${sec.classe || ''}" data-grupo="${esc(sec.id)}" aria-expanded="${!fechado}">
             <span class="seta">${fechado ? '▸' : '▾'}</span>${esc(sec.titulo)}<span class="contagem">${sec.cadeias.length}</span></button>`;
         if (fechado) continue;
+        if (sec.grupo && !sec.cadeias.length) html += '<div class="grupo-vazio">Arraste uma conversa para cá ou use ⋯ › Mover para grupo.</div>';
+        // SECOES QUE MISTURAM PROJETOS (GRUPOS, FIXADAS) SEPARAM POR PROJETO; NO CHAT NAO HA PROJETO
+        if (modoApp !== 'chat' && !sec.id.startsWith('p:')) { html += sublistaPorProjeto(sec.cadeias); continue; }
         for (const c of sec.cadeias) html += blocoCadeia(c);
     }
-    const vazios = { ativas: 'Nenhuma conversa ativa agora.', favoritas: 'Nenhuma favorita. Use a estrela ☆ numa conversa.', arquivadas: 'Nada arquivado.', todas: 'Nenhuma conversa encontrada.' };
-    document.getElementById('listaSessoes').innerHTML = html || `<div class="vazio" style="padding:20px 18px">${vazios[abaSessoes]}</div>`;
+    const vazios = { ativas: 'Nenhuma conversa ativa agora.', hoje: 'Nenhuma conversa hoje.', semana: 'Nenhuma conversa nesta semana.', mes: 'Nenhuma conversa neste mês.', todas: 'Nenhuma conversa encontrada.' };
+    document.getElementById('listaSessoes').innerHTML = html + (secoes.some(s => s.cadeias.length) ? '' : `<div class="vazio" style="padding:20px 18px">${vazios[abaSessoes]}</div>`);
+    marcaAreasDeGrupo();
     // Janela secundária: a sessão abriu antes de saber qual é a pasta do Chat; acerta o modo e redesenha a lista
     if (sessaoAtual && ehChatChave(sessaoAtual) !== (modoApp === 'chat')) { aplicaModo(ehChatChave(sessaoAtual) ? 'chat' : 'codigo'); return carregaSessoes(); }
     if (grupoRecemAberto) {
@@ -5338,11 +5481,147 @@ async function carregaSessoes() {
     if (!sessaoAtual && !chatVazioAberto && !iniciando) { if (modoApp === 'chat') mostraChatVazio(); else if (sessoesVisiveis[0]) abreSessao(chaveDe(sessoesVisiveis[0])); }
 }
 
+function sublistaPorProjeto(cadeias) {
+    const porProjeto = new Map();
+    for (const c of cadeias) {
+        const { id, nome } = grupoDoProjeto(c.membros[c.membros.length - 1]);
+        if (!porProjeto.has(id)) porProjeto.set(id, { nome, cadeias: [] });
+        porProjeto.get(id).cadeias.push(c);
+    }
+    return [...porProjeto.values()].map(p => `<div class="bloco-subprojeto"><div class="subprojeto"><span class="nome-subprojeto">${esc(p.nome)}</span><span class="conta-subprojeto">${p.cadeias.length}</span></div>`
+        + p.cadeias.map(blocoCadeia).join('') + '</div>').join('');
+}
+
+function marcaAreasDeGrupo() {
+    for (const cab of document.querySelectorAll('#listaSessoes [data-grupo-usuario]')) {
+        for (let el = cab.nextElementSibling; el && !el.matches('.projeto, .divisor-lista'); el = el.nextElementSibling) el.dataset.areaGrupo = cab.dataset.grupoUsuario;
+    }
+}
+
 let grupoRecemAberto = null;
 function alternaGrupo(id) {
     if (gruposFechados.has(id)) { gruposFechados.delete(id); grupoRecemAberto = id; } else gruposFechados.add(id);
     try { localStorage.setItem('painelGruposFechados', JSON.stringify([...gruposFechados])); } catch (e) { /* sem armazenamento */ }
     carregaSessoes();
+}
+
+const CORES_GRUPO = [['voce', 'Vermelho'], ['atencao', 'Âmbar'], ['ok', 'Verde'], ['agente', 'Sálvia'], ['modelo', 'Lavanda'], ['erro', 'Salmão']];
+const ICONES_GRUPO = ['', '📁', '⭐', '🔥', '🐛', '🚀', '💡', '🧪', '📊', '💰', '🛠️', '📦', '🧾', '🎯', '🔒', '📝'];
+const corLivre = (cor) => /^#[0-9a-f]{6}$/i.test(String(cor || ''));
+const estiloCorGrupo = (cor) => `--cor-grupo: ${corLivre(cor) ? cor : `var(--${CORES_GRUPO.some(([v]) => v === cor) ? cor : 'voce'})`}`;
+const marcaDoGrupo = (g) => g.icone && ICONES_GRUPO.includes(g.icone) ? `<span class="icone-grupo" aria-hidden="true">${g.icone}</span>` : '<i class="bola-grupo" aria-hidden="true"></i>';
+function cabecalhoGrupo(sec, fechado) {
+    const g = sec.grupo;
+    return `<div class="projeto grupo-usuario" role="button" tabindex="0" draggable="true" data-grupo="${esc(sec.id)}" data-grupo-usuario="${esc(g.id)}" aria-expanded="${!fechado}" style="${estiloCorGrupo(g.cor)}">
+        <span class="seta">${fechado ? '▸' : '▾'}</span>${marcaDoGrupo(g)}<span class="nome-grupo">${esc(sec.titulo)}</span><span class="contagem">${sec.cadeias.length}</span>
+        <button type="button" class="mais-grupo" data-menu-grupo="${esc(g.id)}" title="Opções do grupo" aria-label="Opções do grupo" aria-haspopup="menu">${ICONES.mais}</button></div>`;
+}
+async function acaoGrupo(corpo, aviso) {
+    try {
+        const r = await api('/api/grupos', corpo);
+        dadosPainel.grupos = r.grupos;
+        if (aviso) recado(aviso);
+        carregaSessoes();
+        return r;
+    } catch (e) { recado(e.message); return null; }
+}
+// A CLICADA VAI PRIMEIRO; AS OUTRAS PARTES DA CADEIA SÓ SERVEM PARA SAIR DE OUTRO GRUPO
+function chavesDaCadeia(chave) {
+    const cadeia = montaCadeias(todasSessoes).find(c => c.membros.some(m => chaveDe(m) === chave));
+    return [chave, ...(cadeia ? cadeia.membros.map(chaveDe).filter(k => k !== chave) : [])];
+}
+function grupoDaConversa(chave) {
+    const chaves = chavesDaCadeia(chave);
+    return dadosPainel.grupos.find(g => g.conversas.some(k => chaves.includes(k))) || null;
+}
+async function pedeDadosGrupo(titulo, rotulo, g = { nome: '', cor: 'voce', icone: '' }) {
+    const livre = corLivre(g.cor) ? g.cor : '#3b82f6';
+    const html = `<div class="form-grupo"><label>Nome<input class="campo-config" name="nomeGrupo" maxlength="60" value="${esc(g.nome)}" placeholder="Ex.: Fechamento do mês"></label>
+        <div class="rotulo-form">Cor</div><div class="cores-grupo" role="radiogroup" aria-label="Cor">${CORES_GRUPO.map(([v, n]) => `<label title="${esc(n)}"><input type="radio" name="corGrupo" value="${v}" ${v === g.cor ? 'checked' : ''}><i class="bola-grupo" style="${estiloCorGrupo(v)}"></i></label>`).join('')}
+            <label class="cor-livre" title="Cor personalizada"><input type="radio" name="corGrupo" value="livre" ${corLivre(g.cor) ? 'checked' : ''}><i class="bola-grupo" style="${estiloCorGrupo(livre)}"></i><input type="color" name="corLivre" value="${livre}" aria-label="Cor personalizada"></label></div>
+        <div class="rotulo-form">Ícone</div><div class="icones-grupo" role="radiogroup" aria-label="Ícone">${ICONES_GRUPO.map(i => `<label title="${i ? i : 'Só a bolinha da cor'}"><input type="radio" name="iconeGrupo" value="${i}" ${i === (g.icone || '') ? 'checked' : ''}><span>${i || '●'}</span></label>`).join('')}</div></div>`;
+    const resposta = confirmaNaPagina(titulo, html, rotulo);
+    const campo = document.querySelector('#corpoConfirma [name="nomeGrupo"]');
+    campo.focus();
+    campo.select();
+    campo.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); document.getElementById('btnConfirmaSim').click(); } });
+    const seletorCor = document.querySelector('#corpoConfirma [name="corLivre"]');
+    seletorCor.addEventListener('input', () => { seletorCor.previousElementSibling.style.cssText = estiloCorGrupo(seletorCor.value); seletorCor.parentElement.querySelector('[value="livre"]').checked = true; });
+    if (!(await resposta)) return null;
+    const nome = campo.value.trim();
+    if (!nome) { recado('Dê um nome ao grupo'); return null; }
+    const cor = (document.querySelector('#corpoConfirma [name="corGrupo"]:checked') || {}).value || g.cor;
+    const icone = (document.querySelector('#corpoConfirma [name="iconeGrupo"]:checked') || {}).value || '';
+    return { nome, cor: cor === 'livre' ? document.querySelector('#corpoConfirma [name="corLivre"]').value : cor, icone };
+}
+async function novoGrupo(chave) {
+    const d = await pedeDadosGrupo('Novo grupo', 'Criar');
+    if (d) acaoGrupo({ acao: 'criar', ...d, chaves: chave ? chavesDaCadeia(chave) : [] }, chave ? `Grupo "${d.nome}" criado com a conversa` : `Grupo "${d.nome}" criado`);
+}
+function colocaNoGrupo(chave, id) {
+    const g = dadosPainel.grupos.find(x => x.id === id);
+    if (g) acaoGrupo({ acao: 'colocar', id, chaves: chavesDaCadeia(chave) }, `Conversa no grupo "${g.nome}"`);
+}
+async function apagaGrupo(g) {
+    const ok = await confirmaNaPagina(`Apagar o grupo "${g.nome}"?`, '<p>Nenhuma conversa é apagada: elas continuam na lista, nos projetos delas. Só o agrupamento some.</p>', 'Apagar grupo');
+    if (ok) acaoGrupo({ acao: 'apagar', id: g.id }, 'Grupo apagado');
+}
+let menuGrupo = null;
+let menuGrupoFechado = { id: '', quando: 0 };
+function abreMenuGrupo(botao) {
+    if (!window.tippy) return;
+    const id = botao.dataset.menuGrupo;
+    const g = dadosPainel.grupos.find(x => x.id === id);
+    if (!g) return;
+    if (menuGrupo && menuGrupo.id === id) return menuGrupo.menu.hide();
+    if (menuGrupoFechado.id === id && Date.now() - menuGrupoFechado.quando < 400) return;
+    if (menuGrupo) menuGrupo.menu.hide();
+    const pos = dadosPainel.grupos.indexOf(g), ultimo = dadosPainel.grupos.length - 1;
+    const menu = tippy(botao, {
+        content: `<div class="menu-sessao" role="menu">
+                <button type="button" role="menuitem" data-grupo-acao="renomear">${ICONES.lapis} Editar nome, cor e ícone…</button>
+                <div class="cores-grupo-menu" role="group" aria-label="Cor">${CORES_GRUPO.map(([v, n]) => `<button type="button" data-grupo-cor="${v}" title="${esc(n)}" aria-label="Cor ${esc(n)}" aria-pressed="${v === g.cor}" style="${estiloCorGrupo(v)}"></button>`).join('')}</div>
+                <hr>
+                <button type="button" role="menuitem" data-grupo-acao="subir" ${pos === 0 ? 'disabled' : ''}>↑ Subir</button>
+                <button type="button" role="menuitem" data-grupo-acao="descer" ${pos === ultimo ? 'disabled' : ''}>↓ Descer</button>
+                <hr>
+                <button type="button" role="menuitem" class="apagar-grupo" data-grupo-acao="apagar">${ICONES.arquivar} Apagar grupo</button>
+            </div>`,
+        allowHTML: true, interactive: true, trigger: 'manual', hideOnClick: true, placement: 'bottom-end', theme: 'redcode menu', animation: 'redcode',
+        arrow: false, offset: [0, 6], duration: [140, 80], appendTo: () => document.body,
+        getReferenceClientRect: () => (document.querySelector('[data-menu-grupo="' + CSS.escape(id) + '"]') || botao).getBoundingClientRect(),
+        onShow() { botao.setAttribute('aria-expanded', 'true'); },
+        onClickOutside(i) { i.hide(); },
+        onHide() {
+            menuGrupoFechado = { id, quando: Date.now() };
+            if (menuGrupo && menuGrupo.menu === menu) menuGrupo = null;
+        },
+        onHidden(i) { botao.removeAttribute('aria-expanded'); i.destroy(); },
+    });
+    menuGrupo = { id, menu };
+    menu.show();
+    menu.popper.addEventListener('click', async (ev) => {
+        const cor = ev.target.closest('[data-grupo-cor]');
+        const acao = ev.target.closest('[data-grupo-acao]');
+        if (!cor && !acao) return;
+        menu.hide();
+        if (cor) return acaoGrupo({ acao: 'cor', id, cor: cor.dataset.grupoCor });
+        const qual = acao.dataset.grupoAcao;
+        if (qual === 'subir' || qual === 'descer') return acaoGrupo({ acao: 'mover', id, passo: qual === 'subir' ? -1 : 1 });
+        if (qual === 'apagar') return apagaGrupo(g);
+        const d = await pedeDadosGrupo('Editar grupo', 'Salvar', g);
+        if (d) acaoGrupo({ acao: 'renomear', id, ...d }, 'Grupo salvo');
+    });
+}
+function menuMoverParaGrupo(chave) {
+    const atual = grupoDaConversa(chave);
+    return `<div class="menu-sessao" role="menu">
+            <button type="button" role="menuitem" data-menu-voltar>‹ Voltar</button>
+            <hr>
+            ${dadosPainel.grupos.map(g => `<button type="button" role="menuitem" data-menu-por-grupo="${esc(g.id)}" style="${estiloCorGrupo(g.cor)}" ${atual === g ? 'aria-current="true"' : ''}>${marcaDoGrupo(g)}<span class="nome-grupo">${esc(g.nome)}</span>${atual === g ? ' ✓' : ''}</button>`).join('')}
+            <button type="button" role="menuitem" data-menu-novo-grupo>+ Novo grupo…</button>
+            ${atual ? `<hr><button type="button" role="menuitem" data-menu-tirar-grupo>Tirar do grupo "${esc(atual.nome)}"</button>` : ''}
+        </div>`;
 }
 
 async function alternaArquivo(chave) {
@@ -5387,13 +5666,13 @@ function comecaRenomear(chave) {
 async function alternaFavorita(chave) {
     try {
         const r = await api('/api/favorito', { chave });
-        recado(r.favorita ? 'Marcada como favorita' : 'Tirada das favoritas');
+        recado(r.favorita ? 'Conversa fixada' : 'Conversa desafixada');
     } catch (e) { recado(e.message); }
     await carregaSessoes();
     if (ultimosDados) redesenha(ultimosDados);
 }
 
-async function abreSessao(chave, { daNova = false } = {}) {
+async function abreSessao(chave, { daNova = false, deClear = false } = {}) {
     saiChatVazio();
     const principalEl = document.getElementById('principal');
     evTrocaSessao();
@@ -5405,21 +5684,20 @@ async function abreSessao(chave, { daNova = false } = {}) {
     // Sai da conversa anterior marcando-a como vista até aqui; a nova também fica vista
     if (sessaoAtual && sessaoAtual !== chave) marcaVista(sessaoAtual);
     marcaVista(chave);
-    if (sessaoAtual !== chave) { guardaRascunho(sessaoAtual); restauraRascunho(chave); }
+    if (sessaoAtual !== chave && !deClear) { guardaRascunho(sessaoAtual); restauraRascunho(chave); }
     if (sessaoAtual !== chave) {
         seguirFim = true; historicoAberto = false; procura = ''; filtroAtual = 'tudo';
         abertos.clear(); fechados.clear();
         // Conversa nova na tela: nada "entra" animado no primeiro desenho dela
         vistos.clear();
         primeiroDesenho = true;
-        principalEl.classList.add('trocando');
-        setTimeout(() => principalEl.classList.remove('trocando'), 140);
+        if (!deClear) { principalEl.classList.add('trocando'); setTimeout(() => principalEl.classList.remove('trocando'), 140); }
     }
     sessaoAtual = chave;
     ultimoJson = '';
     if (ehChatChave(chave) !== (modoApp === 'chat')) { aplicaModo(ehChatChave(chave) ? 'chat' : 'codigo'); carregaSessoes(); }
     document.querySelectorAll('.sessao').forEach(e => e.setAttribute('aria-current', String(e.dataset.chave === chave)));
-    const barra = setTimeout(() => principalEl.classList.add('carregando-sessao'), 150);
+    const barra = deClear ? null : setTimeout(() => principalEl.classList.add('carregando-sessao'), 150);
     try {
         const ok = await atualizaSessao(true);
         // A sessão nova existe mas o transcript ainda não foi gravado: segue "Iniciando" até aparecer
@@ -5440,9 +5718,50 @@ async function atualizaSessao(forcar) {
     if (sessaoAtual !== chave || iniciando) return;
     if (texto === ultimoJson && !forcar) return;
     ultimoJson = texto;
-    const dados = JSON.parse(texto);
+    let dados = JSON.parse(texto);
+    if (limpeza && limpeza.origem === chave) dados = telaLimpa(dados);
     dados.__chave = projeto + '/' + id;   // de que conversa estes dados são (o editor ao vivo confere)
     redesenha(dados);
+}
+
+// /clear: a tela fica limpa e a próxima mensagem abre uma sessão nova atrelada a esta (mesma entrada da lista,
+// mesmo nome, contexto do zero). { origem, chave (processo da sessão nova, depois de enviar), texto }
+let limpeza = null;
+function telaLimpa(d) {
+    return { ...d, eventos: [], plano: [], planoHora: null, agentes: [], agentesRodando: 0, pergunta: null, fimTurno: null, contexto: 0, compactacoes: [], __limpa: true };
+}
+function limpaContexto() {
+    const conversa = conversaRelevante();
+    if ((conversa && (conversa.status === 'rodando' || conversa.status === 'parando' || (conversa.tarefasBg || []).length)) || (ultimosDados && (ultimosDados.ativa || ultimosDados.agentesRodando))) {
+        return recado('A conversa está trabalhando. Espere ela terminar (ou pare) antes de limpar o contexto.');
+    }
+    if (limpeza && limpeza.chave) return recado('Espere a conversa limpa começar.');
+    limpeza = { origem: sessaoAtual, chave: null, texto: '' };
+    seguirFim = true; procura = ''; filtroAtual = 'tudo';
+    abertos.clear(); fechados.clear(); vistos.clear();
+    primeiroDesenho = true;
+    if (ultimosDados && ultimosDados.__chave === sessaoAtual) redesenha(telaLimpa(ultimosDados));
+    ultimoJson = '';
+    atualizaSessao(true);
+    recado('Contexto limpo: a próxima mensagem começa do zero, nesta mesma conversa');
+}
+// Processo da sessão limpa: quando ganha o id, a tela passa para ela sem animação de troca; se morrer antes, avisa
+async function acompanhaLimpeza() {
+    if (!limpeza || !limpeza.chave) return;
+    const nova = estadoChat.find(c => c.chave === limpeza.chave);
+    if (nova && nova.sessionId) {
+        const origem = limpeza.origem, destino = nova.projeto + '/' + nova.sessionId;
+        limpeza = null;
+        if (chaveNova === nova.chave) chaveNova = null;
+        await carregaSessoes();
+        if (sessaoAtual === origem) await abreSessao(destino, { daNova: true, deClear: true });
+    } else if (!nova || nova.status !== 'rodando') {
+        recado((nova && nova.erro) || 'O Claude Code terminou antes de começar a conversa limpa. Tente de novo.');
+        const campo = document.getElementById('mensagem');
+        if (sessaoAtual === limpeza.origem && !campo.value.trim()) { campo.value = limpeza.texto; ajustaAlturaCaixa(); }
+        if (chaveNova === limpeza.chave) chaveNova = null;
+        limpeza.chave = null;
+    }
 }
 
 // Perguntas e permissões do Claude ficam no fim da conversa (rolam com ela); sem conversa desenhada, voltam para cima da caixa.
@@ -6072,11 +6391,13 @@ function desenhaPrincipal(d) {
     const c = d.contagem;
 
     const favorita = dadosPainel.favoritos.includes(sessaoAtual);
-    const origem = dadosPainel.vinculos[sessaoAtual];
-    const continuacoes = Object.entries(dadosPainel.vinculos).filter(([, o]) => o === sessaoAtual).map(([k]) => k);
+    const deClear = !!dadosPainel.vinculosClear[sessaoAtual];
+    const origem = deClear ? null : dadosPainel.vinculos[sessaoAtual];
+    const continuacoes = Object.entries(dadosPainel.vinculos).filter(([k, o]) => o === sessaoAtual && !dadosPainel.vinculosClear[k]).map(([k]) => k);
     const tituloDe = (chave) => ((todasSessoes.find(s => s.projeto + '/' + s.id === chave) || {}).titulo || 'conversa de mais de 7 dias');
+    const titulo = ((deClear || d.__limpa) && dadosPainel.nomes[sessaoAtual]) || d.titulo || 'Sessão sem título';
     let html = `<div class="topo-sessao">
-        <h1 class="titulo">${esc(d.titulo || 'Sessão sem título')}<button class="estrela-titulo ${favorita ? 'marcada' : ''}" data-acao="favoritar" aria-pressed="${favorita}" title="${favorita ? 'Tirar das favoritas' : 'Marcar como favorita'}">${favorita ? '★' : '☆'}</button></h1>
+        <h1 class="titulo">${esc(titulo)}<button class="estrela-titulo ${favorita ? 'marcada' : ''}" data-acao="favoritar" aria-pressed="${favorita}" title="${favorita ? 'Tirar das favoritas' : 'Marcar como favorita'}">${favorita ? '★' : '☆'}</button></h1>
         ${origem || continuacoes.length ? `<div class="vinculos">
             ${origem ? `<span>Continuação de <button data-abrir="${esc(origem)}">${esc(tituloDe(origem))}</button></span>` : ''}
             ${continuacoes.map(c => `<span>Continuada em <button data-abrir="${esc(c)}">${esc(tituloDe(c))}</button></span>`).join('')}
@@ -6169,7 +6490,7 @@ function desenhaPrincipal(d) {
         const escolhidas = indexados.filter(x => !ehConversa(x.e) && casaFiltro(x.e) && casaProcura(x.e));
         if (escolhidas.length) corpo = `<div class="lista-plana">${escolhidas.map(x => desenhaAcao(x, d.ativa)).join('')}</div>`;
     }
-    html += corpo || `<div class="vazio">${procura ? `Nada encontrado para "${esc(procura)}".` : 'Nenhum evento para este filtro.'}</div>`;
+    html += corpo || `<div class="vazio">${d.__limpa && !procura ? 'Contexto limpo. A próxima mensagem começa do zero, nesta mesma conversa (as mensagens anteriores ficam nas partes dela, na lista).' : procura ?`Nada encontrado para "${esc(procura)}".` : 'Nenhum evento para este filtro.'}</div>`;
     // Comentários feitos no meio do trabalho que o Claude ainda não leu: aparecem "na fila"
     const pedidosJaLidos = d.eventos.filter(e => e.tipo === 'pedido');
     // Sai da fila quando o comentário aparece na conversa: pelo texto, ou por qualquer comentário
@@ -6503,6 +6824,9 @@ function irParaSessao(passo) {
 }
 
 document.getElementById('listaSessoes').addEventListener('click', (ev) => {
+    const maisGrupo = ev.target.closest('[data-menu-grupo]');
+    if (maisGrupo) { ev.stopPropagation(); return abreMenuGrupo(maisGrupo); }
+    if (ev.target.closest('[data-novo-grupo]')) return novoGrupo();
     const grupo = ev.target.closest('[data-grupo]');
     if (grupo) return alternaGrupo(grupo.dataset.grupo);
     const estrela = ev.target.closest('[data-favoritar]');
@@ -6568,13 +6892,17 @@ function abreMenuSessao(botao) {
     if (menuSessao) menuSessao.menu.hide();
     if (botao._menu) botao._menu.destroy();
     if (botao._tippy) botao._tippy.hide();
-    const menu = tippy(botao, {
-        content: `<div class="menu-sessao" role="menu">
+    const grupoAtual = arquivada ? null : grupoDaConversa(chave);
+    const principal = `<div class="menu-sessao" role="menu">
                 <button type="button" role="menuitem" data-menu-renomear="${esc(chave)}">${ICONES.lapis} Renomear</button>
                 <button type="button" role="menuitem" data-menu-conta="${esc(chave)}">${ICONE_GIT_VAGA} Conta e Git…</button>
+                ${arquivada ? '' : `<button type="button" role="menuitem" data-menu-grupos>${ICONES.grupo} Mover para grupo <span class="seta-sub">▸</span></button>`}
+                ${grupoAtual ? `<button type="button" role="menuitem" data-menu-tirar-grupo>${ICONES.grupo} Tirar do grupo "${esc(grupoAtual.nome)}"</button>` : ''}
                 <hr>
                 <button type="button" role="menuitem" data-menu-arquivar="${esc(chave)}">${arquivada ? ICONES.desarquivar + ' Tirar do arquivo' : ICONES.arquivar + ' Arquivar'}</button>
-            </div>`,
+            </div>`;
+    const menu = tippy(botao, {
+        content: principal,
         allowHTML: true, interactive: true, trigger: 'manual', hideOnClick: true, placement: 'bottom-end', theme: 'redcode menu', animation: 'redcode',
         arrow: false, offset: [0, 6], duration: [140, 80], appendTo: () => document.body,
         // A lista é redesenhada enquanto o menu está aberto: segue o botão novo da mesma conversa
@@ -6600,6 +6928,12 @@ function abreMenuSessao(botao) {
         const arq = ev.target.closest('[data-menu-arquivar]');
         const cta = ev.target.closest('[data-menu-conta]');
         if (cta) { menu.hide(); return abreContaDaConversa(cta.dataset.menuConta); }
+        if (ev.target.closest('[data-menu-grupos]')) return menu.setContent(menuMoverParaGrupo(chave));
+        if (ev.target.closest('[data-menu-voltar]')) return menu.setContent(principal);
+        const porGrupo = ev.target.closest('[data-menu-por-grupo]');
+        if (porGrupo) { menu.hide(); return colocaNoGrupo(chave, porGrupo.dataset.menuPorGrupo); }
+        if (ev.target.closest('[data-menu-novo-grupo]')) { menu.hide(); return novoGrupo(chave); }
+        if (ev.target.closest('[data-menu-tirar-grupo]')) { menu.hide(); return acaoGrupo({ acao: 'tirar', chaves: chavesDaCadeia(chave) }, 'Conversa fora do grupo'); }
         if (!ren && !arq) return;
         menu.hide();
         if (ren) comecaRenomear(ren.dataset.menuRenomear);
@@ -6611,12 +6945,97 @@ document.getElementById('listaSessoes').addEventListener('dblclick', (ev) => {
     if (titulo) { ev.preventDefault(); comecaRenomear(titulo.dataset.renomear); }
 });
 document.getElementById('listaSessoes').addEventListener('keydown', (ev) => {
+    const cab = ev.target.closest('[data-grupo-usuario]');
+    if (cab && ev.target === cab && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); return alternaGrupo(cab.dataset.grupo); }
     const item = ev.target.closest('.sessao');
     if (item && ev.target === item && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); abreSessao(item.dataset.chave); }
 });
+// A LISTA NÃO REDESENHA DURANTE O ARRASTE (arrastandoConversa) OU O ELEMENTO ARRASTADO SOME
+const TIPO_ARRASTE = 'text/x-redcode-conversa';
+const TIPO_ARRASTE_GRUPO = 'text/x-redcode-grupo';
+let grupoArrastado = null;
+let grupoDeOrigem = null;
+let conversaArrastada = null;
+const listaLateral = document.getElementById('listaSessoes');
+const limpaAlvos = () => document.querySelectorAll('.alvo-soltar, .alvo-soltar-area, .alvo-soltar-depois, .saindo-do-grupo').forEach(el => el.classList.remove('alvo-soltar', 'alvo-soltar-area', 'alvo-soltar-depois', 'saindo-do-grupo'));
+const fimArraste = () => { arrastandoConversa = false; grupoArrastado = null; grupoDeOrigem = null; listaLateral.classList.remove('arrastando-grupo'); limpaAlvos(); };
+const grupoSobOCursor = (ev) => { const el = ev.target.closest('[data-grupo-usuario], [data-area-grupo]'); return el && (el.dataset.grupoUsuario || el.dataset.areaGrupo); };
+function alvoDoArraste(ev) {
+    const tipos = ev.dataTransfer.types;
+    if (tipos.includes(TIPO_ARRASTE_GRUPO)) {
+        const id = grupoSobOCursor(ev);
+        return id && id !== grupoArrastado ? { tipo: 'grupo', id } : null;
+    }
+    if (!tipos.includes(TIPO_ARRASTE)) return null;
+    if (ev.target.closest('[data-novo-grupo]')) return { tipo: 'novo' };
+    const id = grupoSobOCursor(ev);
+    if (id) return { tipo: 'conversa', id };
+    return grupoDeOrigem ? { tipo: 'fora' } : null;
+}
+function realcaAlvo(alvo) {
+    limpaAlvos();
+    if (alvo.tipo === 'novo') return listaLateral.querySelector('[data-novo-grupo]').classList.add('alvo-soltar');
+    if (alvo.tipo === 'fora') return listaLateral.querySelectorAll(`[data-area-grupo="${CSS.escape(grupoDeOrigem)}"] .sessao[data-chave="${CSS.escape(conversaArrastada)}"]`).forEach(el => el.classList.add('saindo-do-grupo'));
+    const ordem = dadosPainel.grupos.map(g => g.id);
+    const desce = alvo.tipo === 'grupo' && ordem.indexOf(grupoArrastado) < ordem.indexOf(alvo.id);
+    for (const el of listaLateral.querySelectorAll(`[data-grupo-usuario="${CSS.escape(alvo.id)}"], [data-area-grupo="${CSS.escape(alvo.id)}"]`)) {
+        el.classList.add(el.dataset.grupoUsuario ? (desce ? 'alvo-soltar-depois' : 'alvo-soltar') : 'alvo-soltar-area');
+    }
+}
+listaLateral.addEventListener('dragstart', (ev) => {
+    if (!ev.target.closest) return ev.preventDefault();
+    const cab = ev.target.closest('[data-grupo-usuario]');
+    if (cab) {
+        if (ev.target.closest('.mais-grupo')) return ev.preventDefault();
+        grupoArrastado = cab.dataset.grupoUsuario;
+        arrastandoConversa = true;
+        listaLateral.classList.add('arrastando-grupo');
+        ev.dataTransfer.setData(TIPO_ARRASTE_GRUPO, grupoArrastado);
+        ev.dataTransfer.effectAllowed = 'move';
+        return;
+    }
+    const item = ev.target.closest('.sessao');
+    if (!item || ev.target.closest('.campo-nome')) return ev.preventDefault();
+    arrastandoConversa = true;
+    conversaArrastada = item.dataset.chave;
+    grupoDeOrigem = item.closest('[data-area-grupo]')?.dataset.areaGrupo || null;
+    ev.dataTransfer.setData(TIPO_ARRASTE, item.dataset.chave);
+    ev.dataTransfer.effectAllowed = 'move';
+});
+listaLateral.addEventListener('dragover', (ev) => {
+    const alvo = alvoDoArraste(ev);
+    if (!alvo) return limpaAlvos();
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    realcaAlvo(alvo);
+});
+listaLateral.addEventListener('dragleave', (ev) => { if (!listaLateral.contains(ev.relatedTarget)) limpaAlvos(); });
+listaLateral.addEventListener('drop', (ev) => {
+    const alvo = alvoDoArraste(ev);
+    const chave = ev.dataTransfer.getData(TIPO_ARRASTE);
+    const arrastado = grupoArrastado;
+    fimArraste();
+    if (!alvo) return;
+    ev.preventDefault();
+    if (alvo.tipo === 'novo') return novoGrupo(chave);
+    if (alvo.tipo === 'fora') return acaoGrupo({ acao: 'tirar', chaves: chavesDaCadeia(chave) }, 'Conversa fora do grupo');
+    if (alvo.tipo === 'conversa') return colocaNoGrupo(chave, alvo.id);
+    acaoGrupo({ acao: 'posicao', id: arrastado, para: dadosPainel.grupos.findIndex(g => g.id === alvo.id) }, 'Grupo reordenado');
+});
+document.addEventListener('dragend', fimArraste);
 document.getElementById('filtro').addEventListener('input', carregaSessoes);
 document.getElementById('resumoStatus').addEventListener('click', (ev) => {
     if (ev.target.closest('[data-ir-ativas]')) document.querySelector('.abas [data-aba="ativas"]').click();
+});
+function marcaAlternaSecao() { document.querySelectorAll('[data-alterna-secao]').forEach(b => b.setAttribute('aria-pressed', String(!!verSecao[b.dataset.alternaSecao]))); }
+marcaAlternaSecao();
+document.querySelector('.busca-lateral').addEventListener('click', (ev) => {
+    const botao = ev.target.closest('[data-alterna-secao]');
+    if (!botao) return;
+    verSecao[botao.dataset.alternaSecao] = !verSecao[botao.dataset.alternaSecao];
+    try { localStorage.setItem('painelVerSecao', JSON.stringify(verSecao)); } catch (e) { /* sem armazenamento */ }
+    marcaAlternaSecao();
+    carregaSessoes();
 });
 document.querySelector('.abas').addEventListener('click', (ev) => {
     const botao = ev.target.closest('[data-aba]');
@@ -8182,7 +8601,8 @@ const ACOES_BARRA = [
     { grupo: 'Contexto', nome: 'Mencionar arquivo do projeto…', chave: 'mencionar arquivo @', faz: () => insereNoCampo('@') },
     { grupo: 'Contexto', nome: 'Exportar conversa', chave: 'exportar baixar markdown', faz: () => document.querySelector('a[href^="/api/exportar/"]')?.click() },
     { grupo: 'Contexto', nome: 'Capítulos', chave: 'capitulos marcadores bookmarks', quando: () => ultimosDados && ultimosDados.eventos.some(e => e.tipo === 'capitulo'), faz: () => { const b = document.querySelector('[data-acao="sumario"]'); if (b) abreSumario(b); } },
-    { grupo: 'Contexto', nome: 'Continuar em conversa nova', chave: 'continuar nova resumo limpar clear', faz: () => continuarEmNova() },
+    { grupo: 'Contexto', nome: 'Limpar contexto', chave: 'clear limpar contexto zerar', detalhe: () => 'continua nesta conversa', quando: () => !!sessaoAtual && !iniciando, faz: () => limpaContexto() },
+    { grupo: 'Contexto', nome: 'Continuar em conversa nova', chave: 'continuar nova resumo', faz: () => continuarEmNova() },
     { grupo: 'Contexto', nome: 'Nova conversa', chave: 'nova conversa', faz: () => abreNovaConversa() },
     { grupo: 'Contexto', nome: 'Editor', chave: 'editor arquivo abrir codigo monaco', faz: () => abreEditor() },
     { grupo: 'Contexto', nome: 'Terminal', chave: 'terminal console powershell prompt', faz: () => mostraTerminal() },
@@ -8839,6 +9259,7 @@ async function atualizaChat() {
     try {
         estadoChat = await (await fetch('/api/chat/estado')).json();
     } catch (e) { return; }
+    await acompanhaLimpeza();
     // Conversa nova: assim que o Claude Code cria a sessão, abre ela
     if (chaveNova) {
         const nova = estadoChat.find(c => c.chave === chaveNova);
@@ -8888,17 +9309,23 @@ async function enviaMensagem() {
     // /mcp não vai para o Claude: abre a janela dos servidores MCP (como no VS Code)
     if (/^\/mcp\s*$/i.test(texto)) { campo.value = ''; ajustaAlturaCaixa(); return abreMcp(); }
     if (iniciando) return recado('Espere a conversa nova abrir: esta mensagem iria para a conversa anterior.');
+    if (/^\/clear\s*$/i.test(texto)) { campo.value = ''; ajustaAlturaCaixa(); return limpaContexto(); }
+    const limpando = !!(limpeza && limpeza.origem === sessaoAtual);
+    if (limpando && limpeza.chave) return recado('Espere a conversa limpa começar.');
     const [projeto, sessao] = sessaoAtual.split('/');
     const conversa = conversaRelevante();
-    const comentando = conversa && (conversa.status === 'rodando' || conversa.status === 'parando');
+    const comentando = !limpando && conversa && (conversa.status === 'rodando' || conversa.status === 'parando');
     const botao = document.getElementById('btnEnviar');
     if (botao.classList.contains('ocupado')) return;
     botao.classList.add('ocupado');
     try {
-        await api('/api/chat/enviar', {
-            projeto, sessao, texto, modelo: modeloEscolhido().modelo, esforco: modeloEscolhido().esforco, modo: modoAtual(),
+        const daTela = todasSessoes.find(s => chaveDe(s) === sessaoAtual);
+        const resposta = await api('/api/chat/enviar', {
+            ...(limpando ? { origem: sessaoAtual, limpar: true, nome: daTela ? nomeExibido(daTela, 1) : '' } : { projeto, sessao }),
+            texto, modelo: modeloEscolhido().modelo, esforco: modeloEscolhido().esforco, modo: modoAtual(),
             anexos: anexosPendentes.map(a => ({ nome: a.nome, tipo: a.tipo, dados: a.dados })),
         });
+        if (limpando) { limpeza.chave = resposta.chave; limpeza.texto = texto; chaveNova = resposta.chave; }
         const previas = anexosPendentes.filter(a => a.previa).map(a => a.previa);
         ultimasPrevias = previas.length ? { sessao: sessaoAtual, imagens: previas, hora: Date.now() } : null;
         if (comentando) {

@@ -58,6 +58,11 @@ while ($true) {
                     'alternar' { Espera ($sessao.TryTogglePlayPauseAsync()) ([bool]) | Out-Null }
                     'proxima' { Espera ($sessao.TrySkipNextAsync()) ([bool]) | Out-Null }
                     'anterior' { Espera ($sessao.TrySkipPreviousAsync()) ([bool]) | Out-Null }
+                    { $_ -like 'posicao *' } {
+                        $segundos = [double]::Parse($_.Substring(8), [Globalization.CultureInfo]::InvariantCulture)
+                        $inicio = $sessao.GetTimelineProperties().StartTime.Ticks
+                        Espera ($sessao.TryChangePlaybackPositionAsync([long]($inicio + $segundos * 10000000))) ([bool]) | Out-Null
+                    }
                 }
             }
         } catch { }
@@ -78,7 +83,7 @@ while ($true) {
             $linhaTempo = $sessao.GetTimelineProperties()
             $estado = [ordered]@{
                 app = $sessao.SourceAppUserModelId; titulo = $p.Title; artista = $p.Artist; album = $p.AlbumTitle
-                estado = "$($info.PlaybackStatus)"; podeAlternar = $info.Controls.IsPlayPauseToggleEnabled; podeProxima = $info.Controls.IsNextEnabled
+                estado = "$($info.PlaybackStatus)"; podeAlternar = $info.Controls.IsPlayPauseToggleEnabled; podeProxima = $info.Controls.IsNextEnabled; podeBuscar = $info.Controls.IsPlaybackPositionEnabled
                 posicao = [math]::Round($linhaTempo.Position.TotalSeconds, 1); duracao = [math]::Round(($linhaTempo.EndTime - $linhaTempo.StartTime).TotalSeconds, 1)
                 atualizadoEm = $linhaTempo.LastUpdatedTime.ToUnixTimeMilliseconds()
             }

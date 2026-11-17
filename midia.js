@@ -75,8 +75,11 @@ function espera(versaoTela, prazo) {
         esperando.add(fim);
     });
 }
-function comando(acao) {
-    if (!COMANDOS.includes(acao)) throw new Error('Comando de mídia inválido.');
+function comando(acao, segundos) {
+    if (acao === 'posicao') {
+        if (!Number.isFinite(segundos) || segundos < 0) throw new Error('Posição inválida.');
+        acao = 'posicao ' + segundos.toFixed(1);
+    } else if (!COMANDOS.includes(acao)) throw new Error('Comando de mídia inválido.');
     usado();
     if (!proc) throw new Error('O player do Windows não está disponível agora.');
     proc.stdin.write(acao + '\n');
