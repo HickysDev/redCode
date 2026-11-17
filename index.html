@@ -1962,13 +1962,9 @@ body.lateral-aberta .lateral { display: block; }
 .atalhos-lateral, .resumo-status { display: none; }
 .busca { border-color: transparent; background: var(--realce); }
 .busca:focus { border-color: var(--linha); outline: none; }
-.abas { background: none; border: 0; padding: 0; margin-bottom: 8px; gap: 2px; }
-.abas button { flex: none; padding: 3px 8px; }
+.abas { background: none; border: 0; padding: 0; margin-bottom: 8px; gap: 0; justify-content: space-between; }
+.abas button { flex: none; padding: 3px 5px; }
 .abas button[aria-pressed="true"] { background: none; box-shadow: none; color: var(--tinta); font-weight: 600; }
-.periodos { display: flex; flex-wrap: wrap; gap: 4px; margin: -2px 14px 8px; }
-.periodos button { padding: 1px 8px; border: 1px solid var(--linha); border-radius: 999px; font-size: 11px; color: var(--grafite); }
-.periodos button:hover { color: var(--tinta); }
-.periodos button[aria-pressed="true"] { border-color: var(--voce); color: var(--voce); }
 .projeto { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 14px 18px 4px; font: 500 12.5px var(--sans); color: var(--grafite); }
 .projeto:hover { color: var(--tinta); }
 .projeto .seta { font-size: 9px; opacity: .7; }
@@ -2663,14 +2659,9 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
         <div class="abas" role="group" aria-label="Quais sessões mostrar">
             <button data-aba="todas" aria-pressed="true">Todas</button>
             <button data-aba="ativas" aria-pressed="false">Ativas</button>
-            <button data-aba="favoritas" aria-pressed="false">Fixadas</button>
-            <button data-aba="arquivadas" aria-pressed="false">Arquivo</button>
-        </div>
-        <div class="periodos" role="group" aria-label="Período da última atividade">
-            <button data-periodo="tudo" aria-pressed="true">Tudo</button>
-            <button data-periodo="hoje" aria-pressed="false">Hoje</button>
-            <button data-periodo="semana" aria-pressed="false">Semana</button>
-            <button data-periodo="mes" aria-pressed="false">Mês</button>
+            <button data-aba="hoje" aria-pressed="false" title="Com atividade desde a meia-noite">Hoje</button>
+            <button data-aba="semana" aria-pressed="false" title="Com atividade desde segunda-feira">Semana</button>
+            <button data-aba="mes" aria-pressed="false" title="Com atividade desde o dia 1">Mês</button>
         </div>
         <div class="aviso-versao" id="avisoVersao" role="status" hidden></div>
         <div class="resumo-status" id="resumoStatus" aria-live="polite"></div>
@@ -3072,8 +3063,6 @@ let filtroAtual = 'tudo';
 let procura = '';
 let seguirFim = true;
 let abaSessoes = 'todas';
-let periodoSessoes = 'tudo';
-try { periodoSessoes = localStorage.getItem('painelPeriodo') || 'tudo'; } catch (e) { /* sem armazenamento */ }
 function inicioDoPeriodo(periodo) {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -5352,29 +5341,26 @@ async function carregaSessoes() {
     document.getElementById('resumoStatus').innerHTML = Object.entries(contagem).filter(([, n]) => n).map(([c, n]) =>
         `<button class="${c}" data-ir-ativas title="Ver as conversas ativas"><b>${rotulos[c][0]}</b>${n} ${n > 1 && rotulos[c][2] ? rotulos[c][2] : rotulos[c][1]}</button>`).join('');
     const casa = (s) => !filtro || (nomeExibido(s, 1) + ' ' + s.titulo + ' ' + s.nomeProjeto).toLowerCase().includes(filtro);
-    let base = sessoes.filter(s => doModo(s) && (abaSessoes === 'arquivadas' ? arquivada(s) : !arquivada(s)) && casa(s));
-    const desde = inicioDoPeriodo(periodoSessoes);
-    if (desde) base = base.filter(s => s.atualizado >= desde);
+    const desde = inicioDoPeriodo(abaSessoes);
+    const visivel = (s) => doModo(s) && casa(s) && (!desde || s.atualizado >= desde);
+    let base = sessoes.filter(s => visivel(s) && !arquivada(s));
     if (abaSessoes === 'ativas') base = base.filter(s => s.ativa || s.pergunta || (s.esperando && Date.now() - s.atualizado < 30 * 60 * 1000));
 
     const cadeias = montaCadeias(base).sort((a, b) => b.atualizado - a.atualizado);
     const favoritaCadeia = (c) => c.membros.some(m => dadosPainel.favoritos.includes(chaveDe(m)));
-    if (abaSessoes === 'favoritas') {
-        cadeias.splice(0, cadeias.length, ...cadeias.filter(favoritaCadeia));
-    }
 
     const secoes = [];
     const usadas = new Set();
     const pega = (filtroCadeia) => cadeias.filter(c => !usadas.has(c) && filtroCadeia(c)).map(c => { usadas.add(c); return c; });
-    // GRUPOS DO USUÁRIO NÃO USAM O pega: A CONVERSA CONTINUA TAMBÉM NO PROJETO
-    const comGrupos = abaSessoes === 'todas' || abaSessoes === 'ativas';
-    if (comGrupos) for (const g of dadosPainel.grupos) {
-        const lista = cadeias.filter(c => c.membros.some(m => g.conversas.includes(chaveDe(m))));
-        if (lista.length || !filtro) secoes.push({ id: 'g:' + g.id, titulo: g.nome, grupo: g, cadeias: lista });
-    }
-    if (comGrupos && !filtro) secoes.push({ id: 'novo-grupo', novoGrupo: true, cadeias: [] });
-    const favoritas = abaSessoes === 'todas' || abaSessoes === 'ativas' ? pega(favoritaCadeia) : [];
+    const favoritas = pega(favoritaCadeia);
     if (favoritas.length) secoes.push({ id: 'favoritas', titulo: 'Fixadas', classe: 'favoritas', cadeias: favoritas });
+    // GRUPOS DO USUÁRIO NÃO USAM O pega: A CONVERSA CONTINUA TAMBÉM NO PROJETO
+    const gruposVaziosVisiveis = abaSessoes === 'todas' && !filtro;
+    for (const g of dadosPainel.grupos) {
+        const lista = cadeias.filter(c => c.membros.some(m => g.conversas.includes(chaveDe(m))));
+        if (lista.length || gruposVaziosVisiveis) secoes.push({ id: 'g:' + g.id, titulo: g.nome, grupo: g, cadeias: lista });
+    }
+    if (gruposVaziosVisiveis) secoes.push({ id: 'novo-grupo', novoGrupo: true, cadeias: [] });
     // Demais conversas por projeto; o projeto com atividade mais recente vem primeiro
     const porProjeto = new Map();
     for (const c of pega(() => true)) {
@@ -5383,6 +5369,8 @@ async function carregaSessoes() {
         porProjeto.get(id).cadeias.push(c);
     }
     for (const [id, { titulo, cadeias: lista }] of porProjeto) secoes.push({ id: 'p:' + id, titulo, cadeias: lista });
+    const arquivo = abaSessoes === 'ativas' ? [] : montaCadeias(sessoes.filter(s => visivel(s) && arquivada(s))).sort((a, b) => b.atualizado - a.atualizado);
+    if (arquivo.length) secoes.push({ id: 'arquivo', titulo: 'Arquivo', classe: 'arquivo', cadeias: arquivo, fechadoPorPadrao: true });
 
     const jaListadas = new Set();
     sessoesVisiveis = secoes.flatMap(sec => sec.cadeias.flatMap(c => partesAbertas(c) ? [...c.membros].reverse() : [c.membros[c.membros.length - 1]]))
@@ -5390,7 +5378,8 @@ async function carregaSessoes() {
     let html = '';
     for (const sec of secoes) {
         if (sec.novoGrupo) { html += '<button type="button" class="novo-grupo" data-novo-grupo>+ Novo grupo</button>'; continue; }
-        const fechado = gruposFechados.has(sec.id) && !filtro;
+        // NO FECHADO POR PADRÃO (ARQUIVO) ESTAR NO gruposFechados SIGNIFICA ABERTO
+        const fechado = (sec.fechadoPorPadrao ? !gruposFechados.has(sec.id) : gruposFechados.has(sec.id)) && !filtro;
         html += sec.grupo ? cabecalhoGrupo(sec, fechado) : `<button class="projeto ${sec.classe || ''}" data-grupo="${esc(sec.id)}" aria-expanded="${!fechado}">
             <span class="seta">${fechado ? '▸' : '▾'}</span>${esc(sec.titulo)}<span class="contagem">${sec.cadeias.length}</span></button>`;
         if (fechado) continue;
@@ -5399,7 +5388,7 @@ async function carregaSessoes() {
         if (modoApp !== 'chat' && !sec.id.startsWith('p:')) { html += sublistaPorProjeto(sec.cadeias); continue; }
         for (const c of sec.cadeias) html += blocoCadeia(c);
     }
-    const vazios = desde ? { ativas: 'Nenhuma conversa ativa nesse período.', favoritas: 'Nenhuma fixada nesse período.', arquivadas: 'Nada arquivado nesse período.', todas: 'Nenhuma conversa nesse período.' } : { ativas: 'Nenhuma conversa ativa agora.', favoritas: 'Nenhuma fixada. Use a estrela ☆ numa conversa.', arquivadas: 'Nada arquivado.', todas: 'Nenhuma conversa encontrada.' };
+    const vazios = { ativas: 'Nenhuma conversa ativa agora.', hoje: 'Nenhuma conversa hoje.', semana: 'Nenhuma conversa nesta semana.', mes: 'Nenhuma conversa neste mês.', todas: 'Nenhuma conversa encontrada.' };
     document.getElementById('listaSessoes').innerHTML = html + (secoes.some(s => s.cadeias.length) ? '' : `<div class="vazio" style="padding:20px 18px">${vazios[abaSessoes]}</div>`);
     marcaAreasDeGrupo();
     // Janela secundária: a sessão abriu antes de saber qual é a pasta do Chat; acerta o modo e redesenha a lista
@@ -5587,7 +5576,7 @@ function comecaRenomear(chave) {
 async function alternaFavorita(chave) {
     try {
         const r = await api('/api/favorito', { chave });
-        recado(r.favorita ? 'Marcada como favorita' : 'Tirada das favoritas');
+        recado(r.favorita ? 'Conversa fixada' : 'Conversa desafixada');
     } catch (e) { recado(e.message); }
     await carregaSessoes();
     if (ultimosDados) redesenha(ultimosDados);
@@ -6862,7 +6851,7 @@ function realcaAlvo(alvo) {
     }
 }
 listaLateral.addEventListener('dragstart', (ev) => {
-    if (!ev.target.closest || abaSessoes === 'arquivadas') return ev.preventDefault();
+    if (!ev.target.closest) return ev.preventDefault();
     const cab = ev.target.closest('[data-grupo-usuario]');
     if (cab) {
         if (ev.target.closest('.mais-grupo')) return ev.preventDefault();
@@ -6906,16 +6895,6 @@ document.getElementById('filtro').addEventListener('input', carregaSessoes);
 document.getElementById('resumoStatus').addEventListener('click', (ev) => {
     if (ev.target.closest('[data-ir-ativas]')) document.querySelector('.abas [data-aba="ativas"]').click();
 });
-document.querySelector('.periodos').addEventListener('click', (ev) => {
-    const botao = ev.target.closest('[data-periodo]');
-    if (!botao) return;
-    periodoSessoes = botao.dataset.periodo;
-    try { localStorage.setItem('painelPeriodo', periodoSessoes); } catch (e) { /* sem armazenamento */ }
-    marcaPeriodo();
-    carregaSessoes();
-});
-function marcaPeriodo() { document.querySelectorAll('.periodos button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.periodo === periodoSessoes))); }
-marcaPeriodo();
 document.querySelector('.abas').addEventListener('click', (ev) => {
     const botao = ev.target.closest('[data-aba]');
     if (!botao) return;
