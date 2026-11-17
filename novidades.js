@@ -3,6 +3,16 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.22', data: '2026-11-17', itens: [
+            'Grupos na lista de conversas: crie grupos com nome, cor e ícone e coloque conversas neles pelo menu ⋯ ou arrastando; arraste o grupo para mudar a ordem. A lista ganha as divisórias Grupos e Projetos, e as conversas de projetos diferentes aparecem separadas em cartões (feito pelo Guilherme)',
+            'Fixadas e Arquivo viram botões ao lado da busca: as Fixadas ficam no topo e o Arquivo no fim, quando ligado. As abas agora são Todas, Ativas, Hoje, Semana e Mês (feito pelo Guilherme)',
+            'Subagentes na lista: cada conversa mostra mini-slimes dos agentes que estão rodando nela (feito pelo Guilherme)',
+            '/clear sem sair da conversa: limpa o contexto e a próxima mensagem continua na mesma entrada da lista, com o mesmo nome (feito pelo Guilherme)',
+            'Player do rodapé: clique ou arraste a barra de progresso para avançar ou voltar a música (feito pelo Guilherme)',
+            'Agente parado junto com a conversa: ao parar a resposta (Esc ou Parar), o agente que ela tinha lançado deixa de aparecer como rodando',
+        ],
+    },
+    {
         versao: '1.0.21', data: '2026-11-16', itens: [
             'Mascotes dançam com música: com uma música tocando, de vez em quando (a cada 1 a 3 minutos) os mascotes dançam por alguns segundos. São 12 danças sorteadas, como balancinho, moonwalk, robô, rock, cambalhota e valsinha, e as de grupo: festa com globo de discoteca, coreografia espelhada e karaokê. Pausou a música, eles param',
             'Parar agentes: passe o mouse no mascote de um agente e clique no quadradinho para parar só aquele agente; a conversa continua',
