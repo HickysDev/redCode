@@ -1630,6 +1630,8 @@ function registraVivas() {
     try { fs.writeFileSync(ARQUIVO_VIVAS, json); } catch (e) { /* só otimização */ }
 }
 const CORES_GRUPO = ['voce', 'atencao', 'ok', 'agente', 'modelo', 'erro'];
+const ICONES_GRUPO = ['', '📁', '⭐', '🔥', '🐛', '🚀', '💡', '🧪', '📊', '💰', '🛠️', '📦', '🧾', '🎯', '🔒', '📝'];
+const corDeGrupoValida = (cor) => CORES_GRUPO.includes(cor) || /^#[0-9a-f]{6}$/i.test(String(cor || ''));
 function chaveValida(chave) {
     return typeof chave === 'string' && /^[A-Za-z0-9-]+\/[A-Za-z0-9-]+$/.test(chave);
 }
@@ -2710,11 +2712,11 @@ async function rotaChat(req, res, url) {
         const tiraDeTodos = () => grupos.forEach(g => { g.conversas = g.conversas.filter(c => !chaves.includes(c)); });
         let criado = null;
         if (acao === 'criar') {
-            criado = { id: 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), nome, cor: CORES_GRUPO.includes(corpo.cor) ? corpo.cor : CORES_GRUPO[0], conversas: [] };
+            criado = { id: 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), nome, cor: corDeGrupoValida(corpo.cor) ? corpo.cor : CORES_GRUPO[0], icone: ICONES_GRUPO.includes(corpo.icone) ? corpo.icone : '', conversas: [] };
             grupos.push(criado);
             if (chaves.length) { tiraDeTodos(); criado.conversas.push(chaves[0]); }
-        } else if (acao === 'renomear') { grupo.nome = nome; if (CORES_GRUPO.includes(corpo.cor)) grupo.cor = corpo.cor; }
-        else if (acao === 'cor') { if (!CORES_GRUPO.includes(corpo.cor)) return responde(res, 400, { erro: 'cor inválida' }); grupo.cor = corpo.cor; }
+        } else if (acao === 'renomear') { grupo.nome = nome; if (corDeGrupoValida(corpo.cor)) grupo.cor = corpo.cor; if (ICONES_GRUPO.includes(corpo.icone)) grupo.icone = corpo.icone; }
+        else if (acao === 'cor') { if (!corDeGrupoValida(corpo.cor)) return responde(res, 400, { erro: 'cor inválida' }); grupo.cor = corpo.cor; }
         else if (acao === 'mover') {
             const de = grupos.indexOf(grupo), para = de + (corpo.passo < 0 ? -1 : 1);
             if (para >= 0 && para < grupos.length) [grupos[de], grupos[para]] = [grupos[para], grupos[de]];

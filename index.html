@@ -1995,6 +1995,11 @@ body.lateral-aberta .lateral { display: block; }
 .grupo-vazio { padding: 2px 18px 8px 34px; font-size: 12px; color: var(--grafite); }
 .novo-grupo { display: block; margin: 6px 18px 2px; padding: 0; font-size: 12px; color: var(--grafite); opacity: .8; }
 .novo-grupo:hover { color: var(--tinta); }
+.divisor-lista { display: flex; align-items: center; gap: 8px; margin: 16px 18px 0; font: 600 10.5px var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--grafite); }
+.divisor-lista::after { content: ""; flex: 1; height: 1px; background: var(--linha); }
+.divisor-lista .novo-grupo { order: 2; margin: 0; padding: 1px 7px; border: 1px solid var(--linha); border-radius: 999px; font: 500 11px var(--sans); text-transform: none; letter-spacing: 0; color: var(--tinta); opacity: 1; }
+.divisor-lista .novo-grupo:hover { border-color: var(--voce); color: var(--voce); }
+.lista .projeto.arquivo { margin-top: 10px; border-top: 1px solid var(--linha); }
 .menu-sessao .seta-sub { margin-left: auto; font-size: 10px; color: var(--grafite); }
 .menu-sessao [data-menu-por-grupo] .bola-grupo { margin: 0 3px; }
 .menu-sessao [data-menu-por-grupo][aria-current="true"] { color: var(--cor-grupo); }
@@ -2013,6 +2018,16 @@ body.lateral-aberta .lateral { display: block; }
 .cores-grupo .bola-grupo { width: 20px; height: 20px; border: 2px solid transparent; box-shadow: 0 0 0 1px var(--linha); }
 .cores-grupo input:checked + .bola-grupo { border-color: var(--tinta); }
 .cores-grupo input:focus-visible + .bola-grupo { outline: 2px solid var(--voce); outline-offset: 2px; }
+.cores-grupo { flex-wrap: wrap; align-items: center; }
+.cor-livre { position: relative; }
+.cor-livre input[type="color"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.cor-livre .bola-grupo { background: conic-gradient(var(--cor-grupo) 0 75%, #f43f5e 75% 83%, #22c55e 83% 91%, #3b82f6 91%); }
+.rotulo-form { margin-bottom: -6px; font-size: 13px; }
+.icones-grupo { display: grid; grid-template-columns: repeat(8, 30px); gap: 6px; }
+.icones-grupo label { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--linha); cursor: pointer; font-size: 15px; color: var(--grafite); }
+.icones-grupo input { position: absolute; opacity: 0; pointer-events: none; }
+.icones-grupo label:has(input:checked) { border-color: var(--tinta); background: var(--realce); }
+.icone-grupo { flex: none; font-size: 12px; line-height: 1; }
 .sessao.parte { position: relative; padding-left: 30px; }
 .sessao.parte::before { content: "\2514"; position: absolute; left: 17px; top: 6px; color: var(--grafite); opacity: .5; }
 .sessao { padding: 7px 14px 7px 15px; border-left-width: 2px; }
@@ -5367,11 +5382,12 @@ async function carregaSessoes() {
     if (favoritas.length) secoes.push({ id: 'favoritas', titulo: 'Fixadas', classe: 'favoritas', cadeias: favoritas });
     // GRUPOS DO USUÁRIO NÃO USAM O pega: A CONVERSA CONTINUA TAMBÉM NO PROJETO
     const gruposVaziosVisiveis = abaSessoes === 'todas' && !filtro;
+    const antesDosGrupos = secoes.length;
     for (const g of dadosPainel.grupos) {
         const lista = cadeias.filter(c => c.membros.some(m => g.conversas.includes(chaveDe(m))));
         if (lista.length || gruposVaziosVisiveis) secoes.push({ id: 'g:' + g.id, titulo: g.nome, grupo: g, cadeias: lista });
     }
-    if (gruposVaziosVisiveis) secoes.push({ id: 'novo-grupo', novoGrupo: true, cadeias: [] });
+    if (secoes.length > antesDosGrupos || gruposVaziosVisiveis) secoes.splice(antesDosGrupos, 0, { divisor: 'Grupos', novoGrupo: gruposVaziosVisiveis, cadeias: [] });
     // Demais conversas por projeto; o projeto com atividade mais recente vem primeiro
     const porProjeto = new Map();
     for (const c of pega(() => true)) {
@@ -5379,6 +5395,7 @@ async function carregaSessoes() {
         if (!porProjeto.has(id)) porProjeto.set(id, { titulo: nome, cadeias: [] });
         porProjeto.get(id).cadeias.push(c);
     }
+    if (secoes.length && porProjeto.size) secoes.push({ divisor: modoApp === 'chat' ? 'Conversas' : 'Projetos', cadeias: [] });
     for (const [id, { titulo, cadeias: lista }] of porProjeto) secoes.push({ id: 'p:' + id, titulo, cadeias: lista });
     const arquivo = abaSessoes === 'ativas' || !(verSecao.arquivo || filtro) ? [] : montaCadeias(sessoes.filter(s => visivel(s) && arquivada(s))).sort((a, b) => b.atualizado - a.atualizado);
     if (arquivo.length) secoes.push({ id: 'arquivo', titulo: 'Arquivo', classe: 'arquivo', cadeias: arquivo });
@@ -5388,7 +5405,7 @@ async function carregaSessoes() {
         .filter(s => !jaListadas.has(chaveDe(s)) && jaListadas.add(chaveDe(s)));
     let html = '';
     for (const sec of secoes) {
-        if (sec.novoGrupo) { html += '<button type="button" class="novo-grupo" data-novo-grupo>+ Novo grupo</button>'; continue; }
+        if (sec.divisor) { html += `<div class="divisor-lista"><span>${sec.divisor}</span>${sec.novoGrupo ? '<button type="button" class="novo-grupo" data-novo-grupo title="Criar um grupo">+ Novo grupo</button>' : ''}</div>`; continue; }
         const fechado = gruposFechados.has(sec.id) && !filtro;
         html += sec.grupo ? cabecalhoGrupo(sec, fechado) : `<button class="projeto ${sec.classe || ''}" data-grupo="${esc(sec.id)}" aria-expanded="${!fechado}">
             <span class="seta">${fechado ? '▸' : '▾'}</span>${esc(sec.titulo)}<span class="contagem">${sec.cadeias.length}</span></button>`;
@@ -5424,7 +5441,7 @@ function sublistaPorProjeto(cadeias) {
 
 function marcaAreasDeGrupo() {
     for (const cab of document.querySelectorAll('#listaSessoes [data-grupo-usuario]')) {
-        for (let el = cab.nextElementSibling; el && !el.matches('.projeto, .novo-grupo'); el = el.nextElementSibling) el.dataset.areaGrupo = cab.dataset.grupoUsuario;
+        for (let el = cab.nextElementSibling; el && !el.matches('.projeto, .divisor-lista'); el = el.nextElementSibling) el.dataset.areaGrupo = cab.dataset.grupoUsuario;
     }
 }
 
@@ -5436,11 +5453,14 @@ function alternaGrupo(id) {
 }
 
 const CORES_GRUPO = [['voce', 'Vermelho'], ['atencao', 'Âmbar'], ['ok', 'Verde'], ['agente', 'Sálvia'], ['modelo', 'Lavanda'], ['erro', 'Salmão']];
-const estiloCorGrupo = (cor) => `--cor-grupo: var(--${CORES_GRUPO.some(([v]) => v === cor) ? cor : 'voce'})`;
+const ICONES_GRUPO = ['', '📁', '⭐', '🔥', '🐛', '🚀', '💡', '🧪', '📊', '💰', '🛠️', '📦', '🧾', '🎯', '🔒', '📝'];
+const corLivre = (cor) => /^#[0-9a-f]{6}$/i.test(String(cor || ''));
+const estiloCorGrupo = (cor) => `--cor-grupo: ${corLivre(cor) ? cor : `var(--${CORES_GRUPO.some(([v]) => v === cor) ? cor : 'voce'})`}`;
+const marcaDoGrupo = (g) => g.icone && ICONES_GRUPO.includes(g.icone) ? `<span class="icone-grupo" aria-hidden="true">${g.icone}</span>` : '<i class="bola-grupo" aria-hidden="true"></i>';
 function cabecalhoGrupo(sec, fechado) {
     const g = sec.grupo;
     return `<div class="projeto grupo-usuario" role="button" tabindex="0" draggable="true" data-grupo="${esc(sec.id)}" data-grupo-usuario="${esc(g.id)}" aria-expanded="${!fechado}" style="${estiloCorGrupo(g.cor)}">
-        <span class="seta">${fechado ? '▸' : '▾'}</span><i class="bola-grupo" aria-hidden="true"></i><span class="nome-grupo">${esc(sec.titulo)}</span><span class="contagem">${sec.cadeias.length}</span>
+        <span class="seta">${fechado ? '▸' : '▾'}</span>${marcaDoGrupo(g)}<span class="nome-grupo">${esc(sec.titulo)}</span><span class="contagem">${sec.cadeias.length}</span>
         <button type="button" class="mais-grupo" data-menu-grupo="${esc(g.id)}" title="Opções do grupo" aria-label="Opções do grupo" aria-haspopup="menu">${ICONES.mais}</button></div>`;
 }
 async function acaoGrupo(corpo, aviso) {
@@ -5461,18 +5481,25 @@ function grupoDaConversa(chave) {
     const chaves = chavesDaCadeia(chave);
     return dadosPainel.grupos.find(g => g.conversas.some(k => chaves.includes(k))) || null;
 }
-async function pedeDadosGrupo(titulo, rotulo, g = { nome: '', cor: 'voce' }) {
+async function pedeDadosGrupo(titulo, rotulo, g = { nome: '', cor: 'voce', icone: '' }) {
+    const livre = corLivre(g.cor) ? g.cor : '#3b82f6';
     const html = `<div class="form-grupo"><label>Nome<input class="campo-config" name="nomeGrupo" maxlength="60" value="${esc(g.nome)}" placeholder="Ex.: Fechamento do mês"></label>
-        <div class="cores-grupo" role="radiogroup" aria-label="Cor">${CORES_GRUPO.map(([v, n]) => `<label title="${esc(n)}"><input type="radio" name="corGrupo" value="${v}" ${v === g.cor ? 'checked' : ''}><i class="bola-grupo" style="${estiloCorGrupo(v)}"></i></label>`).join('')}</div></div>`;
+        <div class="rotulo-form">Cor</div><div class="cores-grupo" role="radiogroup" aria-label="Cor">${CORES_GRUPO.map(([v, n]) => `<label title="${esc(n)}"><input type="radio" name="corGrupo" value="${v}" ${v === g.cor ? 'checked' : ''}><i class="bola-grupo" style="${estiloCorGrupo(v)}"></i></label>`).join('')}
+            <label class="cor-livre" title="Cor personalizada"><input type="radio" name="corGrupo" value="livre" ${corLivre(g.cor) ? 'checked' : ''}><i class="bola-grupo" style="${estiloCorGrupo(livre)}"></i><input type="color" name="corLivre" value="${livre}" aria-label="Cor personalizada"></label></div>
+        <div class="rotulo-form">Ícone</div><div class="icones-grupo" role="radiogroup" aria-label="Ícone">${ICONES_GRUPO.map(i => `<label title="${i ? i : 'Só a bolinha da cor'}"><input type="radio" name="iconeGrupo" value="${i}" ${i === (g.icone || '') ? 'checked' : ''}><span>${i || '●'}</span></label>`).join('')}</div></div>`;
     const resposta = confirmaNaPagina(titulo, html, rotulo);
     const campo = document.querySelector('#corpoConfirma [name="nomeGrupo"]');
     campo.focus();
     campo.select();
     campo.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); document.getElementById('btnConfirmaSim').click(); } });
+    const seletorCor = document.querySelector('#corpoConfirma [name="corLivre"]');
+    seletorCor.addEventListener('input', () => { seletorCor.previousElementSibling.style.cssText = estiloCorGrupo(seletorCor.value); seletorCor.parentElement.querySelector('[value="livre"]').checked = true; });
     if (!(await resposta)) return null;
     const nome = campo.value.trim();
     if (!nome) { recado('Dê um nome ao grupo'); return null; }
-    return { nome, cor: (document.querySelector('#corpoConfirma [name="corGrupo"]:checked') || {}).value || g.cor };
+    const cor = (document.querySelector('#corpoConfirma [name="corGrupo"]:checked') || {}).value || g.cor;
+    const icone = (document.querySelector('#corpoConfirma [name="iconeGrupo"]:checked') || {}).value || '';
+    return { nome, cor: cor === 'livre' ? document.querySelector('#corpoConfirma [name="corLivre"]').value : cor, icone };
 }
 async function novoGrupo(chave) {
     const d = await pedeDadosGrupo('Novo grupo', 'Criar');
@@ -5499,7 +5526,7 @@ function abreMenuGrupo(botao) {
     const pos = dadosPainel.grupos.indexOf(g), ultimo = dadosPainel.grupos.length - 1;
     const menu = tippy(botao, {
         content: `<div class="menu-sessao" role="menu">
-                <button type="button" role="menuitem" data-grupo-acao="renomear">${ICONES.lapis} Renomear…</button>
+                <button type="button" role="menuitem" data-grupo-acao="renomear">${ICONES.lapis} Editar nome, cor e ícone…</button>
                 <div class="cores-grupo-menu" role="group" aria-label="Cor">${CORES_GRUPO.map(([v, n]) => `<button type="button" data-grupo-cor="${v}" title="${esc(n)}" aria-label="Cor ${esc(n)}" aria-pressed="${v === g.cor}" style="${estiloCorGrupo(v)}"></button>`).join('')}</div>
                 <hr>
                 <button type="button" role="menuitem" data-grupo-acao="subir" ${pos === 0 ? 'disabled' : ''}>↑ Subir</button>
@@ -5529,7 +5556,7 @@ function abreMenuGrupo(botao) {
         const qual = acao.dataset.grupoAcao;
         if (qual === 'subir' || qual === 'descer') return acaoGrupo({ acao: 'mover', id, passo: qual === 'subir' ? -1 : 1 });
         if (qual === 'apagar') return apagaGrupo(g);
-        const d = await pedeDadosGrupo('Renomear grupo', 'Salvar', g);
+        const d = await pedeDadosGrupo('Editar grupo', 'Salvar', g);
         if (d) acaoGrupo({ acao: 'renomear', id, ...d }, 'Grupo salvo');
     });
 }
@@ -5538,7 +5565,7 @@ function menuMoverParaGrupo(chave) {
     return `<div class="menu-sessao" role="menu">
             <button type="button" role="menuitem" data-menu-voltar>‹ Voltar</button>
             <hr>
-            ${dadosPainel.grupos.map(g => `<button type="button" role="menuitem" data-menu-por-grupo="${esc(g.id)}" style="${estiloCorGrupo(g.cor)}" ${atual === g ? 'aria-current="true"' : ''}><i class="bola-grupo" aria-hidden="true"></i><span class="nome-grupo">${esc(g.nome)}</span>${atual === g ? ' ✓' : ''}</button>`).join('')}
+            ${dadosPainel.grupos.map(g => `<button type="button" role="menuitem" data-menu-por-grupo="${esc(g.id)}" style="${estiloCorGrupo(g.cor)}" ${atual === g ? 'aria-current="true"' : ''}>${marcaDoGrupo(g)}<span class="nome-grupo">${esc(g.nome)}</span>${atual === g ? ' ✓' : ''}</button>`).join('')}
             <button type="button" role="menuitem" data-menu-novo-grupo>+ Novo grupo…</button>
             ${atual ? `<hr><button type="button" role="menuitem" data-menu-tirar-grupo>Tirar do grupo "${esc(atual.nome)}"</button>` : ''}
         </div>`;
