@@ -469,6 +469,8 @@ function processaRegistro(estado, r, origem) {
         // Vira um aviso "Interrompido" e encerra o turno, em vez de parecer um pedido novo.
         const textosUsuario = typeof msg.content === 'string' ? [msg.content]
             : (msg.content || []).filter(b => b && b.type === 'text').map(b => b.text);
+        // No transcript de um agente (sidechain) só marca a hora: o agente foi parado junto com a conversa
+        if (r.isSidechain && textosUsuario.some(t => /^\s*\[Request interrupted by user/.test(String(t)))) { estado.interrompidoEm = r.timestamp; return; }
         if (!r.isSidechain && textosUsuario.some(t => /^\s*\[Request interrupted by user/.test(String(t)))) {
             estado.turnoEncerrado = true;
             estado.fimTurno = r.timestamp;
@@ -750,7 +752,10 @@ function leSubagentes(pastaSessao, estadoPai) {
         const horaDe = (e) => (e.horaNotificacao && e.horaNotificacao[idAgente]) || '';
         const dono = fontes.sort((a, b) => Date.parse(horaDe(b) || 0) - Date.parse(horaDe(a) || 0))[0];
         const aviso = dono.tarefasNotificadas[idAgente];
-        if (aviso && /stopped|failed|killed|error/i.test(aviso)) agente.status = 'interrompido';
+        // Parado pelo Esc / Parar da conversa: não sai aviso; o meta diz stoppedByUser e o transcript termina na interrupção
+        // (atividade depois dela = retomado por SendMessage)
+        const paradoPeloUsuario = (meta.stoppedByUser === true || !!sub.interrompidoEm) && (!sub.interrompidoEm || Date.parse(sub.ultimo || 0) <= Date.parse(sub.interrompidoEm));
+        if ((aviso && /stopped|failed|killed|error/i.test(aviso)) || paradoPeloUsuario) agente.status = 'interrompido';
         else if (aviso && /completed|finished|done|success/i.test(aviso)) agente.status = 'concluido';
         else if (meta.finished === true || (agente.status === 'rodando' && parado)) {
             agente.status = agente.status === 'erro' ? 'erro' : 'concluido';
