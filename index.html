@@ -5349,7 +5349,7 @@ async function carregaSessoes() {
     const rodando = (m) => m.ativa || m.agentesRodando || estadoChat.some(x => x.sessionId === m.id && x.status === 'rodando');
     const trabalhandoCadeia = (c) => precisaCadeia(c) || c.membros.some(rodando) || Date.now() - c.atualizado < janelaTrabalhando;
     const trabalhando = abaSessoes === 'arquivadas' ? [] : pega(trabalhandoCadeia).sort((a, b) => precisaCadeia(b) - precisaCadeia(a));
-    if (trabalhando.length) secoes.push({ id: 'trabalhando', titulo: 'Trabalhando agora', classe: 'trabalhando-agora', cadeias: trabalhando, porProjeto: modoApp !== 'chat' });
+    if (trabalhando.length) secoes.push({ id: 'trabalhando', titulo: 'Trabalhando agora', classe: 'trabalhando-agora', cadeias: trabalhando });
     // GRUPOS DO USUÁRIO NÃO USAM O pega: A CONVERSA CONTINUA TAMBÉM NO PROJETO
     const comGrupos = abaSessoes === 'todas' || abaSessoes === 'ativas';
     if (comGrupos) for (const g of dadosPainel.grupos) {
@@ -5379,7 +5379,8 @@ async function carregaSessoes() {
             <span class="seta">${fechado ? '▸' : '▾'}</span>${esc(sec.titulo)}<span class="contagem">${sec.cadeias.length}</span></button>`;
         if (fechado) continue;
         if (sec.grupo && !sec.cadeias.length) html += '<div class="grupo-vazio">Arraste uma conversa para cá ou use ⋯ › Mover para grupo.</div>';
-        if (sec.porProjeto) { html += sublistaPorProjeto(sec.cadeias); continue; }
+        // SECOES QUE MISTURAM PROJETOS (TRABALHANDO, GRUPOS, FIXADAS) SEPARAM POR PROJETO; NO CHAT NAO HA PROJETO
+        if (modoApp !== 'chat' && !sec.id.startsWith('p:')) { html += sublistaPorProjeto(sec.cadeias); continue; }
         for (const c of sec.cadeias) html += blocoCadeia(c);
     }
     const vazios = { ativas: 'Nenhuma conversa ativa agora.', favoritas: 'Nenhuma favorita. Use a estrela ☆ numa conversa.', arquivadas: 'Nada arquivado.', todas: 'Nenhuma conversa encontrada.' };
