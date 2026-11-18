@@ -3,6 +3,13 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.23', data: '2026-11-18', itens: [
+            'Botões nas respostas do Claude, como no ChatGPT: copiar, gostei / não gostei (marca só sua), ler em voz alta com a voz em português do Windows, compartilhar (copia sua pergunta e a resposta, prontas para colar) e ⋯ com citar na sua mensagem e copiar sem formatação ou em Markdown',
+            'Esc não para mais o Claude: a resposta só é interrompida pelo botão Parar (o Esc continua fechando janelas e limpando a procura)',
+            'Red Code mais leve com o tempo: o editor de código de uma pasta que ficou 5 minutos fora de vista é fechado (cada um pesava centenas de MB e ficava aberto para sempre); o que tem alteração não salva fica',
+        ],
+    },
+    {
         versao: '1.0.22', data: '2026-11-17', itens: [
             'Grupos na lista de conversas: crie grupos com nome, cor e ícone e coloque conversas neles pelo menu ⋯ ou arrastando; arraste o grupo para mudar a ordem. A lista ganha as divisórias Grupos e Projetos, e as conversas de projetos diferentes aparecem separadas em cartões (feito pelo Guilherme)',
             'Fixadas e Arquivo viram botões ao lado da busca: as Fixadas ficam no topo e o Arquivo no fim, quando ligado. As abas agora são Todas, Ativas, Hoje, Semana e Mês (feito pelo Guilherme)',

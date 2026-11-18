@@ -1280,6 +1280,12 @@ pre.diff-inteiro .ln { display: inline-block; width: 4.2em; margin: 0 12px 0 -4p
 .msg.voce.anexo .refinado { max-width: min(76%, 760px); text-align: right; }
 .msg.voce.anexo .refinado .texto { text-align: left; }
 .msg.modelo { align-items: flex-start; }
+.acoes-fala { display: inline-flex; align-items: center; gap: 1px; margin-left: 8px; opacity: 0; transition: opacity .15s; }
+.msg.modelo:hover .acoes-fala, .acoes-fala.sempre, .acoes-fala:has(:focus-visible), .acoes-fala:has(.ativo), .acoes-fala:has([aria-pressed="true"]) { opacity: 1; }
+.acoes-fala button { display: grid; place-items: center; width: 28px; height: 26px; padding: 0; border-radius: 7px; color: var(--grafite); transition: background .12s, color .12s; }
+.acoes-fala button:hover { background: var(--realce); color: var(--tinta); }
+.acoes-fala button.ativo, .acoes-fala button[aria-pressed="true"] { color: var(--voce); }
+.acoes-fala button[aria-pressed="true"] svg { fill: color-mix(in srgb, var(--voce) 25%, transparent); }
 .msg.modelo .autor { font: 600 12.5px var(--estreita); color: var(--modelo); margin: 0 0 3px 6px; }
 .msg.modelo .balao { background: var(--realce); border: 1px solid var(--linha); border-bottom-left-radius: 4px; }
 .msg.modelo .texto { font-size: 14.5px; line-height: 1.6; }
@@ -3031,7 +3037,6 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
             <dt><kbd>c</kbd></dt><dd>Escrever na caixa de mensagem</dd>
             <dt><kbd>m</kbd></dt><dd>Abrir ou fechar o mapa de agentes</dd>
             <dt><kbd>Alt</kbd> + <kbd>V</kbd></dt><dd>Abrir ou fechar o vídeo no canto (este e os outros com Ctrl/Alt mudam em Configurações › Atalhos)</dd>
-            <dt><kbd>Esc</kbd></dt><dd>Interromper a resposta em andamento (pelo painel)</dd>
             <dt><kbd>/</kbd> na caixa</dt><dd>Comandos e skills (ex.: /compact, /testar-tela)</dd>
             <dt><kbd>@</kbd> na caixa</dt><dd>Citar um arquivo do projeto</dd>
             <dt><kbd>Enter</kbd></dt><dd>Enviar a mensagem</dd>
@@ -6034,6 +6039,128 @@ document.addEventListener('click', (ev) => {
     faixa.title = perguntaExpandida ? 'Clique para recolher' : 'Clique para ver a pergunta inteira';
 });
 
+// Botões embaixo da resposta do Claude (como no ChatGPT): copiar, gostei/não gostei, ouvir, compartilhar e mais
+const ICONES_FALA = {
+    copiar: svg('<rect x="5" y="5" width="8.5" height="8.5" rx="1.6"/><path d="M3 10.5V3.6A1.1 1.1 0 0 1 4.1 2.5H10.5"/>', 'width="15" height="15"'),
+    copiado: svg('<path d="M3.2 8.4l3 3 6.6-6.8"/>', 'width="15" height="15"'),
+    gostei: svg('<path d="M5.5 7l2.4-4.5c.9 0 1.6.8 1.4 1.7L8.9 6.5h3.4c.8 0 1.4.8 1.2 1.6l-1 4.4c-.2.6-.7 1-1.3 1H5.5z"/><path d="M5.5 7H3.2v6.5h2.3"/>', 'width="15" height="15"'),
+    naoGostei: svg('<path d="M10.5 9l-2.4 4.5c-.9 0-1.6-.8-1.4-1.7l.4-2.3H3.7c-.8 0-1.4-.8-1.2-1.6l1-4.4c.2-.6.7-1 1.3-1h5.7z"/><path d="M10.5 9h2.3V2.5h-2.3"/>', 'width="15" height="15"'),
+    ouvir: svg('<path d="M2.5 6.2h2.2L8 3.5v9L4.7 9.8H2.5z"/><path d="M10.6 5.6a3.4 3.4 0 0 1 0 4.8M12.4 3.8a6 6 0 0 1 0 8.4"/>', 'width="15" height="15"'),
+    pararVoz: svg('<rect x="4" y="4" width="8" height="8" rx="1.4"/>', 'width="15" height="15"'),
+    compartilhar: svg('<path d="M8 10V2.5M5 5.3l3-2.8 3 2.8"/><path d="M3 8.5v4a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-4"/>', 'width="15" height="15"'),
+};
+// Gostei / não gostei: marca só sua, guardada neste computador (não vai para lugar nenhum)
+const AVALIACOES_FALA = (() => { try { return JSON.parse(localStorage.getItem('painelAvaliacoesFala') || '{}'); } catch (e) { return {}; } })();
+const chaveFala = (e) => sessaoAtual + '|' + e.hora;
+function acoesFala(e, ultima) {
+    const nota = AVALIACOES_FALA[chaveFala(e)] || '';
+    return `<span class="acoes-fala ${ultima ? 'sempre' : ''}">
+        <button type="button" data-fala-acao="copiar" title="Copiar" aria-label="Copiar a resposta">${ICONES_FALA.copiar}</button>
+        <button type="button" data-fala-acao="gostei" title="Boa resposta" aria-label="Boa resposta" aria-pressed="${nota === 'gostei'}">${ICONES_FALA.gostei}</button>
+        <button type="button" data-fala-acao="naoGostei" title="Resposta ruim" aria-label="Resposta ruim" aria-pressed="${nota === 'naoGostei'}">${ICONES_FALA.naoGostei}</button>
+        <button type="button" data-fala-acao="ouvir" title="Ler em voz alta" aria-label="Ler em voz alta">${ICONES_FALA.ouvir}</button>
+        <button type="button" data-fala-acao="compartilhar" title="Compartilhar: copia sua pergunta e a resposta, prontas para colar" aria-label="Compartilhar">${ICONES_FALA.compartilhar}</button>
+        <button type="button" data-fala-acao="mais" title="Mais ações" aria-label="Mais ações" aria-haspopup="menu">${ICONES.mais}</button>
+    </span>`;
+}
+// Texto sem a marcação do Markdown (para ouvir e para copiar sem formatação)
+function textoSimples(texto, paraOuvir) {
+    return String(texto || '')
+        .replace(/```[\s\S]*?```/g, paraOuvir ? ' (trecho de código) ' : (m) => m.replace(/```\w*\n?/g, ''))
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, paraOuvir ? '' : '$&')
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+        .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+        .replace(/^\s*>\s?/gm, '')
+        .replace(/(\*\*|__)(.+?)\1/g, '$2')
+        .replace(/(^|[^\w*])\*([^*\n]+)\*/g, '$1$2')
+        .replace(/^\s*\|?[\s:-]+\|[\s|:-]*$/gm, '')
+        .replace(/\|/g, paraOuvir ? ', ' : '|')
+        .replace(/\n{3,}/g, '\n\n').trim();
+}
+// Ler em voz alta: o servidor fala pela voz em português do Windows (o Electron não enxerga essas vozes);
+// o pedido só volta quando a leitura acaba, e clicar de novo (ou em outra resposta) para
+let falaOuvindo = null;
+function paraDeOuvir(avisaServidor = true) {
+    if (falaOuvindo) { const b = falaOuvindo.querySelector('[data-fala-acao="ouvir"]'); if (b) { b.innerHTML = ICONES_FALA.ouvir; b.title = 'Ler em voz alta'; b.classList.remove('ativo'); } }
+    falaOuvindo = null;
+    if (avisaServidor) api('/api/voz', { acao: 'parar' }).catch(() => {});
+}
+function ouveFala(msg, e) {
+    const mesma = falaOuvindo === msg;
+    if (falaOuvindo) paraDeOuvir(mesma);
+    if (mesma) return;
+    const texto = textoSimples(e.texto, true);
+    if (!texto) return;
+    falaOuvindo = msg;
+    const b = msg.querySelector('[data-fala-acao="ouvir"]');
+    b.innerHTML = ICONES_FALA.pararVoz; b.title = 'Parar de ler'; b.classList.add('ativo');
+    api('/api/voz', { acao: 'falar', texto })
+        .then(() => { if (falaOuvindo === msg) paraDeOuvir(false); })
+        .catch((erro) => { if (falaOuvindo === msg) paraDeOuvir(false); recado(erro.message); });
+}
+const copiaTexto = (texto, aviso) => navigator.clipboard.writeText(texto).then(() => aviso && recado(aviso)).catch(() => recado('Não deu para copiar'));
+// Sua pergunta que gerou a resposta: o último pedido antes dela
+function perguntaDaFala(i) {
+    const eventos = (ultimosDados && ultimosDados.eventos) || [];
+    for (let k = i - 1; k >= 0; k--) if (eventos[k] && eventos[k].tipo === 'pedido') return eventos[k].texto;
+    return '';
+}
+function abreMaisFala(botao, e) {
+    if (!window.tippy) return;
+    const menu = tippy(botao, {
+        content: `<div class="menu-sessao" role="menu">
+                <button type="button" role="menuitem" data-fala-mais="citar">❝ Citar na sua mensagem</button>
+                <button type="button" role="menuitem" data-fala-mais="simples">${ICONES_FALA.copiar} Copiar sem formatação</button>
+                <button type="button" role="menuitem" data-fala-mais="markdown">${ICONES_FALA.copiar} Copiar em Markdown</button>
+            </div>`,
+        allowHTML: true, interactive: true, trigger: 'manual', hideOnClick: true, placement: 'bottom-start', theme: 'redcode menu', animation: 'redcode',
+        arrow: false, offset: [0, 6], duration: [140, 80], appendTo: () => document.body,
+        onClickOutside(i) { i.hide(); },
+        onHidden(i) { i.destroy(); },
+    });
+    menu.show();
+    menu.popper.addEventListener('click', (ev) => {
+        const item = ev.target.closest('[data-fala-mais]');
+        if (!item) return;
+        menu.hide();
+        if (item.dataset.falaMais === 'simples') return copiaTexto(textoSimples(e.texto, false), 'Resposta copiada sem formatação');
+        if (item.dataset.falaMais === 'markdown') return copiaTexto(e.texto, 'Resposta copiada em Markdown');
+        // Citar: a resposta entra como citação no campo de mensagem, com o cursor logo abaixo
+        const campo = document.getElementById('mensagem');
+        if (!campo) return;
+        const citacao = textoSimples(e.texto, false).split('\n').slice(0, 12).map(l => '> ' + l).join('\n');
+        campo.value = (campo.value ? campo.value.replace(/\s*$/, '\n\n') : '') + citacao + '\n\n';
+        campo.dispatchEvent(new Event('input', { bubbles: true }));
+        campo.focus(); campo.setSelectionRange(campo.value.length, campo.value.length);
+    });
+}
+document.addEventListener('click', (ev) => {
+    const botao = ev.target.closest('[data-fala-acao]');
+    if (!botao) return;
+    const msg = botao.closest('.msg.modelo');
+    const i = Number(msg && msg.dataset.ev);
+    const e = ultimosDados && ultimosDados.eventos && ultimosDados.eventos[i];
+    if (!e || e.tipo !== 'fala') return;
+    const acao = botao.dataset.falaAcao;
+    if (acao === 'copiar') {
+        navigator.clipboard.writeText(e.texto).then(() => {
+            botao.innerHTML = ICONES_FALA.copiado; botao.title = 'Copiado'; botao.classList.add('ativo');
+            setTimeout(() => { botao.innerHTML = ICONES_FALA.copiar; botao.title = 'Copiar'; botao.classList.remove('ativo'); }, 1600);
+        }).catch(() => recado('Não deu para copiar'));
+    } else if (acao === 'gostei' || acao === 'naoGostei') {
+        const chave = chaveFala(e);
+        AVALIACOES_FALA[chave] = AVALIACOES_FALA[chave] === acao ? '' : acao;
+        if (!AVALIACOES_FALA[chave]) delete AVALIACOES_FALA[chave];
+        try { localStorage.setItem('painelAvaliacoesFala', JSON.stringify(AVALIACOES_FALA)); } catch (erro) { /* sem armazenamento */ }
+        msg.querySelectorAll('[data-fala-acao="gostei"], [data-fala-acao="naoGostei"]').forEach(b => b.setAttribute('aria-pressed', String(AVALIACOES_FALA[chave] === b.dataset.falaAcao)));
+    } else if (acao === 'ouvir') ouveFala(msg, e);
+    else if (acao === 'compartilhar') {
+        const pergunta = perguntaDaFala(i);
+        copiaTexto((pergunta ? '**Pergunta:**\n' + pergunta + '\n\n**Resposta do Claude:**\n' : '') + e.texto, pergunta ? 'Pergunta e resposta copiadas, prontas para colar' : 'Resposta copiada, pronta para colar');
+    } else if (acao === 'mais') abreMaisFala(botao, e);
+});
+
 function desenhaFala({ e, i }, d) {
     // Chat: você à direita, o Claude à esquerda, avisos do sistema no centro
     if (e.tipo === 'pedido') {
@@ -6048,7 +6175,7 @@ function desenhaFala({ e, i }, d) {
             <div class="autor">${esc(modeloCurto(e.modelo || d.modelo))}</div>
             <div class="balao"><div class="texto">${marca(markdown(e.texto))}</div>
                 ${galeriaResposta(e.arquivos)}</div>
-            <div class="rodape-msg">${hora(e.hora)}</div></div>`;
+            <div class="rodape-msg">${hora(e.hora)}${acoesFala(e, d.eventos.findLastIndex(x => x.tipo === 'fala') === i)}</div></div>`;
     }
     if (e.tipo === 'retorno') {
         return `<div class="aviso-centro agente" data-ev="${i}"><span>${esc(e.texto)} às ${hora(e.hora)}</span>
@@ -8958,9 +9085,7 @@ document.addEventListener('keydown', (ev) => {
             if (ultimosDados) redesenha(ultimosDados);
             return;
         }
-        // Como no app: Esc interrompe a resposta em andamento pelo painel
-        const parar = document.getElementById('btnParar');
-        if (!parar.hidden) { parar.click(); recado('Interrompendo (Esc)…'); }
+        // Esc não interrompe a resposta (fácil de apertar sem querer): parar só pelo botão Parar
         return;
     }
     if (digitando || ev.ctrlKey || ev.metaKey || ev.altKey) return;
@@ -10057,7 +10182,7 @@ function iframeEditor(cwd, criar) {
     let f = editoresEmbutidos.get(chave);
     if (!f && criar) {
         f = document.createElement('iframe');
-        f.title = 'Editor de código'; f.hidden = true;
+        f.title = 'Editor de código'; f.hidden = true; f.__escondidoEm = Date.now();
         f.src = `/editor.html?embutido=1&tema=${temaEv()}&cwd=${encodeURIComponent(cwd)}`;
         f.addEventListener('load', () => { enviaTravas(); aplicaVistaEv(); });
         elEv('evEmbutido').appendChild(f);
@@ -10072,7 +10197,8 @@ function aplicaVistaEv(focar) {
     const editavel = !!(ev.ligado && a && dentroDaPastaEv(cwd, a));
     elEv('editorVivo').classList.toggle('editando', editavel);
     const f = editavel ? iframeEditor(cwd, true) : null;
-    for (const x of editoresEmbutidos.values()) x.hidden = x !== f;
+    for (const x of editoresEmbutidos.values()) { if (!x.hidden && x !== f) x.__escondidoEm = Date.now(); x.hidden = x !== f; }
+    liberaEditoresParados();
     if (!editavel) return;
     if (!mesmoArquivo(f.__arquivo, a) || focar) {
         f.__arquivo = a;
@@ -10082,6 +10208,18 @@ function aplicaVistaEv(focar) {
     }
     statusEditavel();
 }
+// Cada editor embutido é um Monaco inteiro (~200 MB): o de pasta fora de vista há 5 min é fechado, menos o que tem
+// alteração não salva. Voltar àquela pasta abre de novo (o Ctrl+Z e as abas daquele editor recomeçam)
+const EDITOR_PARADO_MS = 5 * 60 * 1000;
+function liberaEditoresParados() {
+    for (const [chave, f] of [...editoresEmbutidos]) {
+        if (!f.hidden || Date.now() - (f.__escondidoEm || Date.now()) < EDITOR_PARADO_MS) continue;
+        const info = infoEditor.get(chave);
+        if (info && info.sujos && info.sujos.length) continue;
+        f.remove(); editoresEmbutidos.delete(chave); infoEditor.delete(chave);
+    }
+}
+setInterval(liberaEditoresParados, 60 * 1000);
 // O editor avisa a cada mudança (cursor, texto, salvar): abas ganham o ponto de não salvo e a barra de status acompanha
 window.editorEmbutidoMudou = (cwd, info) => {
     const chave = String(cwd).toLowerCase(), antes = infoEditor.get(chave);

@@ -1636,6 +1636,7 @@ function registraVivas() {
     vivasGravadas = json;
     try { fs.writeFileSync(ARQUIVO_VIVAS, json); } catch (e) { /* só otimização */ }
 }
+let vozAtual = null;   // leitura em voz alta em andamento (/api/voz)
 const CORES_GRUPO = ['voce', 'atencao', 'ok', 'agente', 'modelo', 'erro'];
 const ICONES_GRUPO = ['', '📁', '⭐', '🔥', '🐛', '🚀', '💡', '🧪', '📊', '💰', '🛠️', '📦', '🧾', '🎯', '🔒', '📝'];
 const corDeGrupoValida = (cor) => CORES_GRUPO.includes(cor) || /^#[0-9a-f]{6}$/i.test(String(cor || ''));
@@ -2766,6 +2767,23 @@ async function rotaChat(req, res, url) {
         gravaDados(dados);
         return responde(res, 200, { grupos, criado: criado && criado.id });
     }
+    // Ler a resposta em voz alta: o Electron não enxerga as vozes do Windows, então o servidor fala pela voz em português
+    // (System.Speech). O pedido só responde quando a leitura acaba (ou é parada); só uma leitura por vez
+    if (url.pathname === '/api/voz') {
+        if (vozAtual) { try { vozAtual.kill(); } catch (e) { /* já acabou */ } vozAtual = null; }
+        if (corpo.acao !== 'falar') return responde(res, 200, { ok: true });
+        const texto = String(corpo.texto || '').slice(0, 20000).trim();
+        if (!texto) return responde(res, 400, { erro: 'Nada para ler.' });
+        const script = "$t = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([Console]::In.ReadToEnd())); Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $v = $s.GetInstalledVoices() | Where-Object { $_.Enabled -and $_.VoiceInfo.Culture.Name -like 'pt*' } | Select-Object -First 1; if ($v) { $s.SelectVoice($v.VoiceInfo.Name) }; $s.Speak($t)";
+        const proc = require('child_process').spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true, stdio: ['pipe', 'ignore', 'ignore'] });
+        vozAtual = proc;
+        proc.stdin.end(Buffer.from(texto, 'utf8').toString('base64'));
+        return new Promise((ok) => {
+            const fim = () => { if (vozAtual === proc) vozAtual = null; responde(res, 200, { ok: true }); ok(); };
+            proc.on('exit', fim);
+            proc.on('error', () => { if (vozAtual === proc) vozAtual = null; responde(res, 500, { erro: 'Não deu para ler em voz alta.' }); ok(); });
+        });
+    }
     if (url.pathname === '/api/chat/responder') {
         return chat.responder(corpo.id, corpo) ? responde(res, 200, { ok: true }) : responde(res, 404, { erro: 'Este pedido já foi respondido ou expirou.' });
     }
@@ -2904,7 +2922,7 @@ const servidor = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=86400', 'X-Content-Type-Options': 'nosniff' });
             return res.end(fs.readFileSync(arq));
         }
-        if (url.pathname.startsWith('/api/chat/') || url.pathname === '/api/auth/entrar' || url.pathname === '/api/auth/cancelar' || url.pathname === '/api/auth/codigo' || url.pathname === '/api/plugins/acao' || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/grupos', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta', '/api/economia'].includes(url.pathname)) return await rotaChat(req, res, url);
+        if (url.pathname.startsWith('/api/chat/') || url.pathname === '/api/auth/entrar' || url.pathname === '/api/auth/cancelar' || url.pathname === '/api/auth/codigo' || url.pathname === '/api/plugins/acao' || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/grupos', '/api/voz', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta', '/api/economia'].includes(url.pathname)) return await rotaChat(req, res, url);
         if (url.pathname === '/api/auth/estado') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
             return responde(res, 200, await login.estado());
