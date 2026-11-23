@@ -3,6 +3,12 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.24', data: '2026-11-23', itens: [
+            'Ver o terminal de um comando que espera: quando o comando em segundo plano só vigia um arquivo de andamento (espera aparecer FIM), o clique no mascote abre esse arquivo ao vivo, em vez da saída vazia do comando',
+            'Aba de acompanhar mais limpa: não mostra mais o comando gigante digitado e avisa quando o arquivo ainda está vazio',
+        ],
+    },
+    {
         versao: '1.0.23', data: '2026-11-18', itens: [
             'Botões nas respostas do Claude, como no ChatGPT: copiar, gostei / não gostei (marca só sua), ler em voz alta com a voz em português do Windows, compartilhar (copia sua pergunta e a resposta, prontas para colar) e ⋯ com citar na sua mensagem e copiar sem formatação ou em Markdown',
             'Esc não para mais o Claude: a resposta só é interrompida pelo botão Parar (o Esc continua fechando janelas e limpando a procura)',

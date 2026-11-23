@@ -4704,7 +4704,7 @@ function acompanhaArquivo(pasta, arquivo) {
     const nome = arquivo.split(/[\\/]/).pop();
     // Acompanha lendo de onde parou (não usa Get-Content -Wait, que cai quando o script apaga ou recria o arquivo):
     // espera o arquivo aparecer, avisa se ele sumir ou recomeçar do zero e continua; feche a aba quando terminar
-    const comando = `$a='${arquivo}'; $pos=-1; $aviso=''; while ($true) { if (Test-Path -LiteralPath $a) { try { $fs=[IO.File]::Open($a,'Open','Read','ReadWrite,Delete'); try { $len=$fs.Length; if ($pos -lt 0) { $pos=[Math]::Max(0,$len-6000) } elseif ($len -lt $pos) { Write-Host '--- o arquivo recomecou do zero ---' -ForegroundColor DarkGray; $pos=0 }; if ($len -gt $pos) { $null=$fs.Seek($pos,'Begin'); $sr=New-Object IO.StreamReader($fs,[Text.Encoding]::UTF8,$true); Write-Host -NoNewline $sr.ReadToEnd(); $pos=$len } } finally { $fs.Close() }; $aviso='' } catch {} } elseif ($pos -lt 0) { if ($aviso -ne 'criar') { Write-Host 'Esperando o arquivo ser criado: ${nome}' -ForegroundColor DarkGray; $aviso='criar' } } elseif ($aviso -ne 'sumiu') { Write-Host '--- o arquivo sumiu; esperando ele voltar ---' -ForegroundColor DarkGray; $aviso='sumiu'; $pos=0 }; Start-Sleep -Milliseconds 400 }\r`;
+    const comando = `Clear-Host; Write-Host 'Acompanhando ${nome} (feche a aba quando terminar)' -ForegroundColor DarkGray; $a='${arquivo}'; $pos=-1; $aviso=''; $vazio=$false; while ($true) { if (Test-Path -LiteralPath $a) { try { $fs=[IO.File]::Open($a,'Open','Read','ReadWrite,Delete'); try { $len=$fs.Length; if ($len -eq 0 -and -not $vazio) { Write-Host 'O arquivo ainda está vazio: o que for escrito nele aparece aqui' -ForegroundColor DarkGray; $vazio=$true }; if ($pos -lt 0) { $pos=[Math]::Max(0,$len-6000) } elseif ($len -lt $pos) { Write-Host '--- o arquivo recomecou do zero ---' -ForegroundColor DarkGray; $pos=0 }; if ($len -gt $pos) { $null=$fs.Seek($pos,'Begin'); $sr=New-Object IO.StreamReader($fs,[Text.Encoding]::UTF8,$true); Write-Host -NoNewline $sr.ReadToEnd(); $pos=$len } } finally { $fs.Close() }; $aviso='' } catch {} } elseif ($pos -lt 0) { if ($aviso -ne 'criar') { Write-Host 'Esperando o arquivo ser criado: ${nome}' -ForegroundColor DarkGray; $aviso='criar' } } elseif ($aviso -ne 'sumiu') { Write-Host '--- o arquivo sumiu; esperando ele voltar ---' -ForegroundColor DarkGray; $aviso='sumiu'; $pos=0 }; Start-Sleep -Milliseconds 400 }\r`;
     mostraTerminal(pasta, chave, { rotulo: '▶ ' + nome, titulo: 'Acompanhando ' + arquivo, comando });
     recado('Acompanhando ' + nome + ' no terminal');
 }
@@ -9274,18 +9274,36 @@ function desenhaTarefasBg(conversa) {
     caixa.querySelectorAll('.tempo-tarefa').forEach(el => { el.textContent = tempoTarefa(Number(el.dataset.inicio)); });
 }
 // Saída de um comando em segundo plano: o resultado dele diz o arquivo (...\tasks\<id>.output); abre uma aba acompanhando
+// Comando que espera um arquivo de andamento (until grep FIM ANDAMENTO.txt; sleep...): acha o arquivo, resolvendo
+// as variáveis (D=/c/...) e o cd do próprio comando; caminho do Git Bash (/c/...) vira C:\...
+function arquivoVigiado(comando) {
+    const texto = String(comando || '');
+    const vars = {};
+    for (const m of texto.matchAll(/(?:^|[;&|\s])([A-Za-z_]\w*)=(["']?)([^\s;"'&|]+)\2/g)) vars[m[1]] = m[3];
+    const cd = texto.match(/\bcd\s+(["']?)([^\s;"'&|]+)\1/);
+    const expande = (p) => p.replace(/\$\{?([A-Za-z_]\w*)\}?/g, (x, v) => vars[v] || x);
+    const janelas = (p) => p.replace(/^\/([a-zA-Z])\//, (x, l) => l.toUpperCase() + ':/').replace(/\//g, '\\');
+    const candidatos = [...texto.matchAll(/["']?([^\s"';|&<>()]+\.(?:txt|log))\b/gi)].map(m => expande(m[1]));
+    const escolhido = candidatos.find(c => /andamento/i.test(c)) || candidatos[0];
+    if (!escolhido || /\$/.test(escolhido)) return '';
+    const absoluto = /^([a-zA-Z]:|\/[a-zA-Z]\/)/.test(escolhido) ? escolhido : cd ? expande(cd[2]).replace(/[\\/]+$/, '') + '/' + escolhido : '';
+    const caminho = absoluto && janelas(absoluto);
+    return caminho && ACOMPANHAVEL.test(caminho) ? caminho : '';
+}
 function verSaidaTarefa(id) {
     const d = ultimosDados && ultimosDados.__chave === sessaoAtual ? ultimosDados : null;
     const limpo = String(id).replace(/[^\w-]/g, '');
     // Só o resultado do próprio comando (outros eventos podem citar o mesmo arquivo, como a saída de um teste)
     const padrao = new RegExp('ID: ' + limpo + '\\b[\\s\\S]*?([A-Za-z]:\\\\[^\'"`$;&|<>\\r\\n*?]+?\\\\' + limpo + '\\.output)');
-    let arquivo = '';
+    let arquivo = '', comando = '';
     for (const e of (d && d.eventos) || []) {
         const m = String(((e.codigo || {}).saida || {}).texto || e.saida || '').match(padrao);
-        if (m) { arquivo = m[1]; break; }
+        if (m) { arquivo = m[1]; comando = ((e.codigo || {}).entrada || {}).texto || ''; break; }
     }
     if (!arquivo) return recado('Não achei a saída deste terminal');
-    acompanhaArquivo(d.cwd, arquivo);
+    // Comando que só espera um arquivo de andamento: abre o arquivo (a saída do comando fica vazia até ele acabar)
+    const vigiado = arquivoVigiado(comando);
+    acompanhaArquivo(d.cwd, vigiado || arquivo);
 }
 document.getElementById('tarefasBg').addEventListener('click', async (ev) => {
     const alvo = ev.target.closest('[data-tarefas]');
