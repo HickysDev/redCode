@@ -1637,6 +1637,34 @@ function registraVivas() {
     try { fs.writeFileSync(ARQUIVO_VIVAS, json); } catch (e) { /* só otimização */ }
 }
 let vozAtual = null;   // leitura em voz alta em andamento (/api/voz)
+// Arquivamento automático: conversa parada há dados.arquivarDias dias vai para o Arquivo. A cadeia de continuações
+// conta como uma só (vale a parte mais recente). Nunca arquiva fixada, em grupo, trabalhando, com pergunta ou agente.
+function arquivaParadas() {
+    const dados = leDados(), dias = Number(dados.arquivarDias) || 0;
+    if (!dias) return 0;
+    const limite = Date.now() - dias * 24 * 3600 * 1000;
+    const vinculos = dados.vinculos || {}, desarquivadasEm = dados.desarquivadasEm || {};
+    const emGrupo = new Set((dados.grupos || []).flatMap(g => g.conversas || []));
+    const raizDe = (chave, guarda = 0) => (vinculos[chave] && guarda < 20 ? raizDe(vinculos[chave], guarda + 1) : chave);
+    const cadeias = new Map();
+    for (const s of listaSessoes()) {
+        const chave = s.projeto + '/' + s.id, raiz = raizDe(chave);
+        if (!cadeias.has(raiz)) cadeias.set(raiz, []);
+        cadeias.get(raiz).push({ s, chave });
+    }
+    const arquivadas = new Set(dados.arquivadas);
+    let novas = 0;
+    for (const membros of cadeias.values()) {
+        const protegida = membros.some(({ s, chave }) => dados.favoritos.includes(chave) || emGrupo.has(chave) || s.ativa || s.pergunta || s.agentesRodando
+            || Math.max(s.atualizado || 0, desarquivadasEm[chave] || 0) >= limite);
+        if (protegida) continue;
+        for (const { chave } of membros) if (!arquivadas.has(chave)) { arquivadas.add(chave); novas++; }
+    }
+    if (novas) { dados.arquivadas = [...arquivadas]; gravaDados(dados); }
+    return novas;
+}
+setTimeout(() => { try { arquivaParadas(); } catch (e) { console.log('arquivar paradas: ' + e.message); } }, 60 * 1000);
+setInterval(() => { try { arquivaParadas(); } catch (e) { console.log('arquivar paradas: ' + e.message); } }, 60 * 60 * 1000);
 const CORES_GRUPO = ['voce', 'atencao', 'ok', 'agente', 'modelo', 'erro'];
 const ICONES_GRUPO = ['', '📁', '⭐', '🔥', '🐛', '🚀', '💡', '🧪', '📊', '💰', '🛠️', '📦', '🧾', '🎯', '🔒', '📝'];
 const corDeGrupoValida = (cor) => CORES_GRUPO.includes(cor) || /^#[0-9a-f]{6}$/i.test(String(cor || ''));
@@ -2034,14 +2062,38 @@ function listaComandos(cwd) {
             return corta(String(desc || '').replace(/["']$/, ''), 140);
         } catch (e) { return ''; }
     };
+    // Para o painel de sugestões: argument-hint, descrição inteira e a tabela da seção de argumentos do arquivo
+    const detalhesDe = (arquivo) => {
+        try {
+            const texto = fs.readFileSync(arquivo, 'utf8').slice(0, 20000);
+            const fm = (texto.match(/^---\s*[\r\n]([\s\S]*?)[\r\n]---/) || [])[1] || '';
+            const campo = (nome) => String((fm.match(new RegExp('^' + nome + ':\\s*(.*)$', 'm')) || [])[1] || '').trim().replace(/^["']|["']$/g, '');
+            const limpa = (t) => String(t).replace(/\*\*|`/g, '').trim();
+            // Seção "## Argumentos" / "Parâmetros" / "Ponto de entrada por argumento": linhas da tabela (1ª coluna = parâmetro)
+            const parametros = [];
+            const linhas = texto.split(/\r?\n/);
+            const ini = linhas.findIndex(l => /^#{2,4}\s.*(argument|par[âa]metr|ponto de entrada|uso\b)/i.test(l));
+            if (ini >= 0) {
+                for (let i = ini + 1; i < linhas.length && parametros.length < 14; i++) {
+                    const l = linhas[i].trim();
+                    if (/^#{1,4}\s/.test(l)) break;
+                    if (!l.startsWith('|') || /^\|[\s:|-]+\|?$/.test(l)) continue;
+                    const celulas = l.replace(/^\||\|$/g, '').split('|').map(limpa);
+                    if (!celulas[0] || /^(argumento|par[âa]metro|argumento\/par[âa]metro)$/i.test(celulas[0])) continue;
+                    parametros.push({ param: corta(celulas[0], 80), texto: corta(celulas.slice(1).filter(Boolean).join(' · '), 260) });
+                }
+            }
+            return { argumentos: corta(campo('argument-hint'), 160), descricaoLonga: corta(campo('description'), 600), parametros };
+        } catch (e) { return {}; }
+    };
     const raizes = [[path.join(PASTA_CLAUDE), 'seu'], cwd ? [path.join(cwd, '.claude'), 'projeto'] : null].filter(Boolean);
     for (const [raiz, origem] of raizes) {
         const pastaCmd = path.join(raiz, 'commands');
-        if (fs.existsSync(pastaCmd)) for (const f of fs.readdirSync(pastaCmd)) if (f.endsWith('.md')) lista.push({ nome: f.replace(/\.md$/, ''), descricao: descricaoDe(path.join(pastaCmd, f)), origem: `comando ${origem}` });
+        if (fs.existsSync(pastaCmd)) for (const f of fs.readdirSync(pastaCmd)) if (f.endsWith('.md')) lista.push({ nome: f.replace(/\.md$/, ''), descricao: descricaoDe(path.join(pastaCmd, f)), origem: `comando ${origem}`, ...detalhesDe(path.join(pastaCmd, f)) });
         const pastaSkills = path.join(raiz, 'skills');
         if (fs.existsSync(pastaSkills)) for (const d of fs.readdirSync(pastaSkills)) {
             const skill = path.join(pastaSkills, d, 'SKILL.md');
-            if (fs.existsSync(skill)) lista.push({ nome: d, descricao: descricaoDe(skill), origem: `skill ${origem}` });
+            if (fs.existsSync(skill)) lista.push({ nome: d, descricao: descricaoDe(skill), origem: `skill ${origem}`, ...detalhesDe(skill) });
         }
     }
     return lista;
@@ -2723,8 +2775,20 @@ async function rotaChat(req, res, url) {
         const dados = leDados();
         const ja = dados.arquivadas.includes(corpo.chave);
         dados.arquivadas = ja ? dados.arquivadas.filter(a => a !== corpo.chave) : [...dados.arquivadas, corpo.chave];
+        // Desarquivada à mão: o arquivamento automático recomeça a contar os dias a partir de agora
+        dados.desarquivadasEm = dados.desarquivadasEm || {};
+        if (ja) dados.desarquivadasEm[corpo.chave] = Date.now(); else delete dados.desarquivadasEm[corpo.chave];
         gravaDados(dados);
         return responde(res, 200, { arquivada: !ja });
+    }
+    // Arquivar sozinho as conversas paradas há N dias (0 = desligado; a lista já esconde as paradas há 7 dias ou mais); salva e já roda uma vez
+    if (url.pathname === '/api/arquivar-auto') {
+        const dias = Number(corpo.dias);
+        if (![0, 1, 2, 3, 5].includes(dias)) return responde(res, 400, { erro: 'Prazo inválido.' });
+        const dados = leDados();
+        dados.arquivarDias = dias;
+        gravaDados(dados);
+        return responde(res, 200, { ok: true, arquivadas: arquivaParadas() });
     }
     if (url.pathname === '/api/favorito') {
         if (!chaveValida(corpo.chave)) return responde(res, 400, { erro: 'conversa inválida' });
@@ -2766,6 +2830,18 @@ async function rotaChat(req, res, url) {
         dados.grupos = grupos;
         gravaDados(dados);
         return responde(res, 200, { grupos, criado: criado && criado.id });
+    }
+    // Abrir o terminal da aba fora do Red Code (janela própria do Windows, mesmo shell e pasta)
+    if (url.pathname === '/api/terminal/externo') {
+        const pasta = String(corpo.pasta || ''), shell = ['powershell', 'cmd', 'gitbash'].includes(corpo.shell) ? corpo.shell : 'powershell';
+        const arquivo = String(corpo.arquivo || '');
+        try {
+            if (arquivo) {
+                if (!/^[A-Za-z]:\\[^'"`$;&|<>\r\n*?]+$/.test(arquivo) || !fs.existsSync(arquivo)) return responde(res, 400, { erro: 'Arquivo inválido ou não existe mais.' });
+            } else if (!pasta || !fs.existsSync(pasta) || !fs.statSync(pasta).isDirectory()) return responde(res, 400, { erro: 'Pasta não encontrada.' });
+            terminal.abreExterno(pasta, shell, arquivo);
+            return responde(res, 200, { ok: true });
+        } catch (e) { return responde(res, 500, { erro: e.message }); }
     }
     // Ler a resposta em voz alta: o Electron não enxerga as vozes do Windows, então o servidor fala pela voz em português
     // (System.Speech). O pedido só responde quando a leitura acaba (ou é parada); só uma leitura por vez
@@ -2922,7 +2998,7 @@ const servidor = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=86400', 'X-Content-Type-Options': 'nosniff' });
             return res.end(fs.readFileSync(arq));
         }
-        if (url.pathname.startsWith('/api/chat/') || url.pathname === '/api/auth/entrar' || url.pathname === '/api/auth/cancelar' || url.pathname === '/api/auth/codigo' || url.pathname === '/api/plugins/acao' || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/grupos', '/api/voz', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta', '/api/economia'].includes(url.pathname)) return await rotaChat(req, res, url);
+        if (url.pathname.startsWith('/api/chat/') || url.pathname === '/api/auth/entrar' || url.pathname === '/api/auth/cancelar' || url.pathname === '/api/auth/codigo' || url.pathname === '/api/plugins/acao' || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/grupos', '/api/voz', '/api/terminal/externo', '/api/arquivar-auto', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta', '/api/economia'].includes(url.pathname)) return await rotaChat(req, res, url);
         if (url.pathname === '/api/auth/estado') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
             return responde(res, 200, await login.estado());
@@ -3108,9 +3184,13 @@ const servidor = http.createServer(async (req, res) => {
                 try {
                     const lista = await chat.comandosDisponiveis(pasta);
                     const origemDisco = new Map(doDisco.map(x => [x.nome, x.origem]));
+                    // Detalhes do SKILL.md (descrição inteira e tabela de argumentos) para o painel de sugestões
+                    const detalheDisco = new Map(doDisco.map(x => [x.nome, { descricaoLonga: x.descricaoLonga, parametros: x.parametros }]));
                     cacheComandos.set(chave, { em: Date.now(), lista: lista.filter(x => !x.name.startsWith('__')).map(x => ({
                         nome: x.name, descricao: corta(x.description || '', 140), dica: x.argumentHint || '',
                         origem: x.builtin ? 'Claude Code' : (origemDisco.get(x.name) || (x.name.includes(':') ? 'plugin' : 'skill')),
+                        descricaoLonga: (detalheDisco.get(x.name) || {}).descricaoLonga || corta(x.description || '', 600),
+                        parametros: (detalheDisco.get(x.name) || {}).parametros || [],
                     })) });
                 } catch (e) {
                     return responde(res, 200, doDisco);

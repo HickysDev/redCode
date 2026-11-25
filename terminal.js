@@ -113,4 +113,25 @@ function conecta(ws, cwd, url, login, envConversa, comandoClaude) {
 // Pastas onde há terminal aberto (um terminal segura a pasta: não dá para remover um worktree com ele)
 const pastasAbertas = () => [...abertos].map(p => p.__cwd).filter(Boolean);
 
-module.exports = { liga, quantos: () => abertos.size, pastasAbertas, temGitBash: () => !!caminhoGitBash() };
+// Abrir fora do Red Code: janela própria do Windows com o mesmo terminal da aba, na mesma pasta.
+// Aba que acompanha um arquivo vira um PowerShell com Get-Content -Wait nele.
+function abreExterno(pasta, nome, arquivo) {
+    const { spawn } = require('child_process'), path = require('path'), fsx = require('fs');
+    const abre = (args, cwd) => spawn('cmd.exe', ['/c', 'start', '""', ...args], { cwd, detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    if (arquivo) {
+        const titulo = 'Acompanhando ' + path.basename(arquivo);
+        return abre(['powershell.exe', '-NoExit', '-NoLogo', '-Command', `$Host.UI.RawUI.WindowTitle = '${titulo.replace(/'/g, "''")}'; Get-Content -LiteralPath '${arquivo.replace(/'/g, "''")}' -Wait -Tail 60`], path.dirname(arquivo));
+    }
+    if (nome === 'cmd') return abre([process.env.ComSpec || 'cmd.exe', '/K'], pasta);
+    if (nome === 'gitbash') {
+        const bash = caminhoGitBash();
+        if (!bash) throw new Error('Git Bash não encontrado.');
+        // git-bash.exe (janela própria do Git) quando existe; senão o bash.exe num console
+        const gitBash = path.join(path.dirname(path.dirname(bash)), 'git-bash.exe');
+        if (fsx.existsSync(gitBash)) return abre([gitBash, '--cd=' + pasta], pasta);
+        return abre([bash, '--login', '-i'], pasta);
+    }
+    return abre(['powershell.exe', '-NoExit', '-NoLogo'], pasta);
+}
+
+module.exports = { liga, quantos: () => abertos.size, pastasAbertas, temGitBash: () => !!caminhoGitBash(), abreExterno };

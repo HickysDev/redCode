@@ -1258,6 +1258,32 @@ pre.diff-inteiro .ln { display: inline-block; width: 4.2em; margin: 0 12px 0 -4p
 /* O rodapé desconta a barra de rolagem da conversa, para as bordas baterem */
 .compositor { padding-right: calc(28px + var(--barra, 0px)); }
 .compositor > *, .compositor > form.caixa-mensagem { max-width: var(--coluna); margin-left: auto; margin-right: auto; }
+.compositor { position: relative; }
+.compositor > .skills-sugestao { position: absolute; bottom: 14px; left: calc(50% + min(var(--coluna), 100%) / 2 + 18px); width: 220px; max-width: none; margin: 0; display: flex; flex-direction: column; gap: 6px; max-height: 150px; }
+.skills-sug-topo { display: flex; align-items: baseline; gap: 6px; font: 600 11.5px var(--sans); color: var(--tinta); }
+.skills-sug-topo small { font-weight: 400; font-size: 10.5px; color: var(--grafite); }
+.skills-sug-min { margin-left: auto; width: 22px; height: 20px; padding: 0; border-radius: 6px; color: var(--grafite); font: 600 14px/1 var(--sans); }
+.skills-sug-min:hover { background: var(--realce); color: var(--tinta); }
+.skills-sugestao.minimizado { max-height: none; }
+.skills-sug-abrir { align-self: flex-start; padding: 4px 10px; border: 1px solid var(--linha); border-radius: 999px; font: 600 11.5px var(--mono); color: var(--grafite); }
+.skills-sug-abrir:hover { border-color: var(--voce); color: var(--voce); }
+.skills-sug-lista { display: flex; flex-direction: column; gap: 3px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; }
+.skill-sug { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; padding: 5px 9px; border: 1px solid var(--linha); border-radius: 9px; background: none; text-align: left; transition: border-color .15s, background .15s; }
+.skill-sug b { font: 600 12px var(--mono); color: var(--tinta); }
+.skill-sug small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 10.5px var(--mono); color: var(--grafite); }
+.skill-sug:hover { border-color: var(--voce); background: var(--realce); }
+.skill-sug.sugerida { border-color: color-mix(in srgb, var(--voce) 55%, var(--linha)); }
+.skill-sug.sugerida b { color: var(--voce); }
+.dica-skill { display: flex; flex-direction: column; gap: 6px; }
+.dica-skill-topo { display: flex; align-items: baseline; gap: 8px; }
+.dica-skill-topo b { font: 600 13px var(--mono); color: var(--tinta); }
+.dica-skill-topo span { font-size: 11px; color: var(--grafite); }
+.dica-skill code { display: block; padding: 5px 8px; border-radius: 7px; background: var(--codigo); font: 11.5px var(--mono); white-space: pre-wrap; }
+.dica-skill p { margin: 0; color: var(--tinta); }
+.dica-skill-params { display: grid; grid-template-columns: max-content 1fr; gap: 4px 10px; margin: 2px 0 0; }
+.dica-skill-params dt { font: 600 11px var(--mono); color: var(--voce); max-width: 150px; overflow-wrap: anywhere; }
+.dica-skill-params dd { margin: 0; font-size: 11.5px; color: var(--grafite); }
+.dica-skill-sem, .dica-skill-uso { font-size: 11px; color: var(--grafite); }
 .compositor .pedido-voce, .compositor .alerta-contexto { max-width: none; }
 .compositor .situacao-chat { max-width: var(--coluna); margin-left: auto; margin-right: auto; }
 .msg .balao { max-width: min(78%, 720px); }
@@ -2747,6 +2773,7 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
                     <option value="gitbash">Git Bash</option>
                     <option value="cmd">CMD</option>
                 </select>
+                <button type="button" class="mini" id="btnTerminalFora" title="Abre esta aba numa janela própria do Windows (mesmo terminal e pasta; arquivo acompanhado continua ao vivo)">Abrir fora</button>
                 <button type="button" class="mini" id="btnNovoTerminal" title="Fecha este e abre outro na mesma pasta">Novo</button>
                 <button type="button" class="mini" id="btnFecharTerminal" title="Esconder (Ctrl + `)">Esconder</button>
             </div>
@@ -2777,6 +2804,7 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
                     <button type="submit" class="botao principal enviar" id="btnEnviar" title="Enviar (Ctrl + Enter)" aria-label="Enviar">↑</button>
                 </div>
             </form>
+            <aside class="skills-sugestao" id="skillsSugestao" aria-label="Skills" hidden></aside>
         </div>
     </section>
     <aside class="lateral" aria-label="Painel lateral">
@@ -4705,7 +4733,7 @@ function acompanhaArquivo(pasta, arquivo) {
     // Acompanha lendo de onde parou (não usa Get-Content -Wait, que cai quando o script apaga ou recria o arquivo):
     // espera o arquivo aparecer, avisa se ele sumir ou recomeçar do zero e continua; feche a aba quando terminar
     const comando = `Clear-Host; Write-Host 'Acompanhando ${nome} (feche a aba quando terminar)' -ForegroundColor DarkGray; $a='${arquivo}'; $pos=-1; $aviso=''; $vazio=$false; while ($true) { if (Test-Path -LiteralPath $a) { try { $fs=[IO.File]::Open($a,'Open','Read','ReadWrite,Delete'); try { $len=$fs.Length; if ($len -eq 0 -and -not $vazio) { Write-Host 'O arquivo ainda está vazio: o que for escrito nele aparece aqui' -ForegroundColor DarkGray; $vazio=$true }; if ($pos -lt 0) { $pos=[Math]::Max(0,$len-6000) } elseif ($len -lt $pos) { Write-Host '--- o arquivo recomecou do zero ---' -ForegroundColor DarkGray; $pos=0 }; if ($len -gt $pos) { $null=$fs.Seek($pos,'Begin'); $sr=New-Object IO.StreamReader($fs,[Text.Encoding]::UTF8,$true); Write-Host -NoNewline $sr.ReadToEnd(); $pos=$len } } finally { $fs.Close() }; $aviso='' } catch {} } elseif ($pos -lt 0) { if ($aviso -ne 'criar') { Write-Host 'Esperando o arquivo ser criado: ${nome}' -ForegroundColor DarkGray; $aviso='criar' } } elseif ($aviso -ne 'sumiu') { Write-Host '--- o arquivo sumiu; esperando ele voltar ---' -ForegroundColor DarkGray; $aviso='sumiu'; $pos=0 }; Start-Sleep -Milliseconds 400 }\r`;
-    mostraTerminal(pasta, chave, { rotulo: '▶ ' + nome, titulo: 'Acompanhando ' + arquivo, comando });
+    mostraTerminal(pasta, chave, { rotulo: '▶ ' + nome, titulo: 'Acompanhando ' + arquivo, comando, arquivo });
     recado('Acompanhando ' + nome + ' no terminal');
 }
 // Nas respostas: "ACOMPANHAR: <arquivo>" ou o Get-Content -Wait da regra do CLAUDE.md abrem a aba sozinhos
@@ -4729,7 +4757,7 @@ function verificaAcompanhar(d) {
 // Shell do terminal (Configuração deste navegador): PowerShell, Git Bash ou CMD
 const NOMES_SHELL = { powershell: 'PowerShell', gitbash: 'Git Bash', cmd: 'CMD' };
 const shellPreferido = () => { try { const v = localStorage.getItem('painelShellTerminal'); return NOMES_SHELL[v] ? v : 'powershell'; } catch (e) { return 'powershell'; } };
-function criaTerminal(pasta, { chave = pasta, comando = '', rotulo = '', titulo = '', login = '', claude = '', shell: shellPedido = '' } = {}) {
+function criaTerminal(pasta, { chave = pasta, comando = '', rotulo = '', titulo = '', login = '', claude = '', shell: shellPedido = '', arquivo = '' } = {}) {
     // Comando do próprio Red Code (acompanhar arquivo), login e /mcp do Claude: PowerShell (ou o shell do bloco que mandou rodar)
     const shell = shellPedido || (comando || login || claude ? 'powershell' : shellPreferido());
     rotulo = rotulo || NOMES_SHELL[shell];
@@ -4751,7 +4779,7 @@ function criaTerminal(pasta, { chave = pasta, comando = '', rotulo = '', titulo 
     ws.onerror = () => term.write('\r\n\x1b[31m[não consegui conectar ao terminal]\x1b[0m\r\n');
     term.onData((dados) => { if (ws.readyState === 1) ws.send(JSON.stringify({ tipo: 'entrada', dados })); });
     term.onResize(({ cols, rows }) => { if (ws.readyState === 1) ws.send(JSON.stringify({ tipo: 'tamanho', cols, rows })); });
-    const t = { term, fit, ws, el, pasta, rotulo, titulo };
+    const t = { term, fit, ws, el, pasta, rotulo, titulo, shell, arquivo };
     terminais.set(chave, t);
     return t;
 }
@@ -4794,6 +4822,14 @@ function saidaDoTerminal(maximo = 80) {
 document.getElementById('btnTerminal').addEventListener('click', alternaTerminal);
 document.getElementById('btnFecharTerminal').addEventListener('click', escondeTerminal);
 document.getElementById('btnLimparTerminal').addEventListener('click', () => terminais.get(pastaTerminalAtual)?.term.clear());
+document.getElementById('btnTerminalFora').addEventListener('click', async () => {
+    const t = terminais.get(pastaTerminalAtual);
+    if (!t) return;
+    try {
+        await api('/api/terminal/externo', { pasta: t.pasta, shell: t.shell, arquivo: t.arquivo || '' });
+        recado(t.arquivo ? 'Abrindo ' + t.arquivo.split(/[\\/]/).pop() + ' numa janela do PowerShell' : 'Abrindo ' + (NOMES_SHELL[t.shell] || 'o terminal') + ' numa janela própria');
+    } catch (e) { recado(e.message); }
+});
 document.getElementById('btnNovoTerminal').addEventListener('click', () => { const t = terminais.get(pastaTerminalAtual); const pasta = t ? t.pasta : pastaDaConversa(); fechaTerminal(pasta); mostraTerminal(pasta); });
 document.getElementById('btnMandarSaida').addEventListener('click', () => {
     const saida = saidaDoTerminal();
@@ -7513,6 +7549,9 @@ const SECOES_CONFIG = {
                 <div class="config-pastas">${pastas.length ? pastas.map(p => `<div class="config-pasta"><span title="${esc(p)}">${esc(p)}</span><button class="mini" data-pasta-remover="${esc(p)}">Remover</button></div>`).join('') : '<small>Nenhuma pasta extra.</small>'}</div>
                 <div class="config-controle" style="margin-top:6px"><input type="text" id="novaPastaExtra" placeholder="C:\\pasta\\do\\projeto" style="flex:1">${noApp() ? '<button class="mini" data-pasta-escolher>Escolher…</button>' : ''}<button class="mini" data-pasta-adicionar>Adicionar</button></div>
             </div></div>`
+            + '<h3 class="config-titulo">Lista de conversas</h3>'
+            + linhaConfig('Arquivar sozinho', 'Conversa sem atividade por esse tempo vai para o Arquivo (a busca continua achando). A lista já esconde sozinha as paradas há 7 dias ou mais. Não arquiva fixada, em grupo, trabalhando ou com pergunta; a continuação conta junto. Desarquivou à mão: a contagem recomeça.',
+                `<select data-pref-servidor="arquivarDias" aria-label="Arquivar sozinho">${[[0, 'Desligado'], [1, 'Parada há 1 dia'], [2, 'Parada há 2 dias'], [3, 'Parada há 3 dias'], [5, 'Parada há 5 dias']].map(([v, n]) => `<option value="${v}" ${v === (Number(dados.arquivarDias) || 0) ? 'selected' : ''}>${n}</option>`).join('')}</select>`, 'arquivo arquivar automatico antigas paradas dias')
             + '<h3 class="config-titulo">Links</h3>'
             + linhaConfig('Navegador para abrir links', noApp() ? 'Os links das conversas abrem neste navegador.' : 'Só vale no app do Red Code (aberto no navegador, os links abrem nele mesmo).',
                 `<select data-pref-servidor="navegador" aria-label="Navegador" ${noApp() ? '' : 'disabled'}>${[['padrao', 'Padrão do Windows'], ['edge', 'Microsoft Edge'], ['chrome', 'Google Chrome'], ['firefox', 'Firefox']].map(([v, n]) => `<option value="${v}" ${v === navegadorAtual ? 'selected' : ''}>${n}</option>`).join('')}</select>`, 'navegador chrome edge firefox');
@@ -7631,6 +7670,14 @@ janelaConfig.addEventListener('change', async (evt) => {
         gravaPref(alvo.dataset.pref, alvo.value);
         aplicaAparencia();
         return recado('Configuração salva');
+    }
+    if (alvo.dataset.prefServidor === 'arquivarDias') {
+        try {
+            const r = await api('/api/arquivar-auto', { dias: Number(alvo.value) });
+            recado(Number(alvo.value) ? (r.arquivadas ? `Salvo: ${r.arquivadas} ${r.arquivadas === 1 ? 'conversa parada foi' : 'conversas paradas foram'} para o Arquivo` : 'Salvo: nenhuma conversa parada para arquivar agora') : 'Arquivamento automático desligado');
+            carregaSessoes();
+        } catch (e) { recado(e.message); }
+        return;
     }
     if (alvo.dataset.prefServidor === 'navegador') {
         try { await api('/api/navegador', { navegador: alvo.value }); recado('Navegador salvo'); } catch (e) { recado(e.message); }
@@ -9499,6 +9546,104 @@ async function enviaMensagem() {
 }
 
 document.getElementById('formMensagem').addEventListener('submit', (ev) => { ev.preventDefault(); enviaMensagem(); });
+// Painel de skills ao lado da caixa de mensagem: sugere pelas palavras que você está escrevendo e pelo seu uso;
+// passar o mouse mostra os parâmetros (argument-hint), o que a skill faz e a tabela de argumentos do SKILL.md
+const painelSkills = document.getElementById('skillsSugestao');
+const skillsPorPasta = new Map();   // cwd -> { em, lista }
+let pastaSkills = null, dicasSkills = [];
+let skillsMinimizado = (() => { try { return localStorage.getItem('painelSkillsMinimizado') === '1'; } catch (e) { return false; } })();
+const usoSkills = (() => { try { return JSON.parse(localStorage.getItem('painelUsoSkills') || '{}'); } catch (e) { return {}; } })();
+const palavrasDe = (t) => new Set(semAcento(String(t || '').toLowerCase()).split(/[^a-z0-9]+/).filter(p => p.length >= 4));
+async function carregaSkills() {
+    const cwd = pastaDaConversa() || '';
+    const guardado = skillsPorPasta.get(cwd);
+    if (guardado && Date.now() - guardado.em < 10 * 60 * 1000) return guardado.lista;
+    const lista = await getPainel('/api/comandos' + (cwd ? '?cwd=' + encodeURIComponent(cwd) : '')).catch(() => []);
+    const skills = (lista || []).filter(c => /^(skill|comando|plugin)/i.test(String(c.origem || '')));
+    skillsPorPasta.set(cwd, { em: Date.now(), lista: skills });
+    return skills;
+}
+// Nota de cada skill: palavras da mensagem que aparecem no nome/descrição/parâmetros, uso recente e ser do projeto
+function ordenaSkills(skills) {
+    const escritas = palavrasDe(document.getElementById('mensagem').value);
+    return skills.map(s => {
+        const texto = palavrasDe(s.nome + ' ' + (s.descricaoLonga || s.descricao || '') + ' ' + (s.parametros || []).map(p => p.param + ' ' + p.texto).join(' '));
+        let combina = 0;
+        for (const p of escritas) if (texto.has(p) || s.nome.toLowerCase().includes(p)) combina++;
+        const uso = usoSkills[s.nome] || { n: 0, ultimo: 0 };
+        const nota = combina * 3 + Math.min(uso.n, 10) * .5 + (Date.now() - uso.ultimo < 7 * 864e5 ? 1 : 0) + (/projeto/.test(s.origem) ? .5 : 0);
+        return { s, nota, combina };
+    }).sort((a, b) => b.nota - a.nota || a.s.nome.localeCompare(b.s.nome));
+}
+function dicaSkill(s) {
+    const params = (s.parametros || []).length
+        ? `<dl class="dica-skill-params">${s.parametros.map(p => `<dt>${esc(p.param)}</dt><dd>${esc(p.texto)}</dd>`).join('')}</dl>` : '';
+    return `<div class="dica-skill"><div class="dica-skill-topo"><b>/${esc(s.nome)}</b><span>${esc(s.origem || '')}</span></div>
+        ${s.argumentos || s.dica ? `<code>/${esc(s.nome)} ${esc(s.argumentos || s.dica)}</code>` : '<small class="dica-skill-sem">Sem parâmetros declarados.</small>'}
+        <p>${esc(s.descricaoLonga || s.descricao || '')}</p>${params}<small class="dica-skill-uso">Clique para colocar na mensagem</small></div>`;
+}
+let assinaturaSkills = '';
+async function desenhaSkills() {
+    if (!painelSkills) return;
+    const skills = await carregaSkills();
+    const form = document.getElementById('formMensagem'), compositor = document.getElementById('compositor');
+    // Só aparece quando sobra espaço ao lado da caixa (janela larga)
+    const livre = (compositor.clientWidth - form.offsetWidth) / 2;
+    const mostra = skills.length && livre >= 250 && form.offsetWidth > 0;
+    painelSkills.hidden = !mostra;
+    if (!mostra) return;
+    painelSkills.classList.toggle('minimizado', skillsMinimizado);
+    // Minimizado: só o botão para abrir de novo
+    if (skillsMinimizado) {
+        if (assinaturaSkills === 'min') return;
+        assinaturaSkills = 'min';
+        dicasSkills.forEach(d => d.destroy()); dicasSkills = [];
+        painelSkills.innerHTML = '<button type="button" class="skills-sug-abrir" data-skills-alterna title="Mostrar as sugestões de skills">/ Skills</button>';
+        return;
+    }
+    const ordem = ordenaSkills(skills);
+    const assinatura = ordem.map(o => o.s.nome + (o.combina ? '*' : '')).join('|');
+    if (assinatura === assinaturaSkills) return;
+    assinaturaSkills = assinatura;
+    dicasSkills.forEach(d => d.destroy()); dicasSkills = [];
+    painelSkills.innerHTML = `<div class="skills-sug-topo">Skills<small>${ordem.some(o => o.combina) ? 'sugeridas pelo que você escreve' : 'as que você mais usa primeiro'}</small><button type="button" class="skills-sug-min" data-skills-alterna title="Minimizar" aria-label="Minimizar as sugestões de skills">–</button></div>
+        <div class="skills-sug-lista">${ordem.map(({ s, combina }, i) => `<button type="button" class="skill-sug ${combina && i < 3 ? 'sugerida' : ''}" data-skill="${esc(s.nome)}"><b>/${esc(s.nome)}</b>${s.argumentos || s.dica ? `<small>${esc(s.argumentos || s.dica)}</small>` : ''}</button>`).join('')}</div>`;
+    if (window.tippy) dicasSkills = tippy(painelSkills.querySelectorAll('.skill-sug'), {
+        content: (el) => dicaSkill(ordem.find(o => o.s.nome === el.dataset.skill).s),
+        allowHTML: true, placement: 'left-end', theme: 'redcode', maxWidth: 440, delay: [250, 0], appendTo: () => document.body, offset: [0, 10],
+    });
+}
+painelSkills && painelSkills.addEventListener('click', (ev) => {
+    if (ev.target.closest('[data-skills-alterna]')) {
+        skillsMinimizado = !skillsMinimizado;
+        try { localStorage.setItem('painelSkillsMinimizado', skillsMinimizado ? '1' : '0'); } catch (e) { /* sem armazenamento */ }
+        assinaturaSkills = '';
+        return desenhaSkills();
+    }
+    const b = ev.target.closest('[data-skill]');
+    if (!b) return;
+    const campo = document.getElementById('mensagem');
+    // Troca o /comando do começo (se houver) por esta skill e deixa o cursor logo depois dela
+    const resto = campo.value.replace(/^\/\S*\s*/, '');
+    campo.value = '/' + b.dataset.skill + ' ' + resto;
+    campo.focus();
+    const pos = b.dataset.skill.length + 2;
+    campo.setSelectionRange(pos, pos);
+    campo.dispatchEvent(new Event('input', { bubbles: true }));
+});
+// Uso: conta a skill quando a mensagem enviada começa com /nome
+document.getElementById('formMensagem').addEventListener('submit', () => {
+    const m = document.getElementById('mensagem').value.match(/^\/([\w:.-]+)/);
+    if (!m) return;
+    const uso = usoSkills[m[1]] || { n: 0, ultimo: 0 };
+    usoSkills[m[1]] = { n: uso.n + 1, ultimo: Date.now() };
+    try { localStorage.setItem('painelUsoSkills', JSON.stringify(usoSkills)); } catch (e) { /* sem armazenamento */ }
+}, true);
+let esperaSkills = 0;
+document.getElementById('mensagem').addEventListener('input', () => { clearTimeout(esperaSkills); esperaSkills = setTimeout(desenhaSkills, 350); });
+new ResizeObserver(() => { clearTimeout(esperaSkills); esperaSkills = setTimeout(desenhaSkills, 200); }).observe(document.getElementById('compositor'));
+// Trocou de conversa (outra pasta): recarrega as skills do projeto dela
+setInterval(() => { const cwd = pastaDaConversa() || ''; if (cwd !== pastaSkills) { pastaSkills = cwd; assinaturaSkills = ''; desenhaSkills(); } }, 2000);
 // Bolinha do contexto: compacta a conversa (/compact) sem perder o rascunho da caixa
 document.getElementById('chipContexto').addEventListener('click', async () => {
     const campo = document.getElementById('mensagem');
