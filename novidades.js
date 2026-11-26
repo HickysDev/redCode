@@ -3,6 +3,13 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.27', data: '2026-11-26', itens: [
+            'Tasks agrupada: o botão Grupos junta os cartões pelos grupos da lista de conversas, cada grupo numa moldura com a cor, o ícone e o nome dele',
+            'Fala do Claude na Tasks: quando o Claude responde numa conversa, a resposta aparece num balão em cima do cartão dela e some depois de alguns segundos',
+            'Conversa concluída na Tasks: o cartão mostra ✓ Concluída por alguns segundos antes de sumir, e o painel Agora ganha a seção Concluídas com o horário (clique para abrir a conversa)',
+        ],
+    },
+    {
         versao: '1.0.26', data: '2026-11-26', itens: [
             'Correção de uma incompatibilidade nas conversas',
         ],

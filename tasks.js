@@ -34,6 +34,13 @@
 html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 #janelaTasks, .marca, .trilho-lista { ${Object.entries(IDENTIDADE_MODELO).map(([f, i]) => `--tom-${f}: color-mix(in srgb, ${i.matiz} 62%, var(--tinta)); --tom-${f}-pulso: color-mix(in srgb, ${i.matiz} 88%, var(--tinta));`).join(' ')} }
 #janelaTasks[hidden] { display: none; }
+#tkMolduras { position: absolute; left: 0; top: 0; pointer-events: none; }
+.tk-moldura { position: absolute; border: 1.5px dashed color-mix(in srgb, var(--cor-grupo, var(--grafite)) 60%, transparent); border-radius: 16px; background: color-mix(in srgb, var(--cor-grupo, var(--grafite)) 6%, transparent); }
+.tk-moldura-nome { position: absolute; left: 14px; top: 6px; font: 600 12px var(--sans); color: var(--cor-grupo, var(--grafite)); white-space: nowrap; }
+.tk-fala { position: absolute; z-index: 6; width: max-content; max-width: 300px; padding: 8px 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--tom) 55%, var(--linha)); background: var(--folha); color: var(--tinta); font: 13px/1.4 var(--sans); box-shadow: 0 8px 22px rgba(0, 0, 0, .3); pointer-events: none; transform: translateY(-100%); animation: tkFalaEntra .28s ease both; transition: opacity .45s; }
+.tk-fala::after { content: ""; position: absolute; left: 22px; bottom: -6px; width: 10px; height: 10px; background: inherit; border-right: 1px solid color-mix(in srgb, var(--tom) 55%, var(--linha)); border-bottom: 1px solid color-mix(in srgb, var(--tom) 55%, var(--linha)); transform: rotate(45deg); }
+.tk-fala.saindo { opacity: 0; }
+@keyframes tkFalaEntra { from { opacity: 0; transform: translateY(calc(-100% + 8px)) scale(.96); } to { opacity: 1; transform: translateY(-100%) scale(1); } }
 .tk-topo { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--linha); background: var(--papel); }
 .tk-topo .tk-titulo { display: flex; align-items: center; gap: 8px; color: var(--voce); font: 600 18px/1.1 var(--estreita); margin-right: 6px; }
 .tk-topo .tk-titulo svg { width: 20px; height: 20px; }
@@ -162,6 +169,15 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 .tk-feed div i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 .tk-feed div.fala { align-items: flex-start; }
 .tk-feed div.fala i { margin-top: 5px; }
+.tk-feed .tk-h-concluidas { margin-top: 10px; }
+.tk-feed div.tk-concluida { cursor: pointer; border-radius: 6px; }
+.tk-feed div.tk-concluida:hover { background: var(--realce); }
+.tk-feed div.tk-concluida b { color: var(--ok); flex: none; }
+.tk-feed div.tk-concluida small { margin-left: auto; flex: none; color: var(--grafite); }
+.tk-cartao.concluida { border-color: var(--ok); animation: tkSomeConcluida .6s ease 5.3s both; }
+.tk-cartao.concluida::after { content: "✓ Concluída"; position: absolute; inset: 0; display: grid; place-items: center; border-radius: 10px; background: color-mix(in srgb, var(--folha) 78%, transparent); color: var(--ok); font: 700 22px var(--sans); animation: tkCheckEntra .35s ease both; }
+@keyframes tkCheckEntra { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes tkSomeConcluida { to { opacity: 0; transform: scale(.97); } }
 .tk-feed div.fala span { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--tinta); line-height: 1.38; }
 .tk-feed div.fala span em { font-style: normal; color: var(--grafite); }
 .tk-feed div small { margin-left: auto; font: 11px var(--mono); color: var(--grafite); flex: none; }
@@ -217,6 +233,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
   <div class="tk-modelos" id="tkModelos" role="group" aria-label="Filtrar por modelo"></div>
   <input class="tk-busca" id="tkBusca" placeholder="Procurar tarefa ou conversa (Ctrl+K)" aria-label="Procurar">
   <button class="mini" id="tkSinais" aria-pressed="true" title="Mostrar ou esconder os sinais correndo nas trilhas">Sinais</button>
+  <button class="mini" id="tkAgrupar" hidden aria-pressed="false" title="Juntar os cartões pelos grupos da lista de conversas">Grupos</button>
   <button class="mini" id="tkAbsorvidas" hidden aria-pressed="false" title="Mostrar as conversas concluídas e paradas há mais de ${MINUTOS_ABSORVE} min">Absorvidas<span class="n" id="tkNAbsorvidas"></span></button>
   <button class="mini" id="tkOrganiza" title="Voltar ao arranjo automático (esquece as posições arrastadas)">Organizar</button>
   <button class="mini" id="tkCentraliza" title="Recentralizar no chip (mantém o zoom)">Recentralizar</button>
@@ -227,6 +244,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
   <div class="tk-mundo" id="tkMundo">
     <svg class="tk-svg" xmlns="${NS}"><g id="tkPinos"></g><g id="tkTrilhas"></g><g id="tkPulsos"></g></svg>
     <div class="tk-chip-centro ocioso" id="tkChip"><div class="tk-die"></div><i class="tk-pino1"></i><span class="tk-serigrafia">CLAUDE</span><div class="tk-chip-nucleo"><svg class="tk-anel" id="tkAnel" viewBox="0 0 62 62" aria-hidden="true"><circle class="fundo" cx="31" cy="31" r="27"/></svg>${marcaSvg(26)}</div><b>Claude</b><div class="tk-chip-linha" id="tkLinha">ocioso</div><div class="tk-leds" id="tkLeds" aria-hidden="true"></div></div>
+    <div id="tkMolduras"></div>
     <div id="tkCartoes"></div>
   </div>
   <div class="tk-caixa tk-gaveta" id="tkGaveta" hidden></div>
@@ -260,7 +278,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     const CHAVE_PREFS = 'tasksPrefs', CHAVE_POSICOES = 'tasksPosicoes';
     const lePref = (chave, padrao) => { try { const v = JSON.parse(localStorage.getItem(chave) || 'null'); return v == null ? padrao : v; } catch (e) { return padrao; } };
     const gravaPref = (chave, valor) => { try { localStorage.setItem(chave, JSON.stringify(valor)); } catch (e) { /* sem armazenamento */ } };
-    const prefs = { vista: null, filtro: 'todas', filtroModelo: null, absorvidas: false, sinais: localStorage.getItem('tasksSinais') !== '0', ...lePref(CHAVE_PREFS, {}) };
+    const prefs = { vista: null, filtro: 'todas', filtroModelo: null, absorvidas: false, agrupar: false,sinais: localStorage.getItem('tasksSinais') !== '0', ...lePref(CHAVE_PREFS, {}) };
     const gravaPrefs = () => gravaPref(CHAVE_PREFS, prefs);
     const sinaisLigados = () => prefs.sinais !== false;
 
@@ -292,7 +310,15 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     const absorvida = () => false;
     const passaFiltro = (c) => (prefs.filtro === 'todas' || (prefs.filtro === 'ativas' && c.vivo) || (prefs.filtro === 'esperando' && c.esperando) || (prefs.filtro === 'agentes' && agentesAtivos(c).length > 0))
         && (!prefs.filtroModelo || familiaModelo(c.modelo) === prefs.filtroModelo || todosSubs(c).some(s => familiaModelo(s.modelo) === prefs.filtroModelo));
-    const visiveisAgora = () => dados.conversas.filter(c => passaFiltro(c) && (prefs.absorvidas || !absorvida(c))).sort((a, b) => a.id.localeCompare(b.id));
+    // CONVERSA QUE ACABOU DE CONCLUIR SAI DO /api/tasks NA HORA: O CARTAO FICA ALGUNS SEGUNDOS COM O CHECK ANTES DE SUMIR
+    const DURACAO_CONCLUIDA_MS = 6000;
+    const concluidas = new Map();          // id -> { c (ultimo estado), ate }
+    const historicoConcluidas = [];        // as ultimas que terminaram (secao "Concluidas" do painel Agora)
+    const emConclusao = (id) => { const x = concluidas.get(id); return !!x && x.ate > Date.now() && !dados.conversas.some(c => c.id === id); };
+    const visiveisAgora = () => [
+        ...dados.conversas.filter(c => passaFiltro(c) && (prefs.absorvidas || !absorvida(c))),
+        ...[...concluidas.values()].filter(x => emConclusao(x.c.id)).map(x => x.c),
+    ].sort((a, b) => a.id.localeCompare(b.id));
     const situacao = (c) => c.esperando ? 'pergunta pra você' : c.vivo ? ((c.segundoPlano || []).length && !c.acaoAtual ? 'em segundo plano' : 'trabalhando') : 'parada';
     const classeSituacao = (c) => c.esperando ? 'esperando' : c.vivo ? 'viva' : 'parada';
 
@@ -366,21 +392,52 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     const alturaSubs = (k) => k.subs.reduce((s, u) => s + u.h, 0) + FOLGA_SUB * Math.max(0, k.subs.length - 1);
     const alturaTotal = (k) => Math.max(k.h, alturaSubs(k));
     // LAYOUT DETERMINISTICO: COLUNAS A DIREITA E A ESQUERDA DO CHIP, SEM SOBREPOSICAO; CARTAO FIXADO FICA ONDE O USUARIO DEIXOU
+    // GRUPOS DA LISTA DE CONVERSAS (OS MESMOS DA LATERAL): A CONVERSA ENTRA NO GRUPO DELA OU DE UMA PARTE ANTERIOR DA CADEIA
+    const gruposTk = () => (typeof dadosPainel !== 'undefined' && dadosPainel && Array.isArray(dadosPainel.grupos) ? dadosPainel.grupos : []);
+    const agrupando = () => !!prefs.agrupar && gruposTk().length > 0;
+    function grupoDaConversaTk(c) {
+        const vinculos = (typeof dadosPainel !== 'undefined' && dadosPainel && dadosPainel.vinculos) || {};
+        const chaves = [];
+        for (let k = c.projeto + '/' + c.id, i = 0; k && i < 20; i++) { chaves.push(k); k = vinculos[k]; }
+        return gruposTk().find(g => (g.conversas || []).some(x => chaves.includes(x))) || null;
+    }
+    const FOLGA_GRUPO = 40;
+    const idGrupo = (k) => (k.grupo ? k.grupo.id : '');
     function posiciona(cartoes) {
         const o = centro();
         const automaticos = cartoes.filter(k => !k.fixo);
+        cartoes.forEach(k => { k.grupo = agrupando() ? grupoDaConversaTk(k.c) : null; });
+        // AGRUPADO: CADA GRUPO INTEIRO NUM LADO SO (O QUE TEM MENOS CARTOES), NA ORDEM DA LISTA; OS SEM GRUPO COMPLETAM
+        const ladoDe = new Map();
+        if (agrupando()) {
+            const ordem = new Map(gruposTk().map((g, i) => [g.id, i]));
+            automaticos.sort((a, b) => (a.grupo ? ordem.get(a.grupo.id) : 1e9) - (b.grupo ? ordem.get(b.grupo.id) : 1e9));
+            const conta = { 1: 0, '-1': 0 }, ladoDoGrupo = new Map();
+            for (const k of automaticos) {
+                let lado = k.grupo ? ladoDoGrupo.get(k.grupo.id) : undefined;
+                if (lado === undefined) {
+                    lado = conta[1] <= conta[-1] ? 1 : -1;
+                    if (k.grupo) { ladoDoGrupo.set(k.grupo.id, lado); conta[lado] += automaticos.filter(x => x.grupo && x.grupo.id === k.grupo.id).length; }
+                    else conta[lado]++;
+                }
+                ladoDe.set(k, lado);
+            }
+        }
         for (const lado of [1, -1]) {
-            const lista = automaticos.filter((k, i) => (i % 2 === 0) === (lado === 1));
+            const lista = agrupando() ? automaticos.filter(k => ladoDe.get(k) === lado) : automaticos.filter((k, i) => (i % 2 === 0) === (lado === 1));
             const nColunas = Math.ceil(lista.length / MAX_POR_COLUNA), tam = Math.ceil(lista.length / Math.max(nColunas, 1));
             const alturas = [], bordas = [];
             let borda = CHIP / 2 + CANAL;
             for (let j = 0; j < nColunas; j++) {
                 const itens = lista.slice(j * tam, (j + 1) * tam);
-                const total = itens.reduce((s, k) => s + alturaTotal(k), 0) + FOLGA_Y * (itens.length - 1);
+                // ENTRE GRUPOS DIFERENTES FICA ESPACO PARA O NOME DA MOLDURA
+                const folga = (i) => (i > 0 && agrupando() && idGrupo(itens[i]) !== idGrupo(itens[i - 1]) ? FOLGA_GRUPO : FOLGA_Y);
+                const total = itens.reduce((s, k, i) => s + alturaTotal(k) + (i > 0 ? folga(i) : 0), 0);
                 let y = -total / 2;
-                for (const k of itens) {
+                for (const [i, k] of itens.entries()) {
+                    if (i > 0) y += folga(i);
                     Object.assign(k, { lado, coluna: j, y: o.y + y, x: o.x + (lado > 0 ? borda : -borda - LARGURA_CARTAO), contorno: null });
-                    y += alturaTotal(k) + FOLGA_Y;
+                    y += alturaTotal(k);
                 }
                 alturas.push(total);
                 bordas.push(borda);
@@ -512,7 +569,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         for (const [id, k] of cartoesPorId) if (!vivos.has(id)) { k.el.remove(); k.trilha.remove(); k.pino.remove(); k.subs.forEach(u => { u.el.remove(); u.trilha.remove(); if (subsPorId.get(u.s.id) === u) subsPorId.delete(u.s.id); }); cartoesPorId.delete(id); }
         const cartoes = visiveis.map(c => {
             let k = cartoesPorId.get(c.id);
-            const corpo = htmlCartao(c), classe = `tk-cartao ${classeSituacao(c)}${selecionada === c.id ? ' sel' : ''}`;
+            const corpo = htmlCartao(c), classe = `tk-cartao ${classeSituacao(c)}${selecionada === c.id ? ' sel' : ''}${emConclusao(c.id) ? ' concluida' : ''}`;
             if (!k) {
                 const e = document.createElement('article');
                 e.dataset.conversa = c.id;
@@ -555,6 +612,8 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         if (!gPinos.childElementCount) desenhaPinos();
         for (const k of cartoes) { k.el.style.left = k.x + 'px'; k.el.style.top = k.y + 'px'; }
         atualizaTrilhas();
+        // Respostas novas: balão em cima do cartão (agora que ele existe e tem posição)
+        while (falasPendentes.length) { const p = falasPendentes.shift(); mostraFala(p.c, p.texto); }
         atualizaCentro(visiveis);
         atualizaContadores();
         desenhaLegenda(visiveis);
@@ -598,7 +657,56 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         gPinos.setAttribute('transform', `translate(${o.x} ${o.y})`);
     }
     // RECALCULA TODAS AS TRILHAS (TAMBEM A CADA QUADRO DO ARRASTE DE UM CARTAO OU DO CHIP)
+    // MOLDURA DE CADA GRUPO EM VOLTA DOS SEUS CARTOES (UMA POR COLUNA, JA QUE O GRUPO PODE QUEBRAR DE COLUNA)
+    function desenhaMolduras() {
+        const caixa = $('tkMolduras');
+        if (!agrupando()) { if (caixa.innerHTML) caixa.innerHTML = ''; return; }
+        const blocos = new Map();
+        for (const k of cartoesAtuais) {
+            const g = k.grupo || grupoDaConversaTk(k.c);
+            if (!g) continue;
+            const chave = g.id + '|' + Math.round(k.x);
+            const r = pegada(k), b = blocos.get(chave);
+            if (!b) blocos.set(chave, { g, x1: r.x, y1: r.y, x2: r.x + r.w, y2: r.y + r.h });
+            else Object.assign(b, { x1: Math.min(b.x1, r.x), y1: Math.min(b.y1, r.y), x2: Math.max(b.x2, r.x + r.w), y2: Math.max(b.y2, r.y + r.h) });
+        }
+        const cor = (g) => (typeof estiloCorGrupo === 'function' ? estiloCorGrupo(g.cor) : '');
+        const html = [...blocos.values()].map(b => `<div class="tk-moldura" style="left:${b.x1 - 12}px;top:${b.y1 - 30}px;width:${b.x2 - b.x1 + 24}px;height:${b.y2 - b.y1 + 42}px;${cor(b.g)}"><span class="tk-moldura-nome">${b.g.icone ? escapa(b.g.icone) + ' ' : ''}${escapa(b.g.nome)}</span></div>`).join('');
+        if (caixa.innerHTML !== html) caixa.innerHTML = html;
+    }
+    // FALA DO CLAUDE EM CIMA DO CARTAO: BALAO QUE APARECE COM A RESPOSTA NOVA E SOME SOZINHO
+    const falasAtivas = new Map();   // id da conversa -> { el, timer }
+    const falasPendentes = [];       // respostas chegadas antes do cartao existir (o feed roda antes do desenho)
+    const DURACAO_FALA_MS = 7000;
+    function mostraFala(c, texto) {
+        const k = cartoesPorId.get(c.id);
+        if (!k) return;
+        const antes = falasAtivas.get(c.id);
+        if (antes) { clearTimeout(antes.timer); antes.el.remove(); }
+        const balao = document.createElement('div');
+        balao.className = 'tk-fala';
+        balao.style.setProperty('--tom', tomModelo(c.modelo));
+        balao.textContent = cortaTexto(String(texto || '').replace(/```[\s\S]*?```/g, ' (código) ').replace(/[#*`>_|]/g, '').replace(/\s+/g, ' ').trim(), 220);
+        caixaCartoes.appendChild(balao);
+        const f = { el: balao };
+        f.timer = setTimeout(() => {
+            balao.classList.add('saindo');
+            setTimeout(() => { balao.remove(); if (falasAtivas.get(c.id) === f) falasAtivas.delete(c.id); }, 450);
+        }, DURACAO_FALA_MS);
+        falasAtivas.set(c.id, f);
+        posicionaFalas();
+    }
+    function posicionaFalas() {
+        for (const [id, f] of falasAtivas) {
+            const k = cartoesPorId.get(id);
+            if (!k || !k.el.isConnected) { clearTimeout(f.timer); f.el.remove(); falasAtivas.delete(id); continue; }
+            f.el.style.left = (k.x + 14) + 'px';
+            f.el.style.top = (k.y - 12 - (agrupando() && (k.grupo || grupoDaConversaTk(k.c)) ? 22 : 0)) + 'px';
+        }
+    }
     function atualizaTrilhas() {
+        desenhaMolduras();
+        posicionaFalas();
         roteia(cartoesAtuais);
         for (const lista of Object.values(pads)) for (const p of lista) p.classList.remove('ligado');
         for (const k of cartoesAtuais) {
@@ -689,6 +797,9 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         const htmlModelos = [...familias].sort().map(([f, n]) => `<button class="tk-chip-modelo n" data-modelo="${f}" aria-pressed="${prefs.filtroModelo === f}" style="--tom:var(--tom-${f})" title="Só conversas e agentes com ${IDENTIDADE_MODELO[f].nome}">${glifoModelo(f)}${IDENTIDADE_MODELO[f].nome}<span class="n">${n}</span></button>`).join('');
         if ($('tkModelos').innerHTML !== htmlModelos) $('tkModelos').innerHTML = htmlModelos;
         $('tkSinais').setAttribute('aria-pressed', String(sinaisLigados()));
+        // "Grupos" só aparece quando há grupos na lista de conversas
+        $('tkAgrupar').hidden = !gruposTk().length;
+        $('tkAgrupar').setAttribute('aria-pressed', String(agrupando()));
         $('tkAbsorvidas').setAttribute('aria-pressed', String(!!prefs.absorvidas));
         const absorvidas = dados.conversas.filter(absorvida).length;
         $('tkNAbsorvidas').textContent = absorvidas || '';
@@ -849,6 +960,11 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         }
         gaveta.hidden = false;
     }
+    // Concluída no painel Agora: abre a conversa
+    $('tkFeed').addEventListener('click', (ev) => {
+        const item = ev.target.closest('[data-tk-concluida]');
+        if (item && historicoConcluidas[+item.dataset.tkConcluida]) abreConversa(historicoConcluidas[+item.dataset.tkConcluida].c);
+    });
     $('tkGaveta').addEventListener('click', (ev) => {
         if (ev.target.closest('[data-tk-fecha-gaveta]')) { selecionada = null; $('tkGaveta').hidden = true; desenha(); return; }
         if (ev.target.closest('[data-tk-abrir]')) abreConversa(dados.conversas.find(x => x.id === selecionada));
@@ -962,6 +1078,9 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
             const novas = vista === undefined ? falas.slice(-1) : falas.filter(f => f.hora > vista);
             if (falas.length) falasVistas.set(c.id, falas[falas.length - 1].hora);
             novas.forEach(f => novasFalas.push({ cor: tomModelo(c.modelo), quem: cortaTexto(c.titulo, 26), texto: f.texto, fala: true, hora: Date.parse(f.hora) || Date.now() }));
+            // Balão só para resposta que acabou de chegar (ao abrir a visão, só se for do último minuto)
+            const ultimaNova = novas[novas.length - 1];
+            if (ultimaNova && (vista !== undefined || Date.now() - (Date.parse(ultimaNova.hora) || 0) < 60000)) falasPendentes.push({ c, texto: ultimaNova.texto });
         }
         novasFalas.sort((a, b) => a.hora - b.hora).forEach(f => feed.unshift(f));
         if (anterior) {
@@ -980,13 +1099,23 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
             }
             const idsAgora = new Set(dados.conversas.map(c => c.id));
             for (const v of anterior.conversas) {
-                if (!idsAgora.has(v.id)) feed.unshift({ cor: 'var(--ok)', texto: `${cortaTexto(v.titulo, 34)} terminou`, hora: Date.now() });
+                if (idsAgora.has(v.id) || concluidas.has(v.id)) continue;
+                // Concluiu: check no cartão por alguns segundos e registro na seção "Concluídas"
+                feed.unshift({ cor: 'var(--ok)', texto: `✓ ${cortaTexto(v.titulo, 34)} concluiu`, hora: Date.now() });
+                concluidas.set(v.id, { c: v, ate: Date.now() + DURACAO_CONCLUIDA_MS });
+                historicoConcluidas.unshift({ c: v, hora: Date.now() });
+                historicoConcluidas.splice(5);
+                agenda(() => { concluidas.delete(v.id); desenha(); }, DURACAO_CONCLUIDA_MS + 100);
             }
+            // Voltou a trabalhar: sai das concluídas
+            for (const c of dados.conversas) concluidas.delete(c.id);
         }
         feed.splice(5);
         anterior = dados;
         const quando = (ms) => { const s = Math.round((Date.now() - ms) / 1000); return s < 60 ? s + ' s' : Math.round(s / 60) + ' min'; };
-        $('tkFeed').innerHTML = '<h4>Agora</h4>' + (feed.length ? feed.map(f => `<div class="${f.fala ? 'fala' : ''}"${f.fala ? ` title="${escapa(f.quem + ': ' + f.texto)}"` : ''}><i style="background:${f.cor}"></i><span>${f.fala ? `<em>${escapa(f.quem)}:</em> ` : ''}${escapa(f.texto)}</span><small>${quando(f.hora)}</small></div>`).join('') : '<p>Nada ainda.</p>');
+        const horaCurta = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        $('tkFeed').innerHTML = '<h4>Agora</h4>' + (feed.length ? feed.map(f => `<div class="${f.fala ? 'fala' : ''}"${f.fala ? ` title="${escapa(f.quem + ': ' + f.texto)}"` : ''}><i style="background:${f.cor}"></i><span>${f.fala ? `<em>${escapa(f.quem)}:</em> ` : ''}${escapa(f.texto)}</span><small>${quando(f.hora)}</small></div>`).join('') : '<p>Nada ainda.</p>')
+            + (historicoConcluidas.length ? '<h4 class="tk-h-concluidas">Concluídas</h4>' + historicoConcluidas.map((x, i) => `<div class="tk-concluida" data-tk-concluida="${i}" title="Abrir a conversa"><b>✓</b><span>${escapa(x.c.titulo)}</span><small>às ${horaCurta(x.hora)}</small></div>`).join('') : '');
     }
 
     // POLLING SO COM A VISAO ABERTA E A JANELA VISIVEL; UMA REQUISICAO POR VEZ E RESPOSTA DESCARTADA SE A VISAO FECHOU
@@ -1080,6 +1209,8 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         vista = { k: vista.k, x: caixa.width / 2 - o.x * vista.k, y: (caixa.height - 50) / 2 - o.y * vista.k };
         aplicaVista();
     });
+    // Agrupar pelos grupos da lista: refaz o arranjo automático (cartão arrastado fica onde está)
+    $('tkAgrupar').addEventListener('click', () => { prefs.agrupar = !prefs.agrupar; gravaPrefs(); desenha(); atualizaContadores(); });
     $('tkOrganiza').addEventListener('click', () => { fixas = { cartoes: {}, agentes: {}, chip: null }; gravaPosicoes(); vista = null; desenha(); });
     $('tkFecha').addEventListener('click', fecha);
     // ESC SO QUANDO A TASKS E A JANELA DE CIMA (UMA CONFIRMACAO DO APP, Z-INDEX MAIOR, FICA POR CIMA DELA)
