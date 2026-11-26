@@ -3,6 +3,12 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.28', data: '2026-11-26', itens: [
+            'Limites de uso mais arrumados: a pílula da sua conta fica alinhada ao chip do perfil e a de outra conta com conversa rodando vai acima dela, mostrando sessão e semanal; o player não fica mais coberto',
+            'Tasks: o painel de limites aberto aparece por cima dela, e os cartões usam o nome que você deu à conversa na lista',
+        ],
+    },
+    {
         versao: '1.0.27', data: '2026-11-26', itens: [
             'Tasks agrupada: o botão Grupos junta os cartões pelos grupos da lista de conversas, cada grupo numa moldura com a cor, o ícone e o nome dele',
             'Fala do Claude na Tasks: quando o Claude responde numa conversa, a resposta aparece num balão em cima do cartão dela e some depois de alguns segundos',

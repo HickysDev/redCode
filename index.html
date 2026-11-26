@@ -2130,7 +2130,15 @@ body.sessao-chat #btnTerminal, body.sessao-chat .seletor-modo, body.sessao-chat 
 /* Pílula de uso e perfil no rodapé da lista: mesma altura e mesma base */
 .uso-plano.minimizado .uso-pilula { box-sizing: border-box; height: 30px; white-space: nowrap; max-width: 100%; }
 .uso-plano.minimizado .uso-texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.uso-extras { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.uso-plano.minimizado:has(.uso-extras) { display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 6px; border: 0; background: none; }
+.uso-plano.minimizado:has(.uso-extras) .uso-pilula { border: 1px solid var(--linha); background: var(--folha); }
+.uso-plano.minimizado .uso-pilula.uso-extra { height: auto; padding: 5px 13px; }
+.uso-extra-corpo { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; line-height: 1.3; }
+.uso-extra-corpo .uso-extra-texto { max-width: 100%; font-size: 10.5px; }
+.uso-extras { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.uso-plano.minimizado .uso-extra { width: 100%; }
+/* Painel aberto por cima da Tasks (senão a janela dela cobre o painel) */
+body:has(#janelaTasks:not([hidden])) .uso-plano { z-index: 66; }
 .uso-extra-texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .uso-extra-pct { flex: none; }
 .uso-extra .ponto-uso { flex: none; }
@@ -2142,7 +2150,7 @@ body.sessao-chat #btnTerminal, body.sessao-chat .seletor-modo, body.sessao-chat 
 /* Rodapé da lista: a lista termina acima dele (a barra de rolagem não passa por baixo das pílulas) */
 .lista { padding-bottom: 12px; }
 .rodape-sessoes { flex: none; margin-top: auto; border-top: 1px solid var(--linha); padding: 8px 10px 0; }
-.rodape-pilulas { height: 49px; }
+.rodape-pilulas { height: calc(49px + var(--uso-extras, 0) * 50px); }
 body.lista-escondida .rodape-sessoes { display: none; }
 /* Player do que está tocando no Windows */
 .player-midia { position: relative; overflow: hidden; display: flex; align-items: center; gap: 9px; padding: 7px 5px 9px 7px; border: 1px solid var(--linha); border-radius: 11px; background: var(--folha); animation: playerEntra .35s cubic-bezier(.2, .8, .2, 1); }
@@ -3897,6 +3905,7 @@ function desenhaUso() {
     if (!u) return;
     if (!JANELA_SECUNDARIA) avisaLimite(u);
     el.classList.toggle('minimizado', usoMinimizado);
+    document.body.style.setProperty('--uso-extras', String(usoMinimizado ? usoOutrasContas.length : 0));
     if (!usoMinimizado) el.style.maxWidth = '';
     if (usoMinimizado) {
         // Resumo: sessão e o semanal geral (o maior uso decide a cor)
@@ -3908,8 +3917,8 @@ function desenhaUso() {
         el.innerHTML = `<button class="uso-pilula ${maior >= 90 ? 'critico' : maior >= 70 ? 'alto' : ''}" data-uso-expandir title="${esc(curto.map(c => c.nome + ': ' + c.p + '%').join(' · '))} · clique para ver os limites" aria-label="Mostrar os limites de uso do plano">
             <span class="ponto-uso" aria-hidden="true"></span><span class="uso-texto" data-completo="${esc(texto(curto))}" data-curto="${esc(texto([doMaior]))}">${texto(curto)}</span></button>`;
         el.hidden = false;
-        ajustaPilulaUso();
         if (usoOutrasContas.length) el.insertAdjacentHTML('beforeend', extrasUso(true));
+        ajustaPilulaUso();
         return;
     }
     {
@@ -3949,9 +3958,10 @@ function extrasUso(minimizado) {
     if (minimizado) {
         return '<div class="uso-extras">' + usoOutrasContas.map(c => {
             const semanal = c.uso.limites.find(l => /todos/.test(l.nome)) || c.uso.limites[0];
+            const sessao = c.uso.limites.find(l => l.grupo === 'session');
             const maior = Math.max(...c.uso.limites.map(l => l.percentual));
             return `<button class="uso-pilula uso-extra ${classe(maior)}" data-uso-expandir title="Conta ${esc(c.nome)} (conversa rodando nela): ${esc(c.uso.limites.map(l => l.nome + ' ' + l.percentual + '%').join(' · '))}">
-                <span class="ponto-uso" aria-hidden="true"></span><span class="uso-extra-texto">${esc(c.nome)}</span><span class="uso-extra-pct"><b>${semanal.percentual}%</b></span></button>`;
+                <span class="ponto-uso" aria-hidden="true"></span><span class="uso-extra-corpo"><small class="uso-extra-texto">${esc(c.nome)}</small><span class="uso-extra-pct">${sessao ? `Sessão <b>${sessao.percentual}%</b> · ` : ''}Semanal <b>${semanal.percentual}%</b></span></span></button>`;
         }).join('') + '</div>';
     }
     return usoOutrasContas.map(c => `<div class="uso-outra-conta"><div class="cabeca-uso"><span>Conta ${esc(c.nome)} · conversa rodando nela</span></div>`
@@ -8015,9 +8025,12 @@ function ajustaPilulaUso() {
     const nav = document.querySelector('nav.sessoes');
     const larguraChip = chip && chip.offsetWidth ? chip.offsetWidth + 8 : 0;
     const cabe = Math.max(80, (nav ? nav.getBoundingClientRect().width : 252) - 20 - larguraChip);
-    el.style.maxWidth = cabe + 'px';
+    const temExtras = !!el.querySelector('.uso-extras');
+    const principal = el.querySelector('.uso-pilula:not(.uso-extra)');
+    el.style.maxWidth = (temExtras ? Math.max(cabe, (nav ? nav.getBoundingClientRect().width : 252) - 20) : cabe) + 'px';
+    if (principal) principal.style.maxWidth = temExtras ? cabe + 'px' : '';
     txt.innerHTML = txt.dataset.completo;
-    if (el.scrollWidth > cabe + 1 || txt.scrollWidth > txt.clientWidth + 1) txt.innerHTML = txt.dataset.curto;
+    if ((temExtras ? principal : el).scrollWidth > cabe + 1 || txt.scrollWidth > txt.clientWidth + 1) txt.innerHTML = txt.dataset.curto;
 }
 window.addEventListener('resize', () => ajustaPilulaUso());
 // Seletor no topo (dados vêm do /api/versao, que a página já consulta)

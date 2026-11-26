@@ -401,6 +401,13 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         for (let k = c.projeto + '/' + c.id, i = 0; k && i < 20; i++) { chaves.push(k); k = vinculos[k]; }
         return gruposTk().find(g => (g.conversas || []).some(x => chaves.includes(x))) || null;
     }
+    function nomeDaListaTk(c) {
+        const painel = typeof dadosPainel !== 'undefined' && dadosPainel ? dadosPainel : null;
+        if (!painel || !painel.nomes) return '';
+        const vinculos = painel.vinculos || {};
+        for (let k = c.projeto + '/' + c.id, i = 0; k && i < 20; i++) { if (painel.nomes[k]) return painel.nomes[k]; k = vinculos[k]; }
+        return '';
+    }
     const FOLGA_GRUPO = 40;
     const idGrupo = (k) => (k.grupo ? k.grupo.id : '');
     function posiciona(cartoes) {
@@ -1129,6 +1136,8 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
             const novo = await r.json();
             if (janela.hidden) return;
             dados = novo;
+            // Nome que você deu à conversa na lista (ou à parte anterior da cadeia) vale também aqui
+            for (const c of dados.conversas) { const nome = nomeDaListaTk(c); if (nome) c.titulo = nome; }
             hash = dados.hash;
             registraFeed();
             // POLL NO MEIO DE UM ARRASTE: O CARTAO NAO PODE VOLTAR; REDESENHA AO SOLTAR
