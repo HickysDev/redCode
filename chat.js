@@ -484,14 +484,16 @@ function fechaSessao(sessionId) {
 
 // Limites de uso do plano (sessão de 5 h, semanal, por modelo). Usa um processo vivo do
 // painel se houver; senão sobe um processo que não recebe mensagem nenhuma (não gasta tokens).
-async function usoDoPlano() {
+// env: o de outra conta (pílula extra de uso); sem env, a conta do servidor
+async function usoDoPlano(env) {
     const contaServidor = require('./perfis').contaDoEnv(process.env);
-    const viva = [...conversas.values()].find(c => c.vivo && c.q && (c.contaDir || contaServidor) === contaServidor);
+    const contaAlvo = env ? require('./perfis').contaDoEnv(env) : contaServidor;
+    const viva = [...conversas.values()].find(c => c.vivo && c.q && (c.contaDir || contaServidor) === contaAlvo);
     let q = viva && viva.q, fila = null;
     if (!q) {
         const { query } = await carregaSdk();
         fila = criaFila();
-        q = query({ prompt: fila, options: { cwd: require('os').homedir(), settingSources: [] } });
+        q = query({ prompt: fila, options: { cwd: require('os').homedir(), settingSources: [], ...(env ? { env } : {}) } });
     }
     try {
         const u = await Promise.race([
@@ -579,9 +581,33 @@ function voltarArquivos(sessionId, cwd, uuid, simular, env) {
     return comProcessoDaSessao(sessionId, cwd, (q) => q.rewindFiles(uuid, { dryRun: !!simular }), env);
 }
 // Ramificar: copia a conversa até a mensagem escolhida numa sessão nova
-async function ramificar(sessionId, cwd, uuid) {
-    const sdk = await carregaSdk();
-    return sdk.forkSession(sessionId, { dir: cwd, upToMessageId: uuid });
+// Conversa de outra conta: o forkSession lê e grava na pasta da conta (CLAUDE_CONFIG_DIR) e não aceita env, então roda
+// num processo à parte com o env dela (o env do servidor não muda)
+async function ramificar(sessionId, cwd, uuid, env) {
+    const perfisM = require('./perfis');
+    if (!env || perfisM.contaDoEnv(env) === perfisM.contaDoEnv(process.env)) {
+        const sdk = await carregaSdk();
+        return sdk.forkSession(sessionId, { dir: cwd, upToMessageId: uuid });
+    }
+    const { spawn } = require('child_process'), { pathToFileURL } = require('url');
+    const sdkUrl = pathToFileURL(require('path').join(__dirname, 'node_modules', '@anthropic-ai', 'claude-agent-sdk', 'sdk.mjs')).href;
+    const codigo = `import(${JSON.stringify(sdkUrl)}).then(s => s.forkSession(${JSON.stringify(sessionId)}, { dir: ${JSON.stringify(cwd)}, upToMessageId: ${JSON.stringify(uuid)} }))`
+        + `.then(r => process.stdout.write(JSON.stringify(r)), () => process.exit(1))`;
+    return new Promise((ok, erro) => {
+        const falha = () => erro(new Error('Não deu para ramificar esta conversa.'));
+        // No Red Code empacotado o execPath é o Electron: ELECTRON_RUN_AS_NODE faz ele rodar como Node
+        const filho = spawn(process.execPath, ['-e', codigo], { env: { ...env, ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {}) }, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
+        let saida = '';
+        filho.stdout.on('data', (d) => { saida += d; });
+        const prazo = setTimeout(() => { try { filho.kill(); } catch (e) { /* já saiu */ } }, 60000);
+        filho.on('error', () => { clearTimeout(prazo); falha(); });
+        filho.on('exit', (cod) => {
+            clearTimeout(prazo);
+            let r = null;
+            try { r = cod === 0 ? JSON.parse(saida) : null; } catch (e) { r = null; }
+            if (r && r.sessionId) ok(r); else falha();
+        });
+    });
 }
 // Servidores MCP da conversa. Num processo que acabou de subir todos ainda estão "pending":
 // espera até 20 s eles saírem desse estado antes de responder (o que ainda não subiu volta como está)

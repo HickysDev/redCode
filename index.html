@@ -2130,6 +2130,12 @@ body.sessao-chat #btnTerminal, body.sessao-chat .seletor-modo, body.sessao-chat 
 /* Pílula de uso e perfil no rodapé da lista: mesma altura e mesma base */
 .uso-plano.minimizado .uso-pilula { box-sizing: border-box; height: 30px; white-space: nowrap; max-width: 100%; }
 .uso-plano.minimizado .uso-texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.uso-extras { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.uso-extra-texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.uso-extra-pct { flex: none; }
+.uso-extra .ponto-uso { flex: none; }
+.uso-plano.minimizado .uso-extra { max-width: 100%; }
+.uso-outra-conta { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--linha); }
 /* Telas estreitas: a pílula minimizada continua presa no rodapé (senão ocupa a largura toda e fica sob o seletor de perfil) */
 @media (max-width: 1100px) { .uso-plano.minimizado { position: fixed; margin: 0; width: auto; bottom: 10px; left: 10px; } }
 .chip-perfil:hover { background: var(--realce); }
@@ -3903,6 +3909,7 @@ function desenhaUso() {
             <span class="ponto-uso" aria-hidden="true"></span><span class="uso-texto" data-completo="${esc(texto(curto))}" data-curto="${esc(texto([doMaior]))}">${texto(curto)}</span></button>`;
         el.hidden = false;
         ajustaPilulaUso();
+        if (usoOutrasContas.length) el.insertAdjacentHTML('beforeend', extrasUso(true));
         return;
     }
     {
@@ -3913,9 +3920,47 @@ function desenhaUso() {
             + u.limites.map(l => `<div class="limite" title="${esc(l.nome)}: ${l.percentual}% usado, ${esc(quandoReinicia(l.reinicia))}">
                 <div class="limite-linha"><span class="limite-nome">${esc(l.nome)}</span><span class="limite-dir">${esc(primeiraMaiuscula(quandoReinicia(l.reinicia)))}<b>${l.percentual}%</b></span></div>
                 <div class="barra-uso ${l.percentual >= 90 ? 'critico' : l.percentual >= 70 ? 'alto' : ''}" role="progressbar" aria-valuenow="${l.percentual}" aria-valuemin="0" aria-valuemax="100" aria-label="${esc(l.nome)}"><i style="width:${Math.min(100, l.percentual)}%"></i></div></div>`).join('');
+        if (usoOutrasContas.length) el.insertAdjacentHTML('beforeend', extrasUso(false));
         el.hidden = false;
     }
 }
+// Uso de outra conta: aparece enquanto alguma conversa dela (diferente da conta do perfil) está rodando
+let usoOutrasContas = [];   // [{ id, nome, uso }]
+async function carregaUsoOutrasContas() {
+    const r = await carregaPerfisCache();
+    if (!r) return;
+    const perfil = r.perfis.find(p => p.id === r.ativo) || {};
+    const contaPerfil = perfil.claude || 'padrao';
+    const ids = [...new Set((todasSessoes || []).filter(x => (x.ativa || x.agentesRodando) && x.porConversa && x.porConversa.claude && x.porConversa.claude !== contaPerfil).map(x => x.porConversa.claude))];
+    const novas = [];
+    for (const id of ids) {
+        try {
+            const u = await getPainel('/api/uso?conta=' + encodeURIComponent(id));
+            if (u && u.disponivel && u.limites && u.limites.length) novas.push({ id, nome: (r.contas.find(c => c.id === id) || { nome: id }).nome, uso: u });
+        } catch (e) { /* conta sem resposta agora */ }
+    }
+    const mudou = JSON.stringify(novas.map(c => [c.id, c.uso.limites.map(l => l.percentual)])) !== JSON.stringify(usoOutrasContas.map(c => [c.id, c.uso.limites.map(l => l.percentual)]));
+    usoOutrasContas = novas;
+    if (mudou) desenhaUso();
+}
+function extrasUso(minimizado) {
+    if (!usoOutrasContas.length) return '';
+    const classe = (p) => (p >= 90 ? 'critico' : p >= 70 ? 'alto' : '');
+    if (minimizado) {
+        return '<div class="uso-extras">' + usoOutrasContas.map(c => {
+            const semanal = c.uso.limites.find(l => /todos/.test(l.nome)) || c.uso.limites[0];
+            const maior = Math.max(...c.uso.limites.map(l => l.percentual));
+            return `<button class="uso-pilula uso-extra ${classe(maior)}" data-uso-expandir title="Conta ${esc(c.nome)} (conversa rodando nela): ${esc(c.uso.limites.map(l => l.nome + ' ' + l.percentual + '%').join(' · '))}">
+                <span class="ponto-uso" aria-hidden="true"></span><span class="uso-extra-texto">${esc(c.nome)}</span><span class="uso-extra-pct"><b>${semanal.percentual}%</b></span></button>`;
+        }).join('') + '</div>';
+    }
+    return usoOutrasContas.map(c => `<div class="uso-outra-conta"><div class="cabeca-uso"><span>Conta ${esc(c.nome)} · conversa rodando nela</span></div>`
+        + c.uso.limites.map(l => `<div class="limite" title="${esc(l.nome)}: ${l.percentual}% usado, ${esc(quandoReinicia(l.reinicia))}">
+            <div class="limite-linha"><span class="limite-nome">${esc(l.nome)}</span><span class="limite-dir">${esc(primeiraMaiuscula(quandoReinicia(l.reinicia)))}<b>${l.percentual}%</b></span></div>
+            <div class="barra-uso ${classe(l.percentual)}" role="progressbar" aria-valuenow="${l.percentual}" aria-valuemin="0" aria-valuemax="100" aria-label="${esc(c.nome + ' ' + l.nome)}"><i style="width:${Math.min(100, l.percentual)}%"></i></div></div>`).join('') + '</div>').join('');
+}
+setInterval(carregaUsoOutrasContas, 60000);
+setTimeout(carregaUsoOutrasContas, 8000);
 function alternaUso(minimizar) {
     usoMinimizado = minimizar;
     try { localStorage.setItem('painelUsoMinimizado', minimizar ? '1' : '0'); } catch (e) { /* sem armazenamento */ }
@@ -5444,6 +5489,7 @@ async function carregaSessoes() {
         fetch('/api/dados').then(r => r.json()).catch(() => dadosPainel),
     ]);
     todasSessoes = sessoes;
+    if (sessoes.some(x => (x.ativa || x.agentesRodando) && x.porConversa && x.porConversa.claude) !== !!usoOutrasContas.length) carregaUsoOutrasContas();
     if (window.tasksAtualizaSelo) window.tasksAtualizaSelo(sessoes);
     dadosPainel = { favoritos: [], vinculos: {}, vinculosClear: {}, nomes: {}, arquivadas: [], grupos: [], ...dados };
     // Primeira lista chegou: o carregando sai depois que ela estiver desenhada
@@ -7024,7 +7070,8 @@ function seloConta(s) {
     if (!conta && !ident) return '';
     return ` <span class="selo-conta" title="${esc([conta && 'Claude: ' + conta, ident && 'Git: ' + ident].filter(Boolean).join(' · '))}">${esc(conta || ident)}</span>`;
 }
-// "Conta e Git…" (menu ⋯ da conversa): a conta é fixa (a do transcript); a identidade do Git dá para trocar
+// "Conta e Git…" (menu ⋯ da conversa): troca a conta do Claude (a conversa vai para a pasta da outra conta, só parada)
+// e a identidade do Git
 async function abreContaDaConversa(chave) {
     const [projeto, sessao] = String(chave).split('/');
     const r = await carregaPerfisCache(true);
@@ -7034,12 +7081,23 @@ async function abreContaDaConversa(chave) {
     const idConta = (s.porConversa && s.porConversa.claude) || (s.contaOutra) || perfil.claude || 'padrao';
     const conta = r.contas.find(c => c.id === idConta) || { nome: idConta };
     const idGit = (s.porConversa && s.porConversa.git) || perfil.git || 'padrao';
-    const html = `<p class="nota">Conta do Claude: <b>${esc(conta.nome)}</b>${conta.email ? ' · ' + esc(conta.email) : ''}. Ela é fixa: a conversa fica guardada na conta em que foi criada.</p>
+    const html = `<label class="perfil-campo">Conta do Claude desta conversa<select class="campo-config" name="claude">${r.contas.map(c => `<option value="${esc(c.id)}" ${c.id === idConta ? 'selected' : ''}>${esc(c.nome)}${c.email ? ' · ' + esc(c.email) : ''}</option>`).join('')}</select></label>
+        <small class="perfil-ajuda">Trocar a conta leva a conversa para a pasta da outra conta (os limites de uso passam a ser os dela). Só dá com a conversa parada e com o VS Code fechado nela. A memória do projeto e as outras partes da continuação ficam na conta antiga; o original fica guardado em redcode-movidas, na pasta da conta antiga.</small>
         <label class="perfil-campo">Identidade do Git desta conversa<select class="campo-config" name="git">${r.identidades.map(g => `<option value="${esc(g.id)}" ${g.id === idGit ? 'selected' : ''}>${esc(g.nome)}${g.email ? ' · ' + esc(g.usuario || '') + ' <' + esc(g.email) + '>' : ''}</option>`).join('')}</select></label>
         <small class="perfil-ajuda">Vale para os commits e o push que o Claude fizer nela, para o painel Git e para o terminal desta conversa.</small>`;
     if (!(await confirmaNaPagina('Conta e Git da conversa', `<div class="perfil-form">${html}</div>`, 'Salvar'))) return;
     const git = (document.querySelector('#corpoConfirma [name="git"]') || {}).value;
+    const claude = (document.querySelector('#corpoConfirma [name="claude"]') || {}).value || idConta;
     try {
+        // Conta nova: uma chamada só move a conversa e grava a conta e o Git juntos
+        if (claude !== idConta) {
+            recado('Levando a conversa para a outra conta…');
+            await api('/api/conversa/mover-conta', { projeto, sessao, claude, git });
+            recado('Conta trocada: a próxima mensagem já usa a conta ' + ((r.contas.find(c => c.id === claude) || {}).nome || claude));
+            carregaSessoes();
+            if (chave === sessaoAtual) { gitEstado = null; atualizaGit(true); }
+            return;
+        }
         const res = await api('/api/conversa/conta', { projeto, sessao, git });
         recado(res.aplicaDepois ? 'Salvo: vale quando ela terminar a resposta atual' : 'Salvo: vale a partir da próxima mensagem');
         carregaSessoes();

@@ -32,6 +32,7 @@ function nomeUsuario() {
 }
 const cacheComandos = new Map();
 const cacheUso = { dados: null, em: 0, pedido: null };
+const cacheUsoContas = new Map();   // conta -> { dados, em, pedido } (uso de outra conta, para a pílula extra)
 const cacheModelos = { dados: null, em: 0, pedido: null };
 // Lista do supportedModels() -> { modelos: [{ id, nome, descricao, familia, esforcos, principal }] }
 // id = o nome completo (claude-fable-5-2), que é o que a conversa grava; "default" (o padrão da conta) fica de fora
@@ -868,6 +869,13 @@ function listaSessoes(opcoes = {}) {
             if (!nome.endsWith('.jsonl')) continue;
             // Outra conta: só as conversas que foram criadas nela pela tela (as demais continuam escondidas)
             if (contaLista) { const en = porConversaLista[chaveConversa(pasta, nome.replace('.jsonl', ''))]; if (!en || en.claude !== contaLista) continue; }
+            // Conta do perfil: conversa que foi movida para outra conta (e existe lá) não aparece de novo por uma cópia antiga
+            // que tenha sido recriada aqui (ex.: VS Code aberto nela)
+            else {
+                const en = porConversaLista[chaveConversa(pasta, nome.replace('.jsonl', ''))];
+                if (en && en.claude && perfis.existeConta(en.claude) && resolveMin(perfis.raizDaConta(en.claude)) !== resolveMin(raizLista)
+                    && fs.existsSync(path.join(perfis.raizDaConta(en.claude), pasta, nome))) continue;
+            }
             const arquivo = path.join(caminhoPasta, nome);
             const stat = fs.statSync(arquivo);
             if (stat.mtimeMs < limite) continue;
@@ -1637,6 +1645,7 @@ function registraVivas() {
     try { fs.writeFileSync(ARQUIVO_VIVAS, json); } catch (e) { /* só otimização */ }
 }
 let vozAtual = null;   // leitura em voz alta em andamento (/api/voz)
+const trocandoConta = new Set();   // sessões mudando de conta do Claude agora (nada abre a sessão nesse meio tempo)
 // Arquivamento automático: conversa parada há dados.arquivarDias dias vai para o Arquivo. A cadeia de continuações
 // conta como uma só (vale a parte mais recente). Nunca arquiva fixada, em grupo, trabalhando, com pergunta ou agente.
 function arquivaParadas() {
@@ -2442,6 +2451,7 @@ async function rotaChat(req, res, url) {
             dados.git = await gitDiff(detalhe.cwd, path.resolve(detalhe.cwd, arquivo));
             return responde(res, 200, dados);
         }
+        if (trocandoConta.has(String(url.searchParams.get('sessao')))) return responde(res, 409, { erro: 'A conversa está trocando de conta. Tente de novo em alguns segundos.' });
         try { const entM = entradaDaConversa(url.searchParams.get('projeto'), url.searchParams.get('sessao')); return responde(res, 200, await chat.statusMcp(url.searchParams.get('sessao'), detalhe.cwd, entM ? perfis.envDaConversa(entM) : undefined)); } catch (e) { return responde(res, 500, { erro: e.message }); }
     }
     if (url.pathname === '/api/perfis' && req.method === 'GET') {
@@ -2453,6 +2463,10 @@ async function rotaChat(req, res, url) {
     if (req.method !== 'POST') return responde(res, 405, { erro: 'use POST' });
     if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
     const corpo = await leCorpo(req, url.pathname === '/api/chat/enviar' ? 35e6 : url.pathname === '/api/editor/salvar' ? 8e6 : 1e6);
+    // Conversa mudando de conta: nada abre a sessão (resume) até o transcript estar no lugar novo
+    if (corpo && corpo.sessao && trocandoConta.has(String(corpo.sessao)) && ['/api/chat/enviar', '/api/chat/voltar', '/api/chat/ramificar', '/api/mcp/acao'].includes(url.pathname)) {
+        return responde(res, 409, { erro: 'A conversa está trocando de conta. Tente de novo em alguns segundos.' });
+    }
 
     if (url.pathname === '/api/agendamentos') {
         try {
@@ -2548,10 +2562,11 @@ async function rotaChat(req, res, url) {
         if (!/^[0-9a-f-]{36}$/i.test(String(corpo.uuid))) return responde(res, 400, { erro: 'mensagem inválida' });
         if (url.pathname === '/api/chat/ramificar') {
             const ent = entradaDaConversa(corpo.projeto, corpo.sessao);
-            const achadoR = arquivoDaSessao(String(corpo.projeto), String(corpo.sessao));
-            if (achadoR && resolveMin(achadoR.raiz) !== resolveMin(RAIZ_PROJETOS)) return responde(res, 409, { erro: 'Ramificar só funciona em conversas da conta do Claude do perfil atual.' });
+            // Conversa de outra conta: o fork roda com o env dela (a pasta da conta), num processo à parte
+            let envR;
+            try { envR = ent ? envDeConversa(corpo.projeto, corpo.sessao) : undefined; } catch (e) { return responde(res, 409, { erro: e.message }); }
             try {
-                const r = await chat.ramificar(String(corpo.sessao), detalhe.cwd, corpo.uuid);
+                const r = await chat.ramificar(String(corpo.sessao), detalhe.cwd, corpo.uuid, envR);
                 const dados = leDados();
                 dados.vinculos[`${corpo.projeto}/${r.sessionId}`] = `${corpo.projeto}/${corpo.sessao}`;
                 if (ent) { dados.porConversa = dados.porConversa || {}; dados.porConversa[chaveConversa(corpo.projeto, r.sessionId)] = { ...ent, projeto: corpo.projeto, sessao: r.sessionId }; }
@@ -2710,6 +2725,76 @@ async function rotaChat(req, res, url) {
         gravaDados(dados);
         const viva = chat.vivaNaSessao(String(corpo.sessao));
         return responde(res, 200, { ok: true, aplicaDepois: !!(viva && (viva.status === 'rodando' || viva.status === 'parando' || (viva.tarefasBg || []).length)) });
+    }
+    // Trocar a conta do Claude de uma conversa parada: copia o transcript (e a pasta da sessão e o file-history) para a
+    // pasta da outra conta, confere, e guarda os originais em <conta antiga>/redcode-movidas (fora de projects/)
+    if (url.pathname === '/api/conversa/mover-conta') {
+        const projeto = String(corpo.projeto || ''), sessao = String(corpo.sessao || ''), nova = String(corpo.claude || '');
+        if (!projeto || !/^[0-9a-f-]{36}$/i.test(sessao) || /[\\/]|\.\./.test(projeto)) return responde(res, 400, { erro: 'sessão inválida' });
+        if (!perfis.ID.test(nova) || !perfis.existeConta(nova)) return responde(res, 400, { erro: 'Conta do Claude inválida.' });
+        const git = corpo.git === undefined ? undefined : String(corpo.git);
+        if (git !== undefined && (!perfis.ID.test(git) || !perfis.existeIdentidade(git))) return responde(res, 400, { erro: 'Identidade do Git inválida.' });
+        if (trocandoConta.has(sessao)) return responde(res, 409, { erro: 'Esta conversa já está trocando de conta.' });
+        trocandoConta.add(sessao);
+        try {
+            const detalhe = detalheSessao(projeto, sessao);
+            if (!detalhe) return responde(res, 404, { erro: 'Conversa não encontrada.' });
+            const trava = travaDaSessao(detalhe, sessao);
+            if (trava) return responde(res, 409, { erro: trava });
+            // Processo parado do painel: fecha e espera ele sair de verdade (o transcript fica aberto até lá)
+            const viva = chat.vivaNaSessao(sessao);
+            if (viva) {
+                if (!chat.fechaSessao(sessao)) return responde(res, 409, { erro: 'A conversa ainda está ocupada. Tente de novo quando ela terminar.' });
+                const t0 = Date.now();
+                while (viva.vivo && Date.now() - t0 < 10000) await new Promise(ok => setTimeout(ok, 200));
+                if (viva.vivo) return responde(res, 409, { erro: 'A conversa ainda está fechando. Tente de novo em alguns segundos.' });
+            }
+            const origem = arquivoDaSessao(projeto, sessao);
+            if (!origem) return responde(res, 404, { erro: 'Conversa não encontrada.' });
+            const raizNova = perfis.raizDaConta(nova);
+            const dados = leDados();
+            dados.porConversa = dados.porConversa || {};
+            const k = chaveConversa(projeto, sessao), atual = dados.porConversa[k] || {};
+            const entrada = { claude: nova, projeto, sessao };
+            const gitFinal = git !== undefined ? git : atual.git;
+            if (gitFinal) entrada.git = gitFinal;
+            if (resolveMin(origem.raiz) !== resolveMin(raizNova)) {
+                const pastaOrigem = path.join(origem.raiz, projeto), pastaDestino = path.join(raizNova, projeto);
+                const destinoJsonl = path.join(pastaDestino, sessao + '.jsonl'), destinoPasta = path.join(pastaDestino, sessao);
+                if (fs.existsSync(destinoJsonl) || fs.existsSync(destinoPasta)) return responde(res, 409, { erro: 'A outra conta já tem uma cópia desta conversa. Nada foi mudado.' });
+                const configOrigem = path.dirname(origem.raiz), configDestino = path.dirname(raizNova);
+                const historicoOrigem = path.join(configOrigem, 'file-history', sessao), historicoDestino = path.join(configDestino, 'file-history', sessao);
+                const copiados = [];
+                try {
+                    fs.mkdirSync(pastaDestino, { recursive: true });
+                    fs.copyFileSync(origem.arquivo, destinoJsonl); copiados.push(destinoJsonl);
+                    if (fs.existsSync(path.join(pastaOrigem, sessao))) { fs.cpSync(path.join(pastaOrigem, sessao), destinoPasta, { recursive: true }); copiados.push(destinoPasta); }
+                    if (fs.existsSync(historicoOrigem) && !fs.existsSync(historicoDestino)) { fs.cpSync(historicoOrigem, historicoDestino, { recursive: true }); copiados.push(historicoDestino); }
+                    if (fs.statSync(destinoJsonl).size !== fs.statSync(origem.arquivo).size) throw new Error('cópia incompleta');
+                } catch (e) {
+                    for (const c of copiados) { try { fs.rmSync(c, { recursive: true, force: true }); } catch (e2) { /* fica para limpar à mão */ } }
+                    return responde(res, 500, { erro: 'Não deu para copiar a conversa para a outra conta. Nada foi mudado.' });
+                }
+                // Originais guardados fora de projects/: não aparecem mais na lista, mas dá para desfazer à mão
+                // (o transcript primeiro: se ele não sair, apaga as cópias e nada muda)
+                const guardado = path.join(configOrigem, 'redcode-movidas', projeto);
+                try {
+                    fs.mkdirSync(guardado, { recursive: true });
+                    fs.renameSync(origem.arquivo, path.join(guardado, sessao + '.jsonl'));
+                } catch (e) {
+                    for (const c of copiados) { try { fs.rmSync(c, { recursive: true, force: true }); } catch (e2) { /* fica para limpar à mão */ } }
+                    return responde(res, 409, { erro: 'O arquivo da conversa está em uso (VS Code ou outro programa aberto nela?). Feche e tente de novo. Nada foi mudado.' });
+                }
+                try { if (fs.existsSync(path.join(pastaOrigem, sessao))) fs.renameSync(path.join(pastaOrigem, sessao), path.join(guardado, sessao)); } catch (e) { /* a pasta da sessão já foi copiada; a antiga fica */ }
+            }
+            dados.porConversa[k] = entrada;
+            gravaDados(dados);
+            return responde(res, 200, { ok: true });
+        } catch (e) {
+            return responde(res, 500, { erro: 'Não deu para trocar a conta: ' + e.message });
+        } finally {
+            trocandoConta.delete(sessao);
+        }
     }
     if (url.pathname === '/api/perfis') {
         try {
@@ -2998,7 +3083,7 @@ const servidor = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=86400', 'X-Content-Type-Options': 'nosniff' });
             return res.end(fs.readFileSync(arq));
         }
-        if (url.pathname.startsWith('/api/chat/') || url.pathname === '/api/auth/entrar' || url.pathname === '/api/auth/cancelar' || url.pathname === '/api/auth/codigo' || url.pathname === '/api/plugins/acao' || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/grupos', '/api/voz', '/api/terminal/externo', '/api/arquivar-auto', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta', '/api/economia'].includes(url.pathname)) return await rotaChat(req, res, url);
+        if (url.pathname.startsWith('/api/chat/') || url.pathname === '/api/auth/entrar' || url.pathname === '/api/auth/cancelar' || url.pathname === '/api/auth/codigo' || url.pathname === '/api/plugins/acao' || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/grupos', '/api/voz', '/api/terminal/externo', '/api/arquivar-auto', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta', '/api/conversa/mover-conta', '/api/economia'].includes(url.pathname)) return await rotaChat(req, res, url);
         if (url.pathname === '/api/auth/estado') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
             return responde(res, 200, await login.estado());
@@ -3152,6 +3237,24 @@ const servidor = http.createServer(async (req, res) => {
                 await cacheModelos.pedido;
             }
             return responde(res, 200, cacheModelos.dados);
+        }
+        // Uso de outra conta (pílula extra quando há conversa dela rodando): cache e pedido próprios por conta
+        if (url.pathname === '/api/uso' && url.searchParams.get('conta')) {
+            const conta = String(url.searchParams.get('conta'));
+            if (!perfis.ID.test(conta) || !perfis.existeConta(conta)) return responde(res, 400, { erro: 'Conta inválida.' });
+            const c = cacheUsoContas.get(conta) || { dados: null, em: 0, pedido: null };
+            cacheUsoContas.set(conta, c);
+            if (!c.dados || Date.now() - c.em > 55000) {
+                if (!c.pedido) {
+                    let env;
+                    try { env = perfis.envDaConversa({ claude: conta }); } catch (e) { return responde(res, 409, { erro: e.message }); }
+                    c.pedido = chat.usoDoPlano(env).then(d => { c.dados = d; c.em = Date.now(); })
+                        .catch(e => { c.dados = { disponivel: false }; c.em = Date.now() - 30000; })
+                        .finally(() => { c.pedido = null; });
+                }
+                await c.pedido;
+            }
+            return responde(res, 200, c.dados);
         }
         if (url.pathname === '/api/uso') {
             const agora = Date.now();

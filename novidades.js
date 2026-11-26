@@ -3,6 +3,11 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.26', data: '2026-11-26', itens: [
+            'Correção de uma incompatibilidade nas conversas',
+        ],
+    },
+    {
         versao: '1.0.25', data: '2026-11-25', itens: [
             'Sugestão de skills ao lado da caixa de mensagem: enquanto você escreve, as skills que combinam com o texto sobem; passe o mouse para ver os parâmetros, o que a skill faz e o que cada parâmetro faz (da tabela de argumentos do SKILL.md); clique para colocar na mensagem. Dá para minimizar no botão –',
             'Arquivar sozinho: em Configurações › Código, escolha arquivar as conversas sem uso há 1, 2, 3 ou 5 dias. Não mexe nas fixadas, nas de grupo, nas que estão trabalhando ou com pergunta, e desarquivar à mão recomeça a contagem',
