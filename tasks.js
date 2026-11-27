@@ -8,7 +8,7 @@
     const DURACAO_PULSO = 480, MAX_PULSOS_TRILHA = 3, LOTE_MAX_MS = 2000, JANELA_PRIMEIRO_POLL_MS = 3000;
     const LARGURA_CARTAO = 300, CHIP = 164, CANAL = 140, FOLGA_Y = 18, MAX_POR_COLUNA = 4, LINHAS_CARTAO = 4, CHANFRO = 10;
     const DUPLO_CLIQUE_MS = 320;
-    const LARGURA_SUB = 210, CANAL_SUB = 56, FOLGA_SUB = 10, LINHAS_SUB = 3, FADE_SUB_MS = 420;
+    const LARGURA_SUB = 210, LARGURA_ANDAMENTO = 380, CANAL_SUB = 56, FOLGA_SUB = 10, LINHAS_SUB = 3, FADE_SUB_MS = 420;
     const semMovimento = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // Identidade visual por família de modelo: matiz próprio misturado com a tinta do tema (funciona no claro e no escuro)
@@ -170,6 +170,22 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
 .tk-feed div.fala { align-items: flex-start; }
 .tk-feed div.fala i { margin-top: 5px; }
 .tk-feed .tk-h-concluidas { margin-top: 10px; }
+.tk-subcartao.tk-andamento { padding: 8px 10px; }
+.tk-and-cab { display: flex; align-items: center; gap: 6px; min-width: 0; margin-bottom: 5px; font: 600 11.5px var(--sans); color: var(--tinta); }
+.tk-and-cab span { color: var(--ok); font-size: 9px; }
+.tk-and-cab b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-and-linhas { display: flex; flex-direction: column; gap: 1px; padding: 5px 7px; border-radius: 6px; background: var(--codigo, rgba(0,0,0,.25)); font: 10.5px/1.45 var(--mono); color: var(--grafite); }
+.tk-subcartao.tk-andamento { width: ${LARGURA_ANDAMENTO}px; }
+.tk-and-linhas div { white-space: pre-wrap; overflow-wrap: anywhere; }
+.tk-and-linhas div:last-child { color: var(--tinta); }
+.tk-and-vazio { font-size: 11px; color: var(--grafite); }
+.tk-feed h4 { display: flex; align-items: center; }
+.tk-feed-min { margin-left: auto; width: 22px; height: 20px; padding: 0; border-radius: 6px; color: var(--grafite); font: 600 14px/1 var(--sans); }
+.tk-feed-min:hover { background: var(--realce); color: var(--tinta); }
+.tk-feed.minimizado { width: auto; padding: 0; border-radius: 999px; }
+.tk-feed-abrir { padding: 6px 14px; border-radius: 999px; font: 600 11.5px var(--sans); letter-spacing: .04em; color: var(--grafite); }
+.tk-feed-abrir b { color: var(--tinta); }
+.tk-feed-abrir:hover { color: var(--tinta); }
 .tk-feed div.tk-concluida { cursor: pointer; border-radius: 6px; }
 .tk-feed div.tk-concluida:hover { background: var(--realce); }
 .tk-feed div.tk-concluida b { color: var(--ok); flex: none; }
@@ -388,7 +404,9 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     const gravaPosicoes = () => gravaPref(CHAVE_POSICOES, fixas);
 
     // FOOTPRINT DO CARTAO COM OS SUB-CARTOES PENDURADOS DO LADO DE FORA (LONGE DO CHIP)
-    const extraSubs = (k) => k.subs.length ? CANAL_SUB + LARGURA_SUB : 0;
+    // O CARTAO DE ANDAMENTO E MAIS LARGO QUE O DOS AGENTES (AS LINHAS DO ARQUIVO PRECISAM CABER)
+    const larguraSub = (u) => (u && u.s && u.s.andamento ? LARGURA_ANDAMENTO : LARGURA_SUB);
+    const extraSubs = (k) => k.subs.length ? CANAL_SUB + Math.max(...k.subs.map(larguraSub)) : 0;
     const alturaSubs = (k) => k.subs.reduce((s, u) => s + u.h, 0) + FOLGA_SUB * Math.max(0, k.subs.length - 1);
     const alturaTotal = (k) => Math.max(k.h, alturaSubs(k));
     // LAYOUT DETERMINISTICO: COLUNAS A DIREITA E A ESQUERDA DO CHIP, SEM SOBREPOSICAO; CARTAO FIXADO FICA ONDE O USUARIO DEIXOU
@@ -488,7 +506,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         for (const u of k.subs) {
             const fixa = fixas.agentes[u.s.id];
             if (fixa) { u.dx = fixa.dx; u.dy = fixa.dy; }
-            else { u.dx = aEsquerda ? -CANAL_SUB - LARGURA_SUB : LARGURA_CARTAO + CANAL_SUB; u.dy = y; y += u.h + FOLGA_SUB; }
+            else { u.dx = aEsquerda ? -CANAL_SUB - larguraSub(u) : LARGURA_CARTAO + CANAL_SUB; u.dy = y; y += u.h + FOLGA_SUB; }
             u.x = k.x + u.dx; u.y = k.y + u.dy;
             u.el.style.left = u.x + 'px'; u.el.style.top = u.y + 'px';
         }
@@ -599,7 +617,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
             }
             const fixa = fixas.cartoes[c.id];
             Object.assign(k, { fixo: !!fixa, x: fixa ? fixa.x : 0, y: fixa ? fixa.y : 0 });
-            k.subs = agentesAtivos(c).map(s => montaSub(k, s));
+            k.subs = [...agentesAtivos(c), ...andamentosDe(c)].map(s => montaSub(k, s));
             return k;
         });
         // AGENTE QUE TERMINOU: O SUB-CARTAO SOME COM UM FADE CURTO (A TRILHA FICA ATE O FIM DO FADE PARA O PULSO "BACK")
@@ -630,9 +648,13 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         if (!vista) ajusta();
         if (selecionada) desenhaGaveta();
     }
+    // ANDAMENTO AO LADO DO CARTAO: ARQUIVO ACOMPANHADO OU SAIDA DO COMANDO EM SEGUNDO PLANO (AS ULTIMAS LINHAS, AO VIVO)
+    const andamentosDe = (c) => (c.andamento || []).map(a => ({ id: 'and:' + c.id + ':' + a.nome, andamento: true, nome: a.nome, arquivo: a.arquivo || '', linhas: a.linhas || [], tipo: 'andamento', descricao: a.nome, status: 'rodando', modelo: null, tarefas: [] }));
+    const htmlAndamento = (s) => `<div class="tk-and-cab" title="${escapa(s.arquivo ? 'Clique para abrir o arquivo inteiro: ' + s.arquivo : s.nome)}"><span aria-hidden="true">▶</span><b>${escapa(s.nome)}</b></div>`
+        + (s.linhas.length ? `<div class="tk-and-linhas">${s.linhas.map(l => `<div title="${escapa(l)}">${escapa(l)}</div>`).join('')}</div>` : '<div class="tk-and-vazio">Ainda sem nada escrito.</div>');
     function montaSub(k, s) {
         let u = subsPorId.get(s.id);
-        const corpo = htmlSubCartao(s);
+        const corpo = s.andamento ? htmlAndamento(s) : htmlSubCartao(s);
         if (!u || u.saindo) {
             const e = document.createElement('article');
             e.className = 'tk-subcartao';
@@ -643,6 +665,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
             subsPorId.set(s.id, u);
         }
         u.k = k; u.s = s;
+        u.el.classList.toggle('tk-andamento', !!s.andamento);
         if (u.corpo !== corpo) {
             u.corpo = corpo;
             u.el.innerHTML = corpo;
@@ -723,7 +746,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
             k.pino.setAttribute('cx', k.pinoX);
             k.pino.setAttribute('cy', k.pinoY);
             for (const u of k.subs) {
-                const du = caminhoChanfrado(rotaEntre({ x: k.x, y: k.y, w: LARGURA_CARTAO, h: k.h }, { x: u.x, y: u.y, w: LARGURA_SUB, h: u.h }));
+                const du = caminhoChanfrado(rotaEntre({ x: k.x, y: k.y, w: LARGURA_CARTAO, h: k.h }, { x: u.x, y: u.y, w: larguraSub(u), h: u.h }));
                 if (u.d !== du) { u.d = du; u.len = 0; u.trilha.setAttribute('d', du); }
             }
         }
@@ -832,7 +855,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         for (const k of cartoesAtuais) {
             minX = Math.min(minX, k.x); maxX = Math.max(maxX, k.x + LARGURA_CARTAO);
             minY = Math.min(minY, k.y); maxY = Math.max(maxY, k.y + k.h);
-            for (const u of k.subs) { minX = Math.min(minX, u.x); maxX = Math.max(maxX, u.x + LARGURA_SUB); minY = Math.min(minY, u.y); maxY = Math.max(maxY, u.y + u.h); }
+            for (const u of k.subs) { minX = Math.min(minX, u.x); maxX = Math.max(maxX, u.x + larguraSub(u)); minY = Math.min(minY, u.y); maxY = Math.max(maxY, u.y + u.h); }
         }
         const caixa = palco.getBoundingClientRect(), w = caixa.width || 1600, h = caixa.height || 900, margem = 40;
         const k = Math.min(1.15, (w - margem * 2) / (maxX - minX), (h - margem * 2 - 60) / (maxY - minY));
@@ -911,6 +934,9 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
                 if (a.k && !a.u) fixas.cartoes[a.k.c.id] = { x: a.k.x, y: a.k.y };
                 gravaPosicoes();
                 desenha();
+            } else if (a.u && a.u.s.andamento && a.u.s.arquivo && ev.type === 'pointerup') {
+                // Andamento: abre o arquivo inteiro numa janela do PowerShell, acompanhando ao vivo
+                if (typeof api === 'function') api('/api/terminal/externo', { arquivo: a.u.s.arquivo }).then(() => typeof recado === 'function' && recado('Abrindo ' + a.u.s.nome + ' numa janela do PowerShell')).catch(e => typeof recado === 'function' && recado(e.message));
             } else if (a.k && ev.type === 'pointerup') {
                 cliqueNoCartao(a.k);
             }
@@ -969,6 +995,7 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
     }
     // Concluída no painel Agora: abre a conversa
     $('tkFeed').addEventListener('click', (ev) => {
+        if (ev.target.closest('[data-tk-feed-alterna]')) { prefs.feedMinimizado = !prefs.feedMinimizado; gravaPrefs(); return desenhaFeed(); }
         const item = ev.target.closest('[data-tk-concluida]');
         if (item && historicoConcluidas[+item.dataset.tkConcluida]) abreConversa(historicoConcluidas[+item.dataset.tkConcluida].c);
     });
@@ -1119,9 +1146,18 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         }
         feed.splice(5);
         anterior = dados;
+        desenhaFeed();
+    }
+    // PAINEL "AGORA": MINIMIZADO VIRA UMA PILULA COM A CONTAGEM (ESCOLHA GUARDADA NAS PREFS DA TASKS)
+    function desenhaFeed() {
         const quando = (ms) => { const s = Math.round((Date.now() - ms) / 1000); return s < 60 ? s + ' s' : Math.round(s / 60) + ' min'; };
         const horaCurta = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        $('tkFeed').innerHTML = '<h4>Agora</h4>' + (feed.length ? feed.map(f => `<div class="${f.fala ? 'fala' : ''}"${f.fala ? ` title="${escapa(f.quem + ': ' + f.texto)}"` : ''}><i style="background:${f.cor}"></i><span>${f.fala ? `<em>${escapa(f.quem)}:</em> ` : ''}${escapa(f.texto)}</span><small>${quando(f.hora)}</small></div>`).join('') : '<p>Nada ainda.</p>')
+        $('tkFeed').classList.toggle('minimizado', !!prefs.feedMinimizado);
+        if (prefs.feedMinimizado) {
+            $('tkFeed').innerHTML = `<button type="button" class="tk-feed-abrir" data-tk-feed-alterna title="Mostrar o painel Agora">Agora${feed.length ? ` <b>${feed.length}</b>` : ''}${historicoConcluidas.length ? ` · ✓ <b>${historicoConcluidas.length}</b>` : ''} <span aria-hidden="true">▴</span></button>`;
+            return;
+        }
+        $('tkFeed').innerHTML = '<h4>Agora<button type="button" class="tk-feed-min" data-tk-feed-alterna title="Minimizar" aria-label="Minimizar o painel Agora">–</button></h4>' +(feed.length ? feed.map(f => `<div class="${f.fala ? 'fala' : ''}"${f.fala ? ` title="${escapa(f.quem + ': ' + f.texto)}"` : ''}><i style="background:${f.cor}"></i><span>${f.fala ? `<em>${escapa(f.quem)}:</em> ` : ''}${escapa(f.texto)}</span><small>${quando(f.hora)}</small></div>`).join('') : '<p>Nada ainda.</p>')
             + (historicoConcluidas.length ? '<h4 class="tk-h-concluidas">Concluídas</h4>' + historicoConcluidas.map((x, i) => `<div class="tk-concluida" data-tk-concluida="${i}" title="Abrir a conversa"><b>✓</b><span>${escapa(x.c.titulo)}</span><small>às ${horaCurta(x.hora)}</small></div>`).join('') : '');
     }
 
@@ -1164,6 +1200,8 @@ html[data-tema-efetivo="claro"] #janelaTasks { --tk-nucleo: var(--tinta); }
         if (!janela.hidden) return;
         janela.hidden = false;
         cobreFundo(true);
+        // Painel "Agora" já com o botão de minimizar (e minimizado, se estava) antes da primeira resposta
+        desenhaFeed();
         botoesTasks().forEach(b => b.setAttribute('aria-pressed', 'true'));
         if (!vistaValida(vista)) vista = vistaValida(prefs.vista) ? prefs.vista : null;
         // DADOS JA EM MEMORIA (REABERTURA): DESENHA NA HORA, O POLL SO CONFIRMA (304) OU ATUALIZA

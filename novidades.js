@@ -3,6 +3,14 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.29', data: '2026-11-27', itens: [
+            'Servidores remotos (SSH): em Configurações › Código › Servidores remotos, adicione um servidor Linux e clique em Preparar (a senha é pedida uma vez e não fica guardada; o Red Code instala a chave dele e o Claude Code lá). Depois escolha o servidor em Projeto ao começar uma conversa: o Claude roda no servidor, a conversa aparece na lista com o selo 🖧 e o terminal abre lá',
+            'Tasks: o painel Agora pode ser minimizado, e o andamento dos processos longos aparece num cartão ao lado das Tasks (clique para abrir o arquivo)',
+            'Aba Arquivo na lista: mostra só as conversas arquivadas, todas de uma vez',
+            'Menos travamentos: atualizações da lista e do chat não se acumulam mais quando o computador fica lento, e pedidos presos são cancelados sozinhos',
+        ],
+    },
+    {
         versao: '1.0.28', data: '2026-11-26', itens: [
             'Limites de uso mais arrumados: a pílula da sua conta fica alinhada ao chip do perfil e a de outra conta com conversa rodando vai acima dela, mostrando sessão e semanal; o player não fica mais coberto',
             'Tasks: o painel de limites aberto aparece por cima dela, e os cartões usam o nome que você deu à conversa na lista',

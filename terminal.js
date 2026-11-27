@@ -9,7 +9,7 @@ const os = require('os');
 const MAXIMO = 8;
 const abertos = new Set();
 
-function liga(servidorHttp, { porta, token, pastaPermitida, envDaConversa }) {
+function liga(servidorHttp, { porta, token, pastaPermitida, envDaConversa, servidorRemoto }) {
     const hostsOk = new Set([`127.0.0.1:${porta}`, `localhost:${porta}`]);
     const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
 
@@ -23,8 +23,17 @@ function liga(servidorHttp, { porta, token, pastaPermitida, envDaConversa }) {
         const origem = req.headers.origin || '';
         if (origem !== `http://${host}`) return recusa('origem');
         if (url.searchParams.get('token') !== token) return recusa('token');
-        const cwd = url.searchParams.get('cwd') || os.homedir();
-        if (!pastaPermitida(cwd)) return recusa('pasta');
+        // Terminal num servidor remoto (ssh -t): a pasta é de lá; aqui o pty roda na pasta do usuário
+        const idRemoto = url.searchParams.get('remoto');
+        let remotoTerminal = null;
+        if (idRemoto) {
+            const servidorR = servidorRemoto && servidorRemoto(idRemoto);
+            if (!servidorR) return recusa('servidor remoto');
+            const pastaR = url.searchParams.get('pastaRemota') || servidorR.pastaPadrao;
+            try { remotoTerminal = require('./remoto').argsTerminal(servidorR, pastaR, url.searchParams.get('loginRemoto') === '1'); } catch (e) { return recusa('remoto: ' + e.message); }
+        }
+        const cwd = remotoTerminal ? os.homedir() : (url.searchParams.get('cwd') || os.homedir());
+        if (!remotoTerminal && !pastaPermitida(cwd)) return recusa('pasta');
         if (abertos.size >= MAXIMO) return recusa('limite');
         // Login de uma conta do Claude (Configurações › Perfis): a página manda só o id; o servidor monta o env
         let login = null;
@@ -48,7 +57,7 @@ function liga(servidorHttp, { porta, token, pastaPermitida, envDaConversa }) {
         const pedidoClaude = url.searchParams.get('claude');
         const comandoClaude = login ? '' : pedidoClaude === 'mcp' ? '/mcp' : pedidoClaude === 'login' ? '/login' : '';
         if (comandoClaude && !require('fs').existsSync(CLAUDE_EXE)) return recusa('claude.exe do SDK não encontrado em ' + CLAUDE_EXE);
-        wss.handleUpgrade(req, socket, cabeca, (ws) => conecta(ws, cwd, url, login, envConversa, comandoClaude));
+        wss.handleUpgrade(req, socket, cabeca, (ws) => conecta(ws, cwd, url, login, envConversa, comandoClaude, remotoTerminal));
     });
 }
 
@@ -79,14 +88,14 @@ function shellPedido(nome) {
     }
     return { exe: 'powershell.exe', args: ['-NoLogo'], nome: 'PowerShell' };
 }
-function conecta(ws, cwd, url, login, envConversa, comandoClaude) {
+function conecta(ws, cwd, url, login, envConversa, comandoClaude, remotoTerminal) {
     const cols = Math.max(20, Math.min(400, Number(url.searchParams.get('cols')) || 100));
     const rows = Math.max(5, Math.min(200, Number(url.searchParams.get('rows')) || 24));
     let p;
     try {
         // Login (/login) e /mcp: abrem o Claude e, ao sair dele, o PowerShell fica (dá para fechar a aba). Sempre PowerShell.
         const doClaude = login ? '/login' : comandoClaude;
-        const shell = doClaude ? { exe: 'powershell.exe', args: ['-NoLogo', '-NoExit', '-Command', `& '${CLAUDE_EXE.replace(/'/g, "''")}' ${doClaude}`] } : shellPedido(url.searchParams.get('shell'));
+        const shell = remotoTerminal ? remotoTerminal : doClaude ? { exe: 'powershell.exe', args: ['-NoLogo', '-NoExit', '-Command', `& '${CLAUDE_EXE.replace(/'/g, "''")}' ${doClaude}`] } : shellPedido(url.searchParams.get('shell'));
         if (shell.erro) { ws.send(`\r\n\x1b[31m${shell.erro}\x1b[0m\r\n`); return ws.close(); }
         const base = login ? (() => { const e = { ...process.env, ...login }; for (const k of (login.__sem || [])) delete e[k]; delete e.__sem; return e; })() : (envConversa || process.env);
         p = pty.spawn(shell.exe, shell.args, { name: 'xterm-256color', cwd, cols, rows, env: shell.env ? { ...base, ...shell.env } : base, useConpty: true });

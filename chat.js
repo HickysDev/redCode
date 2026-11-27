@@ -207,6 +207,12 @@ const INSTRUCAO_RED_CODE = [
     'Quando você criar ou salvar imagens para o usuário ver (exemplos, prints, gráficos, mockups), cite cada uma na resposta final em markdown de imagem com o caminho absoluto, uma por linha: ![descrição curta](C:\\caminho\\arquivo.png).',
     'O Red Code mostra essas imagens dentro da própria resposta; não se limite a dizer em que pasta salvou.',
 ].join(' ');
+// Conversa num servidor remoto: o Red Code está em outra máquina (Windows) e não abre arquivos nem caminhos daqui
+const INSTRUCAO_REMOTO = [
+    'Você está rodando num servidor Linux remoto, conectado por SSH ao Red Code, o app desktop do usuário (que fica no Windows dele).',
+    'O usuário vê esta conversa no Red Code, mas o terminal, os arquivos e os comandos que você usa são os deste servidor.',
+    'Caminhos daqui não abrem no computador do usuário: não cite imagens nem arquivos esperando que ele os abra; descreva o resultado ou mostre o conteúdo na resposta.',
+].join(' ');
 
 function criaPermissao(conversa) {
     return (ferramenta, entrada, opcoes) => new Promise((resolve) => {
@@ -242,8 +248,8 @@ function rodandoNaSessao(sessionId) {
     return c && (c.status === 'rodando' || c.status === 'parando') ? c : null;
 }
 
-async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [], aoCriarSessao, env = null, assinatura = '' }) {
-    const chat = ehChat(cwd);
+async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [], aoCriarSessao, env = null, assinatura = '', remoto = null }) {
+    const chat = !remoto && ehChat(cwd);
     // Chat não tem permissões para escolher: o modo é sempre o padrão
     const modoValido = !chat && MODOS.includes(modo) ? modo : 'default';
 
@@ -295,8 +301,28 @@ async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [],
         ultimoUso: Date.now(), fila: criaFila(), q: null, modo: modoValido, podeIgnorar: modoValido === 'bypassPermissions',
         modelo: modelo || null, esforco: esforco || null, tipo: chat ? 'chat' : 'codigo',
         // Conta/identidade desta conversa (env próprio) e a pasta da conta do Claude que ela usa
-        assinatura: assinatura || '', contaDir: require('./perfis').contaDoEnv(env || process.env),
+        assinatura: assinatura || '', contaDir: remoto ? 'remoto:' + remoto.id : require('./perfis').contaDoEnv(env || process.env),
+        remoto: remoto ? remoto.id : null,
     };
+    // Servidor remoto: o Claude Code roda lá, pelo ssh. Sem o MCP "painel" (ele lê arquivos deste computador)
+    // e sem as instruções do Windows (ACOMPANHAR, imagens por caminho local)
+    if (remoto && !chat) {
+        const opcoesRemoto = {
+            cwd, resume: sessao || undefined, model: modelo || undefined, effort: esforco || undefined,
+            permissionMode: modoValido, allowDangerouslySkipPermissions: conversa.podeIgnorar,
+            settingSources: ['user', 'project', 'local'],
+            systemPrompt: { type: 'preset', preset: 'claude_code', append: INSTRUCAO_REMOTO },
+            enableFileCheckpointing: true,
+            mcpServers: {},
+            canUseTool: criaPermissao(conversa),
+            spawnClaudeCodeProcess: (o) => require('./remoto').spawnClaude(remoto, cwd, o),
+        };
+        conversa.fila.push(mensagemUsuario(texto, imagens));
+        conversa.q = query({ prompt: conversa.fila, options: opcoesRemoto });
+        conversas.set(conversa.chave, conversa);
+        acompanhaConversa(conversa, aoCriarSessao);
+        return conversa;
+    }
     const opcoes = chat ? {
         cwd,
         resume: sessao || undefined,
@@ -335,40 +361,43 @@ async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [],
     conversa.q = query({ prompt: conversa.fila, options: opcoes });
     conversas.set(conversa.chave, conversa);
 
-    (async () => {
-        try {
-            for await (const mensagem of conversa.q) {
-                if (mensagem.session_id && !conversa.sessionId) {
-                    conversa.sessionId = mensagem.session_id;
-                    if (aoCriarSessao) aoCriarSessao(conversa.projeto, conversa.sessionId);
-                }
-                conversa.ultimoUso = Date.now();
-                if (mensagem.type === 'system') registraTarefas(conversa, mensagem);
-                if (mensagem.type === 'result') {
-                    // Fim de um turno: o processo continua vivo, esperando a próxima mensagem
-                    conversa.status = conversa.status === 'parando' ? 'interrompida' : 'ociosa';
-                    conversa.tarefasFrente = [];
-                    conversa.erro = mensagem.is_error ? String(mensagem.result || mensagem.subtype || 'erro') : null;
-                } else if (mensagem.type === 'assistant' && conversa.status === 'ociosa') {
-                    // O Claude voltou a trabalhar sozinho (ex.: um agente em segundo plano terminou)
-                    conversa.status = 'rodando';
-                }
-            }
-            conversa.status = conversa.erro ? 'erro' : 'encerrada';
-        } catch (e) {
-            conversa.status = 'erro';
-            conversa.erro = e.message;
-        } finally {
-            conversa.vivo = false;
-            conversa.tarefasBg = [];
-            conversa.tarefasFrente = [];
-            conversa.fim =new Date().toISOString();
-            conversa.fila.close();
-            conversa.pendentes.forEach(p => p.resolve({ behavior: 'deny', message: 'Conversa encerrada.' }));
-            conversa.pendentes.clear();
-        }
-    })();
+    acompanhaConversa(conversa, aoCriarSessao);
     return conversa;
+}
+
+// Lê as mensagens do Claude Code da conversa até o processo acabar (status, sessão criada, tarefas)
+async function acompanhaConversa(conversa, aoCriarSessao) {
+    try {
+        for await (const mensagem of conversa.q) {
+            if (mensagem.session_id && !conversa.sessionId) {
+                conversa.sessionId = mensagem.session_id;
+                if (aoCriarSessao) aoCriarSessao(conversa.projeto, conversa.sessionId);
+            }
+            conversa.ultimoUso = Date.now();
+            if (mensagem.type === 'system') registraTarefas(conversa, mensagem);
+            if (mensagem.type === 'result') {
+                // Fim de um turno: o processo continua vivo, esperando a próxima mensagem
+                conversa.status = conversa.status === 'parando' ? 'interrompida' : 'ociosa';
+                conversa.tarefasFrente = [];
+                conversa.erro = mensagem.is_error ? String(mensagem.result || mensagem.subtype || 'erro') : null;
+            } else if (mensagem.type === 'assistant' && conversa.status === 'ociosa') {
+                // O Claude voltou a trabalhar sozinho (ex.: um agente em segundo plano terminou)
+                conversa.status = 'rodando';
+            }
+        }
+        conversa.status = conversa.erro ? 'erro' : 'encerrada';
+    } catch (e) {
+        conversa.status = 'erro';
+        conversa.erro = e.message;
+    } finally {
+        conversa.vivo = false;
+        conversa.tarefasBg = [];
+        conversa.tarefasFrente = [];
+        conversa.fim = new Date().toISOString();
+        conversa.fila.close();
+        conversa.pendentes.forEach(p => p.resolve({ behavior: 'deny', message: 'Conversa encerrada.' }));
+        conversa.pendentes.clear();
+    }
 }
 
 function responder(idPendente, { decisao, respostas, mensagem, textoEditado }) {
@@ -652,7 +681,7 @@ function estado() {
     return [...conversas.values()].map(c => ({
         chave: c.chave, sessionId: c.sessionId, projeto: c.projeto, cwd: c.cwd, status: c.status, vivo: c.vivo,
         erro: c.erro, inicio: c.inicio, fim: c.fim, texto: c.texto, modo: c.modo, modelo: c.modelo, tipo: c.tipo,
-        tarefasBg: c.tarefasBg, tarefasFrente: c.tarefasFrente, tarefasFim: c.tarefasFim.size,
+        tarefasBg: c.tarefasBg, tarefasFrente: c.tarefasFrente, tarefasFim: c.tarefasFim.size, remoto: c.remoto || null,
         pendentes: [...c.pendentes.values()].map(p => ({
             id: p.id, tipo: p.tipo, ferramenta: p.ferramenta, titulo: p.titulo, descricao: p.descricao,
             podeSempre: p.podeSempre, resumo: resumoEntrada(p.ferramenta, p.entrada),

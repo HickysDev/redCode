@@ -14,6 +14,9 @@ desktop/red-code.ico
 # Extensões instaladas e os dados delas (rodando pelo código, ficam na pasta do Red Code)
 extensoes/
 extensoes-dados/
+# Servidores remotos: chave SSH do Red Code e o espelho dos transcripts de lá (nunca no git)
+ssh/
+remotos/
 
 # Testes e sobras
 teste-chat/

@@ -1306,6 +1306,14 @@ pre.diff-inteiro .ln { display: inline-block; width: 4.2em; margin: 0 12px 0 -4p
 .msg.voce.anexo .refinado { max-width: min(76%, 760px); text-align: right; }
 .msg.voce.anexo .refinado .texto { text-align: left; }
 .msg.modelo { align-items: flex-start; }
+.config-remoto { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--linha); }
+.config-remoto > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.config-remoto small { color: var(--grafite); }
+.config-remoto small.erro-remoto { color: var(--atencao); }
+.config-remoto .config-controle { flex-wrap: wrap; justify-content: flex-end; }
+.digital-remoto { padding: 8px 10px; border-radius: 8px; background: var(--codigo); font: 12.5px var(--mono); user-select: all; }
+.selo-remoto { border-color: color-mix(in srgb, var(--ok) 50%, var(--linha)); color: var(--ok); }
+#contaNova.oculto-remoto { display: none; }
 .acoes-fala { display: inline-flex; align-items: center; gap: 1px; margin-left: 8px; opacity: 0; transition: opacity .15s; }
 .msg.modelo:hover .acoes-fala, .acoes-fala.sempre, .acoes-fala:has(:focus-visible), .acoes-fala:has(.ativo), .acoes-fala:has([aria-pressed="true"]) { opacity: 1; }
 .acoes-fala button { display: grid; place-items: center; width: 28px; height: 26px; padding: 0; border-radius: 7px; color: var(--grafite); transition: background .12s, color .12s; }
@@ -2005,7 +2013,8 @@ body.lateral-aberta .lateral { display: block; }
 .alterna-secao[aria-pressed="true"] { color: var(--voce); background: var(--realce); }
 .busca:focus { border-color: var(--linha); outline: none; }
 .abas { background: none; border: 0; padding: 0; margin-bottom: 8px; gap: 0; justify-content: space-between; }
-.abas button { flex: none; padding: 3px 5px; }
+.abas button { flex: none; padding: 3px 4px; }
+.abas .aba-arquivo { display: inline-grid; place-items: center; padding: 3px 4px; }
 .abas button[aria-pressed="true"] { background: none; box-shadow: none; color: var(--tinta); font-weight: 600; }
 .projeto { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 14px 18px 4px; font: 500 12.5px var(--sans); color: var(--grafite); }
 .projeto:hover { color: var(--tinta); }
@@ -2678,6 +2687,36 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
 .comando-plugin { max-height: 220px; overflow: auto; margin: 8px 0; padding: 10px; border: 1px solid var(--linha); border-radius: 8px; background: var(--codigo); font: 12px var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 </style>
 <script>
+// Prazo para os pedidos ao servidor: o navegador só abre 6 conexões por vez com ele, e um pedido pendurado ocupava
+// uma para sempre; com alguns assim a tela inteira parava (só reiniciando). Depois de 120 s o pedido desiste e a tela segue
+// (o prazo fica acima da subida do servidor, que lê todos os transcripts e passa de 1 min).
+// O que demora de propósito fica sem prazo: voz, envio, ramificar, voltar arquivos, troca de conta, salvar, Git (push/pull),
+// worktree, plugins, login, agendamentos e resumo do dia.
+(function () {
+    const fetchOriginal = window.fetch.bind(window);
+    const SEM_PRAZO = /^\/api\/(voz|chat\/enviar|chat\/ramificar|chat\/voltar|conversa\/mover-conta|editor\/salvar|git\/|worktree|plugins|auth\/|agendamentos|resumo-dia)/;
+    const abertos = window.__pedidosAbertos = new Map();
+    let seq = 0;
+    window.fetch = function (entrada, opcoes) {
+        opcoes = opcoes || {};
+        const url = typeof entrada === 'string' ? entrada : (entrada && entrada.url) || '';
+        const caminho = url.replace(location.origin, '');
+        if (!caminho.startsWith('/api/')) return fetchOriginal(entrada, opcoes);
+        const id = ++seq;
+        abertos.set(id, { caminho: caminho.slice(0, 120), inicio: Date.now() });
+        const comPrazo = opcoes.signal || SEM_PRAZO.test(caminho) ? opcoes : Object.assign({}, opcoes, { signal: AbortSignal.timeout(120000) });
+        return fetchOriginal(entrada, comPrazo).finally(function () { abertos.delete(id); });
+    };
+    // Pedido que desistiu pelo prazo não vira erro da página (quem chamou já trata a falta de resposta)
+    window.addEventListener('unhandledrejection', function (ev) { if (ev.reason && ev.reason.name === 'TimeoutError') ev.preventDefault(); });
+    // Vigia: pedido aberto há mais de 20 s vai para o servidor.log (sendBeacon não espera resposta nem ocupa a tela)
+    setInterval(function () {
+        const lentos = [...abertos.values()].filter(function (p) { return Date.now() - p.inicio > 20000; });
+        if (lentos.length) navigator.sendBeacon('/api/diagnostico', JSON.stringify({ abertos: abertos.size, lentos: lentos.map(function (p) { return { caminho: p.caminho, s: Math.round((Date.now() - p.inicio) / 1000) }; }) }));
+    }, 15000);
+})();
+</script>
+<script>
 // Aparência escolhida em Configurações: aplicada antes do 1º desenho (o tema não pisca)
 (function () {
     try {
@@ -2744,6 +2783,7 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
             <button data-aba="hoje" aria-pressed="false" title="Com atividade desde a meia-noite">Hoje</button>
             <button data-aba="semana" aria-pressed="false" title="Com atividade desde segunda-feira">Semana</button>
             <button data-aba="mes" aria-pressed="false" title="Com atividade desde o dia 1">Mês</button>
+            <button data-aba="arquivadas" class="aba-arquivo" aria-pressed="false" title="Só as conversas arquivadas (dos últimos 7 dias)" aria-label="Só as arquivadas"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="3.5" rx="1"/><path d="M3 6v6.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6M6.5 8.5h3"/></svg></button>
         </div>
         <div class="aviso-versao" id="avisoVersao" role="status" hidden></div>
         <div class="resumo-status" id="resumoStatus" aria-live="polite"></div>
@@ -3009,6 +3049,9 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
         </label>
         <label id="rotuloOutraPasta" hidden>Pasta do projeto
             <span class="linha-pasta"><input id="novaPasta" placeholder="Escolha a pasta ou cole o caminho"><button type="button" class="botao" id="btnEscolherPasta" hidden>Escolher…</button></span>
+        </label>
+        <label id="rotuloPastaRemota" hidden>Pasta no servidor
+            <input id="novaPastaRemota" placeholder="/root" spellcheck="false" autocomplete="off">
         </label>
         <label class="opcao-worktree" id="rotuloWorktree" hidden><input type="checkbox" id="novaWorktree">
             <span>Trabalhar numa cópia isolada (worktree git)<small>Para rodar ao mesmo tempo que outra conversa no mesmo projeto. Vai para um branch painel/… criado a partir do último commit: o que não foi commitado no projeto não vai junto. As regras, skills e hooks da pasta .claude são copiados (e anotados no .git/info/exclude do repositório, que vale também para o projeto principal). Outros arquivos não versionados (ex.: configuração do banco local) não vão. Juntar ao principal fica com você.</small></span></label>
@@ -4812,7 +4855,10 @@ function verificaAcompanhar(d) {
 // Shell do terminal (Configuração deste navegador): PowerShell, Git Bash ou CMD
 const NOMES_SHELL = { powershell: 'PowerShell', gitbash: 'Git Bash', cmd: 'CMD' };
 const shellPreferido = () => { try { const v = localStorage.getItem('painelShellTerminal'); return NOMES_SHELL[v] ? v : 'powershell'; } catch (e) { return 'powershell'; } };
-function criaTerminal(pasta, { chave = pasta, comando = '', rotulo = '', titulo = '', login = '', claude = '', shell: shellPedido = '', arquivo = '' } = {}) {
+function criaTerminal(pasta, { chave = pasta, comando = '', rotulo = '', titulo = '', login = '', claude = '', shell: shellPedido = '', arquivo = '', remoto = null } = {}) {
+    // Conversa remota aberta e terminal na pasta dela: o terminal é no servidor
+    const daConversaRemota = !remoto && !comando && !login && !claude ? sessaoRemota(sessaoAtual) : null;
+    if (daConversaRemota && daConversaRemota.cwd === pasta) { remoto = { id: daConversaRemota.remoto, pasta }; rotulo = rotulo || '🖧 ' + (daConversaRemota.nomeRemoto || daConversaRemota.remoto); }
     // Comando do próprio Red Code (acompanhar arquivo), login e /mcp do Claude: PowerShell (ou o shell do bloco que mandou rodar)
     const shell = shellPedido || (comando || login || claude ? 'powershell' : shellPreferido());
     rotulo = rotulo || NOMES_SHELL[shell];
@@ -4826,7 +4872,7 @@ function criaTerminal(pasta, { chave = pasta, comando = '', rotulo = '', titulo 
     term.loadAddon(fit);
     term.open(el);
     try { fit.fit(); } catch (e) { /* sem tamanho ainda */ }
-    const ws = new WebSocket(`ws://${location.host}/ws/terminal?token=${TOKEN_PAINEL}&cwd=${encodeURIComponent(pasta)}&cols=${term.cols}&rows=${term.rows}&shell=${shell}${claude ? '&claude=' + encodeURIComponent(claude) : ''}${login ? '&login=' + encodeURIComponent(login) : (sessaoAtual && !sessaoEhChat() ? '&conversa=' + encodeURIComponent(sessaoAtual) : '')}`);
+    const ws = new WebSocket(`ws://${location.host}/ws/terminal?token=${TOKEN_PAINEL}${remoto ? `&remoto=${encodeURIComponent(remoto.id)}&pastaRemota=${encodeURIComponent(remoto.pasta)}${remoto.login ? '&loginRemoto=1' : ''}` : ''}&cwd=${encodeURIComponent(pasta)}&cols=${term.cols}&rows=${term.rows}&shell=${shell}${claude ? '&claude=' + encodeURIComponent(claude) : ''}${login ? '&login=' + encodeURIComponent(login) : (sessaoAtual && !sessaoEhChat() ? '&conversa=' + encodeURIComponent(sessaoAtual) : '')}`);
     ws.onmessage = (ev) => term.write(typeof ev.data === 'string' ? ev.data : '');
     // Comando inicial (ex.: acompanhar um arquivo): enviado assim que o PowerShell abrir
     if (comando) ws.addEventListener('open', () => setTimeout(() => { if (ws.readyState === 1) ws.send(JSON.stringify({ tipo: 'entrada', dados: comando })); }, 900), { once: true });
@@ -5519,7 +5565,9 @@ async function carregaSessoes() {
     const casa = (s) => !filtro || (nomeExibido(s, 1) + ' ' + s.titulo + ' ' + s.nomeProjeto).toLowerCase().includes(filtro);
     const desde = inicioDoPeriodo(abaSessoes);
     const visivel = (s) => doModo(s) && casa(s) && (!desde || s.atualizado >= desde);
-    let base = sessoes.filter(s => visivel(s) && !arquivada(s));
+    // Aba Arquivo: só as arquivadas, por projeto (sem Fixadas, grupos e a seção Arquivo do fim)
+    const soArquivadas = abaSessoes === 'arquivadas';
+    let base = sessoes.filter(s => visivel(s) && (soArquivadas ? arquivada(s) : !arquivada(s)));
     if (abaSessoes === 'ativas') base = base.filter(s => s.ativa || s.pergunta || (s.esperando && Date.now() - s.atualizado < 30 * 60 * 1000));
 
     const cadeias = montaCadeias(base).sort((a, b) => b.atualizado - a.atualizado);
@@ -5528,12 +5576,12 @@ async function carregaSessoes() {
     const secoes = [];
     const usadas = new Set();
     const pega = (filtroCadeia) => cadeias.filter(c => !usadas.has(c) && filtroCadeia(c)).map(c => { usadas.add(c); return c; });
-    const favoritas = verSecao.fixadas ? pega(favoritaCadeia) : [];
+    const favoritas = verSecao.fixadas && !soArquivadas ? pega(favoritaCadeia) : [];
     if (favoritas.length) secoes.push({ id: 'favoritas', titulo: 'Fixadas', classe: 'favoritas', cadeias: favoritas });
     // GRUPOS DO USUÁRIO NÃO USAM O pega: A CONVERSA CONTINUA TAMBÉM NO PROJETO
     const gruposVaziosVisiveis = abaSessoes === 'todas' && !filtro;
     const antesDosGrupos = secoes.length;
-    for (const g of dadosPainel.grupos) {
+    for (const g of soArquivadas ? [] : dadosPainel.grupos) {
         const lista = cadeias.filter(c => c.membros.some(m => g.conversas.includes(chaveDe(m))));
         if (lista.length || gruposVaziosVisiveis) secoes.push({ id: 'g:' + g.id, titulo: g.nome, grupo: g, cadeias: lista });
     }
@@ -5547,7 +5595,7 @@ async function carregaSessoes() {
     }
     if (secoes.length && porProjeto.size) secoes.push({ divisor: modoApp === 'chat' ? 'Conversas' : 'Projetos', cadeias: [] });
     for (const [id, { titulo, cadeias: lista }] of porProjeto) secoes.push({ id: 'p:' + id, titulo, cadeias: lista });
-    const arquivo = abaSessoes === 'ativas' || !(verSecao.arquivo || filtro) ? [] : montaCadeias(sessoes.filter(s => visivel(s) && arquivada(s))).sort((a, b) => b.atualizado - a.atualizado);
+    const arquivo = soArquivadas || abaSessoes === 'ativas' || !(verSecao.arquivo || filtro) ? [] : montaCadeias(sessoes.filter(s => visivel(s) && arquivada(s))).sort((a, b) => b.atualizado - a.atualizado);
     if (arquivo.length) secoes.push({ id: 'arquivo', titulo: 'Arquivo', classe: 'arquivo', cadeias: arquivo });
 
     const jaListadas = new Set();
@@ -5565,7 +5613,7 @@ async function carregaSessoes() {
         if (modoApp !== 'chat' && !sec.id.startsWith('p:')) { html += sublistaPorProjeto(sec.cadeias); continue; }
         for (const c of sec.cadeias) html += blocoCadeia(c);
     }
-    const vazios = { ativas: 'Nenhuma conversa ativa agora.', hoje: 'Nenhuma conversa hoje.', semana: 'Nenhuma conversa nesta semana.', mes: 'Nenhuma conversa neste mês.', todas: 'Nenhuma conversa encontrada.' };
+    const vazios = { ativas: 'Nenhuma conversa ativa agora.', hoje: 'Nenhuma conversa hoje.', semana: 'Nenhuma conversa nesta semana.', mes: 'Nenhuma conversa neste mês.', arquivadas: 'Nada arquivado nos últimos 7 dias.', todas: 'Nenhuma conversa encontrada.' };
     document.getElementById('listaSessoes').innerHTML = html + (secoes.some(s => s.cadeias.length) ? '' : `<div class="vazio" style="padding:20px 18px">${vazios[abaSessoes]}</div>`);
     marcaAreasDeGrupo();
     // Janela secundária: a sessão abriu antes de saber qual é a pasta do Chat; acerta o modo e redesenha a lista
@@ -7072,6 +7120,7 @@ let menuSessao = null;
 let menuSessaoFechado = { chave: '', quando: 0 };
 // Selo da conta do Claude/identidade do Git da conversa, quando diferem do perfil em uso
 function seloConta(s) {
+    if (s && s.remoto) return ` <span class="selo-conta selo-remoto" title="Roda no servidor ${esc(s.nomeRemoto || s.remoto)} (${esc(s.cwd || '')})">🖧 ${esc(s.nomeRemoto || s.remoto)}</span>`;
     const e = s && s.porConversa;
     if (!e || !perfisCache) return '';
     const perfil = perfisCache.perfis.find(p => p.id === perfisCache.ativo) || {};
@@ -7620,6 +7669,7 @@ const SECOES_CONFIG = {
             + '<h3 class="config-titulo">Lista de conversas</h3>'
             + linhaConfig('Arquivar sozinho', 'Conversa sem atividade por esse tempo vai para o Arquivo (a busca continua achando). A lista já esconde sozinha as paradas há 7 dias ou mais. Não arquiva fixada, em grupo, trabalhando ou com pergunta; a continuação conta junto. Desarquivou à mão: a contagem recomeça.',
                 `<select data-pref-servidor="arquivarDias" aria-label="Arquivar sozinho">${[[0, 'Desligado'], [1, 'Parada há 1 dia'], [2, 'Parada há 2 dias'], [3, 'Parada há 3 dias'], [5, 'Parada há 5 dias']].map(([v, n]) => `<option value="${v}" ${v === (Number(dados.arquivarDias) || 0) ? 'selected' : ''}>${n}</option>`).join('')}</select>`, 'arquivo arquivar automatico antigas paradas dias')
+            + htmlRemotos(await carregaRemotos())
             + '<h3 class="config-titulo">Links</h3>'
             + linhaConfig('Navegador para abrir links', noApp() ? 'Os links das conversas abrem neste navegador.' : 'Só vale no app do Red Code (aberto no navegador, os links abrem nele mesmo).',
                 `<select data-pref-servidor="navegador" aria-label="Navegador" ${noApp() ? '' : 'disabled'}>${[['padrao', 'Padrão do Windows'], ['edge', 'Microsoft Edge'], ['chrome', 'Google Chrome'], ['firefox', 'Firefox']].map(([v, n]) => `<option value="${v}" ${v === navegadorAtual ? 'selected' : ''}>${n}</option>`).join('')}</select>`, 'navegador chrome edge firefox');
@@ -10097,8 +10147,13 @@ async function abreNovaConversa({ mensagem = '', cwd = '', modelo = '', esforco 
     const grupos = new Map();
     for (const p of projetos) { const g = p.grupo || 'Projetos'; if (!grupos.has(g)) grupos.set(g, []); grupos.get(g).push(p); }
     seletor.innerHTML = [...grupos].map(([g, lista]) => `<optgroup label="${esc(g)}">${lista.map(p => `<option value="${esc(p.cwd)}">${p.semProjeto ? 'Sem pasta específica (conversa livre)' : `${esc(p.nome)} (${esc(p.cwd)})`}</option>`).join('')}</optgroup>`).join('')
+        + ((await carregaRemotos()).servidores || []).map((r, i, l) => (i === 0 ? '<optgroup label="Servidores remotos">' : '') + `<option value="__remoto:${esc(r.id)}">🖧 ${esc(r.nome)} (${esc(r.usuario)}@${esc(r.host)})</option>` + (i === l.length - 1 ? '</optgroup>' : '')).join('')
         + '<optgroup label="Escolher"><option value="__outra">Outra pasta…</option></optgroup>';
     const atual = cwd || (ultimosDados && ultimosDados.cwd) || '';
+    // Continuar uma conversa remota: o mesmo servidor e a mesma pasta de lá
+    const remotaAtual = sessaoRemota(sessaoAtual);
+    document.getElementById('novaPastaRemota').value = '';
+    if (remotaAtual && tipoNova !== 'chat') { seletor.value = '__remoto:' + remotaAtual.remoto; document.getElementById('novaPastaRemota').value = remotaAtual.cwd || ''; }
     const existe = projetos.some(p => p.cwd.toLowerCase() === atual.toLowerCase());
     if (existe) seletor.value = projetos.find(p => p.cwd.toLowerCase() === atual.toLowerCase()).cwd;
     // Pasta da conversa que não está na lista (ex.: rascunho do app): entra no topo e fica escolhida,
@@ -10108,6 +10163,7 @@ async function abreNovaConversa({ mensagem = '', cwd = '', modelo = '', esforco 
         seletor.value = atual;
     }
     document.getElementById('rotuloOutraPasta').hidden = seletor.value !== '__outra';
+    atualizaOndeNova();
     confereWorktree();
     // Padrão: Opus com esforço médio
     document.getElementById('novaModelo').value = modelo || lePref('padraoModelo', 'claude-opus-5-5');
@@ -10144,8 +10200,8 @@ async function confereWorktree() {
     const rot = document.getElementById('rotuloWorktree');
     document.getElementById('novaWorktree').checked = false;
     rot.hidden = true;
-    if (!v || v === '__outra') return;
-    try { const r = await (await fetch('/api/worktree/repo?cwd=' + encodeURIComponent(v), { headers: { 'X-Painel': '1' } })).json(); rot.hidden = !r.repo; } catch (e) { /* sem git */ }
+    if (!v || v === '__outra' || v.startsWith('__remoto:')) return;
+    try { const r = await (await fetch('/api/worktree/repo?cwd=' + encodeURIComponent(v), { headers: { 'X-Painel': '1' } })).json(); if (document.getElementById('novaProjeto').value === v) rot.hidden = !r.repo; } catch (e) { /* sem git */ }
 }
 // No app desktop, "Outra pasta…" abre o seletor de pastas do Windows (no navegador, só o campo de texto)
 const btnEscolherPasta = document.getElementById('btnEscolherPasta');
@@ -10159,11 +10215,22 @@ btnEscolherPasta.addEventListener('click', escolhePasta);
 document.getElementById('novaProjeto').addEventListener('change', (ev) => {
     if (ev.target.value === '__outra' && !btnEscolherPasta.hidden && !document.getElementById('novaPasta').value) escolhePasta();
     document.getElementById('rotuloOutraPasta').hidden = ev.target.value !== '__outra';
+    atualizaOndeNova();
     confereWorktree();
 });
+// Servidor remoto escolhido: pasta de lá (padrão do servidor) e sem conta/identidade locais
+function atualizaOndeNova() {
+    const v = document.getElementById('novaProjeto').value || '';
+    const servidor = v.startsWith('__remoto:') ? servidoresRemotos.find(r => r.id === v.slice(9)) : null;
+    document.getElementById('rotuloPastaRemota').hidden = !servidor;
+    document.getElementById('contaNova').classList.toggle('oculto-remoto', !!servidor);
+    const campo = document.getElementById('novaPastaRemota');
+    if (servidor && !campo.value) campo.value = servidor.pastaPadrao;
+}
 document.getElementById('btnEnfileirar').addEventListener('click', async () => {
     if (tipoNova === 'chat') return;
     const escolhido = document.getElementById('novaProjeto').value;
+    if (escolhido.startsWith('__remoto:')) return recado('A fila ainda não roda em servidor remoto: comece a conversa direto.');
     const cwd = escolhido === '__outra' ? document.getElementById('novaPasta').value.trim() : escolhido;
     try {
         await api('/api/fila', { acao: 'adicionar', pedido: { cwd, texto: document.getElementById('novaMensagem').value, modelo: document.getElementById('novaModelo').value, esforco: document.getElementById('novaEsforco').value, modo: 'acceptEdits' } });
@@ -10171,17 +10238,92 @@ document.getElementById('btnEnfileirar').addEventListener('click', async () => {
         recado('Pedido na fila: roda quando chegar a vez (veja em Configurações › Fila)');
     } catch (e) { recado(e.message); }
 });
+// ---------- Servidores remotos (SSH): Configurações, preparo e terminal ----------
+// O Red Code fala com o Claude Code instalado no servidor; a senha só é pedida para instalar a chave do Red Code
+let servidoresRemotos = [];
+async function carregaRemotos() {
+    try { const r = await getPainel('/api/remotos'); servidoresRemotos = r.servidores || []; return r; } catch (e) { return { servidores: [] }; }
+}
+// Conversa remota aberta (a da lista) — terminal e selo usam
+const sessaoRemota = (chave) => (todasSessoes || []).find(x => x.projeto + '/' + x.id === chave && x.remoto) || null;
+function htmlRemotos(r) {
+    const lista = (r.servidores || []).map(s => {
+        const e = s.estado;
+        const situacao = !r.temChave ? 'Ainda não preparado' : !e ? 'Sem leitura ainda' : e.ok ? 'Conectado · lido ' + new Date(e.em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'Sem conexão: ' + e.erro;
+        return `<div class="config-remoto" data-remoto="${esc(s.id)}"><div><b>🖧 ${esc(s.nome)}</b><small>${esc(s.usuario)}@${esc(s.host)}${s.porta !== 22 ? ':' + s.porta : ''} · pasta ${esc(s.pastaPadrao)}</small><small class="${e && !e.ok ? 'erro-remoto' : ''}">${esc(situacao)}</small></div>
+            <span class="config-controle"><button class="mini" data-remoto-acao="preparar" title="Instala a chave do Red Code e o Claude Code ${esc(r.versaoClaude)} no servidor (pede a senha uma vez)">Preparar</button>
+            <button class="mini" data-remoto-acao="terminal" title="Terminal no servidor, na pasta padrão">Terminal</button>
+            <button class="mini" data-remoto-acao="login" title="Entrar na conta do Claude no servidor (claude /login)">Entrar no Claude</button>
+            <button class="mini" data-remoto-acao="remover">Remover</button></span></div>`;
+    }).join('');
+    return '<h3 class="config-titulo">Servidores remotos</h3>'
+        + `<p class="nota">Conversas com o Claude Code rodando num servidor Linux, pelo SSH (como o Remote-SSH do VS Code). Depois de preparar, escolha o servidor em "Projeto" ao começar uma conversa nova.</p>`
+        + (lista || '<p class="nota">Nenhum servidor ainda.</p>')
+        + '<div class="config-controle" style="margin-top:8px"><button class="mini" data-remoto-acao="adicionar">+ Adicionar servidor</button></div>';
+}
+async function formRemoto() {
+    const html = `<div class="perfil-form">
+        <label class="perfil-campo">Nome<input class="campo-config" name="nome" maxlength="40" placeholder="Ex.: OrbeAI"></label>
+        <label class="perfil-campo">Endereço<input class="campo-config" name="host" placeholder="IP ou nome do servidor"></label>
+        <div class="duas-colunas"><label class="perfil-campo">Usuário<input class="campo-config" name="usuario" value="root"></label>
+        <label class="perfil-campo">Porta<input class="campo-config" name="porta" type="number" value="22" min="1" max="65535"></label></div>
+        <label class="perfil-campo">Pasta padrão no servidor<input class="campo-config" name="pastaPadrao" value="/root"></label></div>`;
+    if (!(await confirmaNaPagina('Adicionar servidor remoto', html, 'Adicionar'))) return;
+    const campo = (n) => (document.querySelector(`#corpoConfirma [name="${n}"]`) || {}).value || '';
+    try {
+        await api('/api/remotos', { acao: 'salvar', servidor: { nome: campo('nome'), host: campo('host'), usuario: campo('usuario'), porta: Number(campo('porta')), pastaPadrao: campo('pastaPadrao') } });
+        recado('Servidor adicionado. Agora clique em Preparar.');
+        abreConfig('codigo');
+    } catch (e) { recado(e.message); }
+}
+// Preparar: senha uma vez (nunca guardada) + confirmação da impressão digital do servidor na 1ª vez
+async function preparaRemoto(s) {
+    if (!(await confirmaNaPagina('Preparar ' + s.nome, `<p class="nota">A senha de <b>${esc(s.usuario)}@${esc(s.host)}</b> é usada só agora, para instalar a chave do Red Code no servidor. Ela não fica guardada.</p><label class="perfil-campo">Senha<input class="campo-config" name="senha" type="password" autocomplete="off"></label>`, 'Continuar'))) return;
+    let senha = (document.querySelector('#corpoConfirma [name="senha"]') || {}).value || '';
+    try {
+        recado('Conectando no ' + s.nome + '…');
+        let r = await api('/api/remotos', { acao: 'preparar', id: s.id, senha });
+        if (r.confirmar) {
+            const ok = await confirmaNaPagina('Confirme o servidor', `<p class="nota">É a primeira conexão do Red Code com <b>${esc(s.host)}</b>. A impressão digital da chave dele (${esc(r.tipo)}) é:</p><pre class="digital-remoto">${esc(r.confirmar)}</pre><p class="nota">Se você conhece a impressão digital do servidor, confira antes de seguir. Seguindo, o Red Code passa a recusar qualquer outra chave para este endereço.</p>`, 'É este servidor');
+            if (!ok) return;
+            recado('Preparando o ' + s.nome + ': instalando a chave e o Claude Code (pode levar alguns minutos)…');
+            r = await api('/api/remotos', { acao: 'preparar', id: s.id, senha, fingerprint: r.confirmar });
+        }
+        recado(r.ok ? `${s.nome} pronto: ${r.versao}${r.login ? ', com login do Claude' : ' — falta entrar no Claude (botão "Entrar no Claude")'}` : 'Não deu para preparar.');
+        abreConfig('codigo');
+    } catch (e) { recado(e.message); }
+    finally { senha = ''; }
+}
+document.addEventListener('click', async (ev) => {
+    const b = ev.target.closest('[data-remoto-acao]');
+    if (!b) return;
+    const acao = b.dataset.remotoAcao;
+    if (acao === 'adicionar') return formRemoto();
+    const s = servidoresRemotos.find(x => x.id === (b.closest('[data-remoto]') || {}).dataset.remoto);
+    if (!s) return;
+    if (acao === 'preparar') return preparaRemoto(s);
+    if (acao === 'remover') {
+        if (!(await confirmaNaPagina('Remover ' + s.nome + '?', '<p class="nota">As conversas que já rodaram nele continuam no servidor; só somem do Red Code.</p>', 'Remover'))) return;
+        try { await api('/api/remotos', { acao: 'remover', id: s.id }); abreConfig('codigo'); } catch (e) { recado(e.message); }
+        return;
+    }
+    // Terminal no servidor (ou o login do Claude de lá)
+    document.getElementById('janelaConfig') && (document.getElementById('janelaConfig').hidden = true);
+    mostraTerminal(s.pastaPadrao, 'remoto:' + s.id + (acao === 'login' ? ':login' : ''), { remoto: { id: s.id, pasta: s.pastaPadrao, login: acao === 'login' }, rotulo: '🖧 ' + s.nome + (acao === 'login' ? ' · login' : ''), titulo: s.usuario + '@' + s.host });
+});
 document.getElementById('formNova').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const escolhido = document.getElementById('novaProjeto').value;
-    let cwd = tipoNova === 'chat' ? '' : escolhido === '__outra' ? document.getElementById('novaPasta').value.trim() : escolhido;
+    // Servidor remoto: a pasta é a de lá
+    const idRemotoNova = tipoNova !== 'chat' && escolhido.startsWith('__remoto:') ? escolhido.slice(9) : '';
+    let cwd = tipoNova === 'chat' ? '' : idRemotoNova ? document.getElementById('novaPastaRemota').value.trim() : escolhido === '__outra' ? document.getElementById('novaPasta').value.trim() : escolhido;
     const botao = ev.target.querySelector('[type="submit"]');
     if (botao.disabled) return;
     const rotulo = botao.textContent;
     botao.disabled = true; botao.classList.add('ocupado');
     botao.textContent = 'Iniciando…';
     try {
-        if (tipoNova !== 'chat' && document.getElementById('novaWorktree').checked && !document.getElementById('rotuloWorktree').hidden) {
+        if (!idRemotoNova && tipoNova !== 'chat' && document.getElementById('novaWorktree').checked && !document.getElementById('rotuloWorktree').hidden) {
             botao.textContent = 'Criando a cópia isolada…';
             const nome = document.getElementById('novaMensagem').value.trim().split(/\s+/).slice(0, 5).join(' ') || 'conversa';
             const wt = await api('/api/worktree/criar', { cwd, nome });
@@ -10197,8 +10339,10 @@ document.getElementById('formNova').addEventListener('submit', async (ev) => {
             modelo: document.getElementById('novaModelo').value,
             esforco: document.getElementById('novaEsforco').value,
             origem: origemNova,
+            // Servidor remoto: o Claude Code roda lá, na pasta escolhida
+            ...(idRemotoNova ? { remoto: idRemotoNova, cwdRemoto: cwd } : {}),
             // Conta do Claude e identidade do Git desta conversa (gravadas nela; o Chat usa as do perfil)
-            ...(tipoNova === 'chat' ? {} : { claude: document.getElementById('novaConta').value || undefined, git: document.getElementById('novaIdentidade').value || undefined }),
+            ...(tipoNova === 'chat' || idRemotoNova ? {} : { claude: document.getElementById('novaConta').value || undefined, git: document.getElementById('novaIdentidade').value || undefined }),
         });
         chaveNova = resposta.chave;
         janelaNova.hidden = true;
@@ -11803,10 +11947,14 @@ desenhaSino();
 // Conversa aberta em outra janela: /?sessao=<chave>
 if (JANELA_SECUNDARIA) abreSessao(JANELA_SECUNDARIA);
 carregaSessoes();
-setInterval(carregaSessoes, 5000);
-setInterval(() => { if (!document.hidden) atualizaSessao(false); }, 2000);
+// Um pedido por vez em cada ciclo: com o servidor lento, o ciclo pula a vez em vez de empilhar pedidos (empilhados, eles
+// ocupavam as 6 conexões do navegador e a tela inteira congelava até reiniciar)
+const umPorVez = (fn) => { let rodando = false; return async (...args) => { if (rodando) return; rodando = true; try { return await fn(...args); } finally { rodando = false; } }; };
+setInterval(umPorVez(carregaSessoes), 5000);
+const atualizaSessaoCiclo = umPorVez(() => atualizaSessao(false));
+setInterval(() => { if (!document.hidden) atualizaSessaoCiclo(); }, 2000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) atualizaSessao(false); });
-setInterval(atualizaChat, 1000);
+setInterval(umPorVez(atualizaChat), 1000);
 
 // Visual minimalista: detalhes da conversa e painel lateral começam escondidos; a escolha fica guardada
 (function () {

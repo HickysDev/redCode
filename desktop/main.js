@@ -274,6 +274,10 @@ function criaJanela() {
         return ok;
     });
 
+    // Travamentos da página ficam no app.log (para achar a causa quando a tela congela)
+    janela.on('unresponsive', () => registra('janela: a página parou de responder'));
+    janela.on('responsive', () => registra('janela: a página voltou a responder'));
+    janela.webContents.on('render-process-gone', (ev, d) => registra('janela: a página caiu (' + (d && d.reason) + ', código ' + (d && d.exitCode) + ')'));
     janela.on('close', (ev) => {
         registra(`janela: fechar (saindo=${saindo})`);
         if (!saindo) { ev.preventDefault(); janela.hide(); }   // fechar = esconder na bandeja

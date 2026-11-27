@@ -16,6 +16,7 @@ const integracoes = require('./integracoes');
 const automacao = require('./automacao');
 const gitScm = require('./git-scm');
 const chat = require('./chat');
+const remoto = require('./remoto');
 const perfis = require('./perfis');
 const midia = require('./midia');
 const login = require('./login');
@@ -839,8 +840,9 @@ function raizesExtras() {
 function arquivoDaSessao(projeto, id) {
     const e = entradaDaConversa(projeto, id);
     const ordem = [];
+    if (e && e.remoto && remoto.RE_ID.test(e.remoto)) ordem.push(remoto.dirEspelho(e.remoto));
     if (e && e.claude && perfis.existeConta(e.claude)) ordem.push(perfis.raizDaConta(e.claude));
-    ordem.push(RAIZ_PROJETOS, ...raizesExtras().map(x => x.raiz));
+    ordem.push(RAIZ_PROJETOS, ...raizesExtras().map(x => x.raiz), ...remoto.lista(leDados()).map(r => remoto.dirEspelho(r.id)));
     const vistas = new Set();
     for (const raiz of ordem) {
         if (vistas.has(resolveMin(raiz))) continue;
@@ -859,8 +861,10 @@ function listaSessoes(opcoes = {}) {
     const limite = Date.now() - DIAS_LISTADOS * 24 * 3600 * 1000;
     const sessoes = [];
     const porConversaLista = leDados().porConversa || {};
-    const raizesLista = [{ raiz: RAIZ_PROJETOS, conta: null }, ...raizesExtras()];
-    for (const { raiz: raizLista, conta: contaLista } of raizesLista) {
+    const remotosLista = remoto.lista(leDados());
+    espelhaRemotos(remotosLista, 5000);
+    const raizesLista = [{ raiz: RAIZ_PROJETOS, conta: null }, ...raizesExtras(), ...remotosLista.map(r => ({ raiz: remoto.dirEspelho(r.id), conta: null, remoto: r }))];
+    for (const { raiz: raizLista, conta: contaLista, remoto: remotoLista } of raizesLista) {
     if (!fs.existsSync(raizLista)) continue;
     for (const pasta of fs.readdirSync(raizLista)) {
         const caminhoPasta = path.join(raizLista, pasta);
@@ -868,7 +872,8 @@ function listaSessoes(opcoes = {}) {
         for (const nome of fs.readdirSync(caminhoPasta)) {
             if (!nome.endsWith('.jsonl')) continue;
             // Outra conta: só as conversas que foram criadas nela pela tela (as demais continuam escondidas)
-            if (contaLista) { const en = porConversaLista[chaveConversa(pasta, nome.replace('.jsonl', ''))]; if (!en || en.claude !== contaLista) continue; }
+            if (remotoLista) { /* espelho de um servidor remoto: tudo o que veio de lá */ }
+            else if (contaLista) { const en = porConversaLista[chaveConversa(pasta, nome.replace('.jsonl', ''))]; if (!en || en.claude !== contaLista) continue; }
             // Conta do perfil: conversa que foi movida para outra conta (e existe lá) não aparece de novo por uma cópia antiga
             // que tenha sido recriada aqui (ex.: VS Code aberto nela)
             else {
@@ -884,7 +889,7 @@ function listaSessoes(opcoes = {}) {
             if (Date.now() - stat.mtimeMs < 3600 * 1000) leSubagentes(path.join(caminhoPasta, nome.replace('.jsonl', '')), estado);
             const situacao = situacaoSessao(estado, stat.mtimeMs, nome.replace('.jsonl', ''));
             // Conversa trabalhando (aberta ou não): vigia os repositórios dela, para cada comando ser comparado com a versão certa
-            if (situacao.ativa && !opcoes.semVigia) reposDaSessao(estado, cwdDaPasta(estado, pasta)).forEach(r => vigiaRepo(r));
+            if (situacao.ativa && !opcoes.semVigia && !remotoLista) reposDaSessao(estado, cwdDaPasta(estado, pasta)).forEach(r => vigiaRepo(r));
             const pedidos = estado.eventos.filter(e => e.tipo === 'pedido');
             // Conversa criada só por digitar "/mcp" (comando do terminal, não conversa de verdade): fica fora da lista
             if (pedidos.length && pedidos.every(p => String(p.texto).trim().toLowerCase() === '/mcp')) continue;
@@ -905,12 +910,30 @@ function listaSessoes(opcoes = {}) {
                 })() : null,
                 // Conta e Git escolhidos para esta conversa (null = os do perfil)
                 porConversa: porConversaLista[chaveConversa(pasta, nome.replace('.jsonl', ''))] || null, contaOutra: contaLista,
+                // Conversa de um servidor remoto (espelhada): o selo na lista e o envio pelo ssh
+                remoto: remotoLista ? remotoLista.id : undefined, nomeRemoto: remotoLista ? remotoLista.nome : undefined,
             });
         }
     }
     }
     return sessoes.sort((a, b) => b.atualizado - a.atualizado);
 }
+
+// Espelho dos servidores remotos: um ciclo por vez por servidor, nunca mais do que a cada "intervalo"
+const ultimoEspelho = new Map();
+function espelhaRemotos(lista, intervalo) {
+    if (!remoto.temChave()) return;
+    for (const r of lista) {
+        if (Date.now() - (ultimoEspelho.get(r.id) || 0) < intervalo) continue;
+        ultimoEspelho.set(r.id, Date.now());
+        remoto.sincroniza(r).then(() => ultimoEspelho.set(r.id, Date.now())).catch(() => {});
+    }
+}
+setInterval(() => {
+    const vivos = new Set(chat.estado().filter(c => c.vivo && c.remoto).map(c => c.remoto));
+    if (vivos.size) espelhaRemotos(remoto.lista(leDados()).filter(r => vivos.has(r.id)), 1500);
+}, 2000);
+const servidorRemotoPorId = (id) => remoto.lista(leDados()).find(r => r.id === String(id || '')) || null;
 
 // Visão Tasks: conversas das últimas 24 h com lista de tarefas ou subagente, montadas do cache já lido.
 // A lista de sessões (e o dados.json) é reaproveitada por ~4,5 s, então a maioria dos polls de 2 s não varre o
@@ -979,7 +1002,7 @@ function falasRecentes(estado) {
     })).filter(f => f.texto);
 }
 function montaTasks(itens) {
-    const conversas = itens.map(({ s, estado, fundo = [] }) => {
+    const conversas = itens.map(({ s, estado, fundo = [], andamento = [] }) => {
         const sol = solicitacoes(s, estado);
         const tarefasTodas = tarefasDoPlano(estado.plano).map((t, i) => ({ ...t, subagentes: [], criada: estado.plano[i].criada }));
         const subagentesSoltos = [];
@@ -1007,10 +1030,35 @@ function montaTasks(itens) {
             vivo: s.ativa || fundo.length > 0, esperando: !s.ativa && !!estado.pergunta, ultimo: s.atualizado, segundoPlano: fundo,
             pergunta: estado.pergunta ? corta(estado.pergunta.texto, 140) : null, acaoAtual: s.acaoAtual || null,
             ...sol,
-            pulsos: pulsosRecentes(estado.pulsos), tarefas, subagentesSoltos, falas: falasRecentes(estado),
+            pulsos: pulsosRecentes(estado.pulsos), tarefas, subagentesSoltos, falas: falasRecentes(estado), andamento,
         };
     });
     return { conversas };
+}
+// Últimas linhas de um arquivo de andamento (lê só o fim, tira cores do terminal e linhas vazias)
+function raboDoArquivo(arquivo, linhas = 6) {
+    let fd = null;
+    try {
+        fd = fs.openSync(arquivo, 'r');
+        const tamanho = fs.fstatSync(fd).size, ler = Math.min(tamanho, 4096);
+        const buf = Buffer.alloc(ler);
+        fs.readSync(fd, buf, 0, ler, tamanho - ler);
+        return buf.toString('utf8').replace(/\r/g, '').split('\n').map(l => l.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').trimEnd()).filter(Boolean).slice(-linhas).map(l => corta(l, 160));
+    } catch (e) { return []; }
+    finally { if (fd !== null) try { fs.closeSync(fd); } catch (e) { /* já fechado */ } }
+}
+// Arquivos acompanhados (ACOMPANHAR / Get-Content -Wait) e saída dos comandos em segundo plano do painel (o próprio
+// resultado do comando diz o arquivo: "... ID: <id>. Output is being written to: <arquivo>")
+function andamentoDe(s, estado, bgPainel) {
+    const lista = (s.acompanhando || []).map(a => ({ nome: a.nome, arquivo: a.arquivo, linhas: raboDoArquivo(a.arquivo) }));
+    for (const t of bgPainel) {
+        const limpo = String(t.id).replace(/[^\w-]/g, '');
+        const padrao = new RegExp('ID: ' + limpo + '\\b[\\s\\S]*?([A-Za-z]:\\\\[^\'"`$;&|<>\\r\\n*?]+?\\\\' + limpo + '\\.output)');
+        const ev = estado.eventos.find(e => padrao.test(String(((e.codigo || {}).saida || {}).texto || '')));
+        const m = ev && String(ev.codigo.saida.texto).match(padrao);
+        if (m) lista.push({ nome: corta(t.descricao || 'comando', 60), arquivo: m[1], linhas: raboDoArquivo(m[1]) });
+    }
+    return lista.slice(0, 3);
 }
 function listaTasks() {
     const limite = Date.now() - HORAS_TASKS * 3600 * 1000;
@@ -1031,10 +1079,13 @@ function listaTasks() {
         if (!item) continue;
         const estado = item.estado;
         // Sem plano nem agente o cartão ainda mostra o pedido e o que ela está fazendo (antes a conversa sumia da visão)
-        itens.push({ s, estado, fundo });
+        // Andamento ao lado do cartão: últimas linhas dos arquivos acompanhados e dos comandos em segundo plano do painel
+        const bgPainel = ((vivasPainel.find(c => c.sessionId === s.id) || {}).tarefasBg || []).filter(t => !t.agente && t.tipo !== 'local_agent');
+        itens.push({ s, estado, fundo, andamento: andamentoDe(s, estado, bgPainel) });
     }
-    const versao = itens.map(({ s, estado, fundo }) => [
+    const versao = itens.map(({ s, estado, fundo, andamento }) => [
         s.id, s.atualizado, s.ativa, s.esperando, fundo.join(';'), s.titulo, s.modelo, estado.pergunta && estado.pergunta.texto, s.acaoAtual && s.acaoAtual.texto,
+        JSON.stringify(andamento),
         JSON.stringify(solicitacoes(s, estado)),
         estado.plano.map(t => t.status + t.texto).join(','),
         Object.values(estado.agentes).map(a => [a.id, a.status, a.modelo, a.fim, (a.plano || []).map(t => t.status + t.texto).join(';'), a.acaoAtual && a.acaoAtual.tipo + ':' + a.acaoAtual.texto].join('|')).join(','),
@@ -1548,6 +1599,7 @@ function requisicaoConfiavel(req) {
 // PAINEL_DADOS: no Red Code.exe, %APPDATA%\Red Code (a pasta do programa é trocada a cada versão)
 const PASTA_DADOS = process.env.PAINEL_DADOS || __dirname;
 videoNavegador.configura(PASTA_DADOS);
+remoto.configura(PASTA_DADOS);
 // Extensões do VS Code (.vsix) instaladas no Red Code: cada uma num processo próprio, encerrado junto com o servidor
 const extensoes = require('./extensoes');
 const credenciaisConversas = require('./credenciais-conversas');
@@ -1712,7 +1764,7 @@ function pastaConhecida(cwd) {
     if (chat.ehChat(cwd)) return false;
     const alvo = path.resolve(cwd).toLowerCase();
     if (reposVistos.has(alvo)) return true;
-    return listaSessoes().some(s => s.cwd && path.resolve(s.cwd).toLowerCase() === alvo);
+    return listaSessoes().some(s => !s.remoto && s.cwd && path.resolve(s.cwd).toLowerCase() === alvo);
 }
 
 // Modelos configurados: agentes (seus e do projeto) e o hook do Haiku que reescreve o pedido.
@@ -2328,6 +2380,9 @@ async function rotaChat(req, res, url) {
     if (url.pathname === '/api/versao' && req.method === 'GET') return responde(res, 200, versaoServidor());
     if (url.pathname === '/api/chat/estado' && req.method === 'GET') return responde(res, 200, chat.estado());
     if (url.pathname === '/api/projetos' && req.method === 'GET') return responde(res, 200, listaProjetos());
+    if (url.pathname === '/api/remotos' && req.method === 'GET') {
+        return responde(res, 200, { versaoClaude: remoto.VERSAO_CLAUDE, temChave: remoto.temChave(), servidores: remoto.lista(leDados()).map(r => ({ ...r, estado: remoto.estadoServidor.get(r.id) || null })) });
+    }
     if (url.pathname === '/api/dados' && req.method === 'GET') return responde(res, 200, { ...leDados(), chatProjeto: chat.pastaDoProjeto(chat.CHAT_DIR), usuario: nomeUsuario(), economia: leEconomia() });
     if (url.pathname.startsWith('/api/git/')) {
         if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
@@ -2664,6 +2719,36 @@ async function rotaChat(req, res, url) {
             }
             cwd = detalhe.cwd;
         }
+        // Servidor remoto da conversa: nova (escolhido na tela), existente (porConversa ou espelho) ou a origem do /clear
+        const entradaRemota = corpo.sessao ? entradaDaConversa(corpo.projeto, corpo.sessao) : limpar ? entradaDaConversa(projetoOrigem, sessaoOrigem) : null;
+        const idRemoto = corpo.sessao || limpar ? (entradaRemota && entradaRemota.remoto) || (listaSessoes().find(x => x.id === (corpo.sessao || sessaoOrigem) && x.remoto) || {}).remoto : corpo.remoto;
+        const servidorRemoto = idRemoto ? servidorRemotoPorId(idRemoto) : null;
+        if (idRemoto && !servidorRemoto) return responde(res, 400, { erro: 'Servidor remoto não encontrado. Confira em Configurações › Servidores remotos.' });
+        if (servidorRemoto) {
+            if (!remoto.temChave()) return responde(res, 409, { erro: 'Prepare o servidor primeiro (Configurações › Servidores remotos).' });
+            if (!corpo.sessao && !limpar) cwd = String(corpo.cwdRemoto || servidorRemoto.pastaPadrao);
+            if (!remoto.pastaRemotaValida(cwd)) return responde(res, 400, { erro: 'Pasta remota inválida (caminho absoluto, sem espaços).' });
+            if (corpo.modo === 'bypassPermissions' && servidorRemoto.usuario === 'root') return responde(res, 400, { erro: 'No servidor como root o Claude Code não aceita "Sem permissões" (regra de segurança dele). Escolha outro modo.' });
+            // O Claude remoto não lê arquivos deste computador: só imagens
+            if ((Array.isArray(corpo.anexos) ? corpo.anexos : []).some(a => !/^image\/(png|jpeg|gif|webp)$/.test(a.tipo))) {
+                return responde(res, 400, { erro: 'Numa conversa no servidor só dá para anexar imagens. Cole o texto do arquivo na mensagem.' });
+            }
+            const { imagens: imagensR } = preparaAnexos(corpo.anexos);
+            const origemR = !corpo.sessao && chaveValida(corpo.origem) ? corpo.origem : null;
+            if (limpar) chat.fechaSessao(sessaoOrigem);
+            const conversaR = await chat.enviar({
+                cwd, sessao: corpo.sessao, texto, modelo: corpo.modelo, esforco: corpo.esforco, modo: corpo.modo, imagens: imagensR,
+                remoto: servidorRemoto, assinatura: 'remoto:' + servidorRemoto.id,
+                aoCriarSessao: corpo.sessao ? null : (projeto, sessionId) => {
+                    const dados = leDados();
+                    dados.porConversa = dados.porConversa || {};
+                    dados.porConversa[chaveConversa(projeto, sessionId)] = { remoto: servidorRemoto.id, projeto, sessao: sessionId };
+                    if (origemR) dados.vinculos[`${projeto}/${sessionId}`] = origemR;
+                    gravaDados(dados);
+                },
+            });
+            return responde(res, 200, { chave: conversaR.chave, projeto: conversaR.projeto });
+        }
         if (!cwd || !fs.existsSync(cwd)) return responde(res, 400, { erro: 'Pasta do projeto não encontrada.' });
         // Conversa nova que continua outra: grava o vínculo assim que a sessão nascer
         const origem = !corpo.sessao && chaveValida(corpo.origem) ? corpo.origem : null;
@@ -2728,6 +2813,31 @@ async function rotaChat(req, res, url) {
     }
     // Trocar a conta do Claude de uma conversa parada: copia o transcript (e a pasta da sessão e o file-history) para a
     // pasta da outra conta, confere, e guarda os originais em <conta antiga>/redcode-movidas (fora de projects/)
+    if (url.pathname === '/api/remotos') {
+        const dados = leDados();
+        const lista = remoto.lista(dados);
+        try {
+            if (corpo.acao === 'salvar') {
+                const novo = remoto.valida({ ...corpo.servidor, id: corpo.servidor && corpo.servidor.id ? corpo.servidor.id : 's' + Date.now().toString(36) });
+                dados.servidores = [...lista.filter(r => r.id !== novo.id), novo];
+                gravaDados(dados);
+                return responde(res, 200, { ok: true, servidores: dados.servidores, id: novo.id });
+            }
+            if (corpo.acao === 'remover') {
+                dados.servidores = lista.filter(r => r.id !== String(corpo.id || ''));
+                gravaDados(dados);
+                return responde(res, 200, { ok: true, servidores: dados.servidores });
+            }
+            if (corpo.acao === 'preparar') {
+                const alvo = lista.find(r => r.id === String(corpo.id || ''));
+                if (!alvo) return responde(res, 404, { erro: 'Servidor não encontrado.' });
+                const r = await remoto.preparar(alvo, String(corpo.senha || ''), String(corpo.fingerprint || ''));
+                if (r.ok) espelhaRemotos([alvo], 0);
+                return responde(res, 200, r);
+            }
+        } catch (e) { return responde(res, 400, { erro: e.message }); }
+        return responde(res, 400, { erro: 'Ação inválida.' });
+    }
     if (url.pathname === '/api/conversa/mover-conta') {
         const projeto = String(corpo.projeto || ''), sessao = String(corpo.sessao || ''), nova = String(corpo.claude || '');
         if (!projeto || !/^[0-9a-f-]{36}$/i.test(sessao) || /[\\/]|\.\./.test(projeto)) return responde(res, 400, { erro: 'sessão inválida' });
@@ -2999,6 +3109,21 @@ function pastaDoTerminal(cwd) {
 
 const servidor = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
+    // Pedido que demorou mais de 8 s vai para o servidor.log (a voz, o terminal e as esperas por novidade duram de propósito)
+    const inicioPedido = Date.now();
+    res.on('finish', () => {
+        const ms = Date.now() - inicioPedido;
+        if (ms > 8000 && !/^\/(api\/voz|api\/extensoes\/eventos|api\/por-comando\/vivo|ws\/)/.test(url.pathname)) console.log(`[${new Date().toLocaleString('pt-BR')}] pedido lento: ${req.method} ${url.pathname} ${ms} ms`);
+    });
+    // Vigia da página (sendBeacon, sem cabeçalho próprio): pedidos dela presos há mais de 20 s vão para o servidor.log
+    if (url.pathname === '/api/diagnostico' && req.method === 'POST') {
+        const origem = req.headers.origin;
+        if (![`127.0.0.1:${PORTA}`, `localhost:${PORTA}`].includes(req.headers.host) || (origem && origem !== `http://localhost:${PORTA}` && origem !== `http://127.0.0.1:${PORTA}`)) { res.writeHead(403); return res.end(); }
+        let corpo = '';
+        req.on('data', (c) => { if (corpo.length < 4000) corpo += c; });
+        req.on('end', () => { console.log(`[${new Date().toLocaleString('pt-BR')}] página com pedidos presos: ${corpo.replace(/[\r\n]/g, ' ').slice(0, 1500)}`); res.writeHead(204); res.end(); });
+        return;
+    }
     if (![`127.0.0.1:${PORTA}`, `localhost:${PORTA}`].includes(req.headers.host)) {
         res.writeHead(421, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end('Host não permitido');
@@ -3083,7 +3208,7 @@ const servidor = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=86400', 'X-Content-Type-Options': 'nosniff' });
             return res.end(fs.readFileSync(arq));
         }
-        if (url.pathname.startsWith('/api/chat/') || url.pathname === '/api/auth/entrar' || url.pathname === '/api/auth/cancelar' || url.pathname === '/api/auth/codigo' || url.pathname === '/api/plugins/acao' || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/grupos', '/api/voz', '/api/terminal/externo', '/api/arquivar-auto', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta', '/api/conversa/mover-conta', '/api/economia'].includes(url.pathname)) return await rotaChat(req, res, url);
+        if (url.pathname.startsWith('/api/chat/') || url.pathname === '/api/auth/entrar' || url.pathname === '/api/auth/cancelar' || url.pathname === '/api/auth/codigo' || url.pathname === '/api/plugins/acao' || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/grupos', '/api/voz', '/api/terminal/externo', '/api/arquivar-auto', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta', '/api/conversa/mover-conta', '/api/remotos', '/api/economia'].includes(url.pathname)) return await rotaChat(req, res, url);
         if (url.pathname === '/api/auth/estado') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
             return responde(res, 200, await login.estado());
@@ -3358,7 +3483,7 @@ const automatico = automacao.inicia({
 });
 
 // Terminal por WebSocket (só da própria página, em pastas conhecidas)
-terminal.liga(servidor, { porta: PORTA, token: TOKEN, pastaPermitida: pastaDoTerminal, envDaConversa: (chave) => { const [pj, ss] = chave.split('/'); return entradaDaConversa(pj, ss) ? envDeConversa(pj, ss) : null; } });
+terminal.liga(servidor, { porta: PORTA, token: TOKEN, pastaPermitida: pastaDoTerminal, servidorRemoto: servidorRemotoPorId, envDaConversa: (chave) => { const [pj, ss] = chave.split('/'); return entradaDaConversa(pj, ss) ? envDeConversa(pj, ss) : null; } });
 
 // Só aceita conexão da própria máquina
 servidor.listen(PORTA, '127.0.0.1', () => {
